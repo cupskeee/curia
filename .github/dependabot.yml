@@ -20,6 +20,9 @@ updates:
           - "minor"
           - "patch"
 
+  # Dependabot only follows vcpkg release tags (it does not compare commit order), so it would
+  # propose moving a master-commit baseline back to the latest release. The baseline is bumped by
+  # hand (see docs/research-notes.md) until it is pinned to a release tag again.
   - package-ecosystem: "vcpkg"
     directory: "/"
     schedule:
@@ -28,3 +31,5 @@ updates:
       - "dependencies"
     commit-message:
       prefix: "build"
+    ignore:
+      - dependency-name: "github.com/microsoft/vcpkg"
