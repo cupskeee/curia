@@ -1,2 +1,3 @@
 # Developer tools pinned so local runs match CI (formatting differs between clang-format versions).
 clang-format==18.1.8
+PyYAML==6.0.3
