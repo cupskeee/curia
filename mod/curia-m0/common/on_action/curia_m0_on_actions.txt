@@ -1,0 +1,139 @@
+﻿# SPDX-License-Identifier: MIT
+# Curia Milestone 0b stub (second M0 round). THROWAWAY feasibility test, never shipped.
+# Marker: every test line starts with "CURIA_M0|" so tools/m0/check.sh finds it.
+# Purpose: pin the value forms the real export needs (research-notes 2.14, spikes/m0-results.md):
+#   * THIS-based forms for gold, a variable and script values
+#   * one probe from each iterator scope the export needs: heir, vassals, factions, wars, claims
+#   * reaching the ruler from an iterated scope (liege / liege_or_court_owner links, a saved scope inside
+#     a script value, a value precomputed in script into a variable)
+# Variables set here are also READ in script (the engine reports "set but never used" otherwise).
+# The long-line test (T4) lives in curia_m0_longlines.txt so a problem there cannot take out these probes.
+# Lines whose id ends in 0 (H0, V0, F0, W0, C0) mean "the ruler has none of that", not a failure.
+
+# Hook: recurring pulse, root scope = the playable character. First pulse comes ~11 in-game days after
+# a new game starts. Guarded to human players.
+quarterly_playable_pulse = {
+	on_actions = { curia_m0_pulse curia_m0_long }
+}
+
+curia_m0_pulse = {
+	trigger = { is_ai = no }
+	effect = {
+		save_scope_as = curia_m0b_ruler
+		set_variable = { name = curia_m0b_var value = 42 }
+		if = {
+			limit = { var:curia_m0b_var = 42 }
+			debug_log = "CURIA_M0|R1|plain|variable-read-in-script=ok"
+		}
+		debug_log_date = yes
+
+		# --- ruler scope (THIS = the ruler) ---
+		debug_log = curia_m0b_r2_name
+		debug_log = curia_m0b_r2b_name_char
+		debug_log = curia_m0b_r3_gold
+		debug_log = curia_m0b_r4_var_this
+		debug_log = curia_m0b_r5_var_makescope
+		debug_log = curia_m0b_r6_sv_this
+		debug_log = curia_m0b_r7_sv_scope
+		debug_log = curia_m0b_r8_title
+
+		# --- heir (an heir is often an unlanded child: test both liege links) ---
+		if = {
+			limit = { exists = player_heir }
+			player_heir = {
+				set_variable = { name = curia_m0b_hop value = curia_m0b_op_court }
+				debug_log = curia_m0b_h1_name
+				if = {
+					limit = { exists = liege }
+					debug_log = "CURIA_M0|H2|heir-has-liege|yes"
+					debug_log = curia_m0b_h2_liege
+					debug_log = curia_m0b_h3_op_liege
+				}
+				else = { debug_log = "CURIA_M0|H2|heir-has-liege|no" }
+				if = {
+					limit = { exists = liege_or_court_owner }
+					debug_log = "CURIA_M0|H5|heir-has-court-owner|yes"
+					debug_log = curia_m0b_h5_op_court
+				}
+				else = { debug_log = "CURIA_M0|H5|heir-has-court-owner|no" }
+				debug_log = curia_m0b_h4_op_saved
+				if = {
+					limit = { exists = var:curia_m0b_hop }
+					debug_log = "CURIA_M0|H6|heir-precomputed-var-exists|yes"
+					debug_log = curia_m0b_h6_op_precomputed
+				}
+				else = { debug_log = "CURIA_M0|H6|heir-precomputed-var-exists|no" }
+				if = {
+					limit = { any_claim = { } }
+					random_claim = { debug_log = curia_m0b_h7_claim }
+				}
+				else = { debug_log = "CURIA_M0|H7|heir-no-claims" }
+			}
+		}
+		else = { debug_log = "CURIA_M0|H0|no-player-heir" }
+
+		# --- vassals (top 2 by military strength) ---
+		if = {
+			limit = { any_vassal = { } }
+			ordered_vassal = {
+				max = 2
+				order_by = current_military_strength
+				set_variable = { name = curia_m0b_vop value = curia_m0b_op_liege }
+				debug_log = curia_m0b_v1_name
+				debug_log = curia_m0b_v2_liege
+				debug_log = curia_m0b_v3_op_liege
+				debug_log = curia_m0b_v4_op_saved
+				if = {
+					limit = { exists = var:curia_m0b_vop }
+					debug_log = "CURIA_M0|V5|vassal-precomputed-var-exists|yes"
+					debug_log = curia_m0b_v5_op_precomputed
+				}
+				else = { debug_log = "CURIA_M0|V5|vassal-precomputed-var-exists|no" }
+				if = {
+					limit = { var:curia_m0b_vop > -1000 }
+					debug_log = "CURIA_M0|V5|vassal-precomputed-var-read-ok|yes"
+				}
+				debug_log = curia_m0b_v6_gold
+				debug_log = curia_m0b_v7_title
+				if = {
+					limit = { any_claim = { } }
+					random_claim = { debug_log = curia_m0b_v8_claim }
+				}
+				else = { debug_log = "CURIA_M0|V8|vassal-no-claims" }
+			}
+		}
+		else = { debug_log = "CURIA_M0|V0|no-vassals" }
+
+		# --- factions targeting the ruler ---
+		if = {
+			limit = { any_targeting_faction = { } }
+			every_targeting_faction = {
+				debug_log = curia_m0b_f1_name
+				debug_log = curia_m0b_f1b_name_notooltip
+				debug_log = curia_m0b_f2_leader
+				debug_log = curia_m0b_f3_special
+			}
+		}
+		else = { debug_log = "CURIA_M0|F0|no-factions-targeting-ruler" }
+
+		# --- wars the ruler is in ---
+		if = {
+			limit = { any_character_war = { } }
+			every_character_war = {
+				debug_log = curia_m0b_w1_name
+				primary_attacker = { debug_log = curia_m0b_w2_attacker }
+				primary_defender = { debug_log = curia_m0b_w3_defender }
+			}
+		}
+		else = { debug_log = "CURIA_M0|W0|no-wars" }
+
+		# --- claims of the ruler ---
+		if = {
+			limit = { any_claim = { } }
+			random_claim = {
+				debug_log = curia_m0b_c1_title
+			}
+		}
+		else = { debug_log = "CURIA_M0|C0|no-claims" }
+	}
+}

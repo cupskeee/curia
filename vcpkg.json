@@ -1,0 +1,38 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+  "name": "curia",
+  "version-semver": "0.1.0",
+  "description": "In-game AI strategy advisor for Crusader Kings III (companion app).",
+  "homepage": "https://github.com/cupskeee/curia",
+  "license": "MIT",
+  "builtin-baseline": "19780d9cdf84d0944cf9a318666703b89ab6629c",
+  "dependencies": [
+    "nlohmann-json",
+    "doctest"
+  ],
+  "default-features": [
+    "app"
+  ],
+  "features": {
+    "app": {
+      "description": "Dependencies of the desktop app (window, UI, networking). Disable for core-only builds such as the sanitizer job.",
+      "dependencies": [
+        "sdl3",
+        {
+          "name": "imgui",
+          "features": [
+            "sdl3-binding",
+            "sdl3-renderer-binding"
+          ]
+        },
+        {
+          "name": "curl",
+          "default-features": false,
+          "features": [
+            "ssl"
+          ]
+        }
+      ]
+    }
+  }
+}

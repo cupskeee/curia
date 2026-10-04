@@ -1,0 +1,48 @@
+name: Set up vcpkg
+description: >
+  Checks out vcpkg at the commit pinned as builtin-baseline in vcpkg.json (so the tool and the port
+  versions always match), bootstraps it, and restores the binary cache. The calling job saves the cache
+  afterwards with actions/cache/save (an always() step), so a failed build still keeps the compiled ports.
+inputs:
+  cache-key-suffix:
+    description: Extra cache key part (usually the vcpkg triplet).
+    required: true
+outputs:
+  cache-hit:
+    description: "true if the exact cache key was restored"
+    value: ${{ steps.restore.outputs.cache-hit }}
+  cache-primary-key:
+    description: The key to save the cache under.
+    value: ${{ steps.restore.outputs.cache-primary-key }}
+runs:
+  using: composite
+  steps:
+    - name: Check out vcpkg at the pinned baseline
+      shell: bash
+      run: |
+        set -euo pipefail
+        # -rj: no trailing newline (a native jq.exe on Windows would add a carriage return)
+        baseline="$(jq -rj '."builtin-baseline"' vcpkg.json | tr -d '\r\n')"
+        [[ "$baseline" =~ ^[0-9a-f]{40}$ ]] || { echo "bad builtin-baseline in vcpkg.json: '$baseline'" >&2; exit 1; }
+        vcpkg_dir="$RUNNER_TEMP/vcpkg"
+        git init "$vcpkg_dir"
+        git -C "$vcpkg_dir" remote add origin https://github.com/microsoft/vcpkg.git
+        git -C "$vcpkg_dir" fetch --depth 1 origin "$baseline"
+        git -C "$vcpkg_dir" checkout FETCH_HEAD
+        if [ "$RUNNER_OS" = "Windows" ]; then
+          "$vcpkg_dir/bootstrap-vcpkg.bat" -disableMetrics
+        else
+          "$vcpkg_dir/bootstrap-vcpkg.sh" -disableMetrics
+        fi
+        echo "VCPKG_ROOT=$vcpkg_dir" >> "$GITHUB_ENV"
+        echo "VCPKG_DISABLE_METRICS=1" >> "$GITHUB_ENV"
+        mkdir -p "$GITHUB_WORKSPACE/.vcpkg-cache"
+        echo "VCPKG_DEFAULT_BINARY_CACHE=$GITHUB_WORKSPACE/.vcpkg-cache" >> "$GITHUB_ENV"
+    - name: Restore the vcpkg binary cache
+      id: restore
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: .vcpkg-cache
+        key: vcpkg-${{ runner.os }}-${{ inputs.cache-key-suffix }}-${{ hashFiles('vcpkg.json', 'cmake/triplets/**') }}
+        restore-keys: |
+          vcpkg-${{ runner.os }}-${{ inputs.cache-key-suffix }}-

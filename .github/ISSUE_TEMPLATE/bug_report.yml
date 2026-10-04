@@ -1,0 +1,106 @@
+name: Bug report
+description: Something in Curia does not work as documented.
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Curia is pre-alpha, so some things are expected to be missing; please check the documentation first.
+
+        **Never paste API keys, tokens or full logs into this form.** Issues are public. Paste only the few log lines that matter, and replace any key or token with `REDACTED`. Do not attach a complete CK3 `debug.log`. For security problems, use [private vulnerability reporting](https://github.com/cupskeee/curia/security/advisories/new) instead.
+  - type: input
+    id: app-version
+    attributes:
+      label: Curia app version
+      description: The version of the release you installed, or the commit hash if you built from source.
+      placeholder: "e.g. 0.1.0, or abc1234 (built from source)"
+    validations:
+      required: true
+  - type: input
+    id: mod-version
+    attributes:
+      label: Curia mod version
+      description: The version of the Curia mod you have enabled in your playset, or "not installed".
+      placeholder: "e.g. 0.1.0"
+    validations:
+      required: true
+  - type: input
+    id: ck3-version
+    attributes:
+      label: Crusader Kings III version
+      description: Shown in the bottom corner of the CK3 main menu.
+      placeholder: "e.g. 1.20.0.3"
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      description: Name, version and CPU architecture. For Linux, also say whether you run X11, XWayland or native Wayland, and whether CK3 runs natively or under Proton.
+      placeholder: "e.g. macOS 15.6 arm64; Windows 10 64-bit; Ubuntu 24.04 X11"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Numbered steps, starting from launching the app.
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: display-mode
+    attributes:
+      label: CK3 display mode
+      description: Graphics settings, "Display mode".
+      options:
+        - Fullscreen
+        - Windowed
+        - Not sure
+    validations:
+      required: true
+  - type: dropdown
+    id: frequency
+    attributes:
+      label: How often does it happen?
+      options:
+        - Every time
+        - Sometimes
+        - Once
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+      description: What you expected to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: What happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log lines (optional)
+      description: A short excerpt of the Curia app log (once the app writes one) only. Remove API keys, tokens and personal paths first. Do not paste whole log files.
+      render: shell
+    validations:
+      required: false
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and did not find this bug reported.
+          required: true
+        - label: I removed all API keys, tokens and other secrets from everything I pasted here.
+          required: true

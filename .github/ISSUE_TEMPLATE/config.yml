@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability (private)
+    url: https://github.com/cupskeee/curia/security/advisories/new
+    about: Use private vulnerability reporting for anything security related, such as API key leakage or storage. Do not open a public issue for these.
+  - name: Documentation
+    url: https://github.com/cupskeee/curia/tree/main/docs
+    about: Read the requirements, architecture, milestones and research notes before filing a question or request.

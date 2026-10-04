@@ -1,0 +1,21 @@
+# Build output and dependencies
+/build/
+/vcpkg_installed/
+/.vcpkg-cache/
+CMakeUserPresets.json
+
+# Local-only reference material: Paradox script dumps and raw game logs. NEVER commit these.
+/reference/
+
+# Local assistant configuration and notes (never committed)
+/CLAUDE.md
+/.claude/
+
+# Editors, OS and tool litter
+.DS_Store
+.idea/
+.vscode/
+.playwright-mcp/
+*.swp
+.venv*/
+__pycache__/

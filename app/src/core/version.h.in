@@ -1,0 +1,8 @@
+// SPDX-License-Identifier: MIT
+// Generated from version.h.in by CMake. Do not edit.
+#pragma once
+
+#define CURIA_VERSION_STRING "@PROJECT_VERSION@"
+#define CURIA_VERSION_MAJOR @PROJECT_VERSION_MAJOR@
+#define CURIA_VERSION_MINOR @PROJECT_VERSION_MINOR@
+#define CURIA_VERSION_PATCH @PROJECT_VERSION_PATCH@

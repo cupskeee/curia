@@ -1,0 +1,26 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{yml,yaml,json}]
+indent_size = 2
+
+[CMakeLists.txt]
+indent_size = 4
+
+[*.cmake]
+indent_size = 4
+
+[*.md]
+trim_trailing_whitespace = false
+
+# CK3 mod files follow the game's own conventions: tabs, and a UTF-8 BOM on script and localization files.
+[mod/**.{txt,yml}]
+indent_style = tab
+charset = utf-8-bom

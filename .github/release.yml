@@ -1,0 +1,24 @@
+changelog:
+  exclude:
+    labels:
+      - skip-release
+  categories:
+    - title: Breaking changes
+      labels:
+        - breaking-change
+    - title: Features
+      labels:
+        - enhancement
+    - title: Fixes
+      labels:
+        - bug
+    - title: Documentation
+      labels:
+        - documentation
+    - title: Build and CI
+      labels:
+        - ci
+        - dependencies
+    - title: Other
+      labels:
+        - "*"

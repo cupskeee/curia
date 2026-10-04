@@ -1,0 +1,112 @@
+name: Tester report
+description: Report how Curia behaves on Windows, Linux or an Intel Mac. The maintainer can only test on an Apple Silicon Mac.
+title: "[Tester]: "
+labels: ["tester-report", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for testing. The maintainer can only test on macOS (Apple Silicon), so reports from Windows, Linux and Intel Mac players are the only way to learn how the overlay, log reading and key storage behave on your system.
+
+        Curia is pre-alpha: there is no release yet, and some features you may expect do not exist. Report what you actually observed, including "nothing happened".
+
+        **Never paste API keys, tokens or full logs into this form.** Issues are public. Paste only a few relevant lines and replace any key or token with `REDACTED`.
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows
+        - Linux (X11 or XWayland)
+        - Linux (native Wayland)
+        - macOS (Intel)
+        - Other (say which in the OS version field)
+    validations:
+      required: true
+  - type: input
+    id: os-version
+    attributes:
+      label: OS version
+      description: Include the distribution for Linux, and whether CK3 runs natively or under Proton. Mention a hybrid or multi-GPU setup if you have one.
+      placeholder: "e.g. Windows 10 22H2 64-bit; Ubuntu 24.04, CK3 via Proton"
+    validations:
+      required: true
+  - type: input
+    id: ck3-version
+    attributes:
+      label: Crusader Kings III version
+      description: Shown in the bottom corner of the CK3 main menu.
+      placeholder: "e.g. 1.20.0.3"
+    validations:
+      required: true
+  - type: input
+    id: mod-version
+    attributes:
+      label: Curia mod version
+      description: The version of the mod enabled in your playset, or "not installed".
+      placeholder: "e.g. 0.1.0"
+    validations:
+      required: true
+  - type: input
+    id: app-version
+    attributes:
+      label: Curia app version
+      description: The release you installed, or the commit hash if you built from source.
+      placeholder: "e.g. 0.1.0, or abc1234 (built from source)"
+    validations:
+      required: true
+  - type: dropdown
+    id: display-mode
+    attributes:
+      label: CK3 display mode
+      description: Found in the CK3 settings under graphics or display.
+      options:
+        - Fullscreen
+        - Windowed
+        - Not sure
+    validations:
+      required: true
+  - type: dropdown
+    id: overlay-works
+    attributes:
+      label: Does the overlay work?
+      description: Does the Curia window appear above CK3, accept clicks and typing, and return control to the game when closed?
+      options:
+        - "Yes"
+        - Partly
+        - "No"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps you followed
+      description: Numbered steps, starting from launching CK3 and Curia.
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: Result
+      description: What happened. Say which parts worked and which did not (window visible, clicks, typing, focus return, anything else).
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log excerpt (optional)
+      description: A few relevant lines from the Curia app log. Do not paste API keys or tokens, and do not paste whole log files or CK3's debug.log. Replace any secret with REDACTED.
+      render: shell
+    validations:
+      required: false
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Before submitting
+      options:
+        - label: I removed all API keys, tokens and other secrets from everything I pasted here.
+          required: true

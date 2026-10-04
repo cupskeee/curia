@@ -1,0 +1,25 @@
+﻿# SPDX-License-Identifier: MIT
+# Curia M0/M0b stub: script values used by the value-resolution tests.
+
+# A constant, readable from any scope.
+curia_m0_const = 1234
+
+# The current scope's gold (character scope).
+curia_m0_gold_value = {
+	value = gold
+}
+
+# Opinion of the current character towards their liege (reaching the ruler through a scope link).
+curia_m0b_op_liege = {
+	value = "opinion(liege)"
+}
+
+# Opinion of the current character towards the ruler saved by the pulse (saved scope inside a script value).
+curia_m0b_op_saved = {
+	value = "opinion(scope:curia_m0b_ruler)"
+}
+
+# Opinion towards the court owner (for an unlanded heir/courtier, whose liege link is usually empty).
+curia_m0b_op_court = {
+	value = "opinion(liege_or_court_owner)"
+}

@@ -1,0 +1,27 @@
+# Starter set. Only the checks in WarningsAsErrors fail CI; the rest are warnings to work down over time.
+Checks: >
+  -*,
+  bugprone-*,
+  clang-analyzer-*,
+  concurrency-*,
+  misc-*,
+  modernize-*,
+  performance-*,
+  portability-*,
+  readability-*,
+  cppcoreguidelines-slicing,
+  cppcoreguidelines-pro-type-cstyle-cast,
+  cppcoreguidelines-init-variables,
+  -bugprone-easily-swappable-parameters,
+  -modernize-use-trailing-return-type,
+  -readability-magic-numbers,
+  -readability-identifier-length,
+  -readability-function-cognitive-complexity,
+  -misc-non-private-member-variables-in-classes,
+  -misc-include-cleaner
+WarningsAsErrors: >
+  bugprone-use-after-move,
+  bugprone-unchecked-optional-access,
+  bugprone-dangling-handle,
+  clang-analyzer-core.*
+HeaderFilterRegex: '.*/curia/app/(src|tools|tests)/.*'
