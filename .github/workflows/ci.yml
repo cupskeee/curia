@@ -73,7 +73,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends pkg-config autoconf autoconf-archive automake libtool \
+          sudo apt-get install -y --no-install-recommends pkg-config autoconf autoconf-archive automake libtool libltdl-dev \
             libx11-dev libxext-dev libxft-dev libxkbcommon-dev libwayland-dev wayland-protocols \
             libegl1-mesa-dev libibus-1.0-dev xvfb xauth
       - uses: ./.github/actions/setup-vcpkg
