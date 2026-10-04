@@ -1,6 +1,6 @@
 # Curia milestones
 
-Status: draft v2, 2026-10-04 (owner decisions of 2026-10-04 applied). Requirements: `requirements.md`. Design: `architecture.md`. Spike questions and evidence: `research-notes.md` (§5).
+Status: draft v2, 2026-10-04 (owner decisions of 2026-10-04 applied; M2 order and scope updated 2026-10-05). Requirements: `requirements.md`. Design: `architecture.md`. Spike questions and evidence: `research-notes.md` (§5).
 
 **Who tests what.** The owner can test on **macOS only** (arm64, macOS 26.5.1; CK3 1.20.0.3 installed locally). Legend:
 - **[CI]** verified automatically on Windows + macOS + Linux.
@@ -26,7 +26,7 @@ Spike results are written to `docs/spikes/<name>.md`; answers are copied back in
 | 7 | Packaging and publishing (v1.0 release) | partly | OWNER-MAC; Windows/Linux TESTER |
 | 8 | Agent Mode (post-v1) | partly | OWNER-MAC |
 
-Order: **M0 first and alone.** M0 gates all C++ (D9). After M0: M1 → M3 (cheapest riskiest-first game checks) → M2 → M4 → M5 → M6a → M7. M2 and M3 are independent and can be swapped or interleaved.
+Order: **M0 first and alone.** M0 gates all C++ (D9). After M0: M1 → M2 (time-boxed macOS overlay spike; owner decision 2026-10-05, originally M3 was first) → M3 (cheapest riskiest-first game checks) → M4 → M5 → M6a → M7. M2 and M3 are independent and can be swapped or interleaved.
 
 ---
 
@@ -80,22 +80,26 @@ Files (committed): `README.md` (install/usage per OS, troubleshooting, the one-l
 6. CI job structure: build/test matrix, `lint` (clang-format check with a pinned version; scan, version and mod lint), `sanitizers and clang-tidy` (Linux, ASan+UBSan on the unit tests, core only), and an aggregator job named **`CI result`** (`if: always()`, fails unless every needed job succeeded). The Conventional Commits PR-title lint is a separate workflow and required check **`PR title`** (it must re-run on title edits). No `paths:` filters on required workflows. Third-party actions pinned to SHAs; workflow `permissions:` read-only by default.
 7. Repository-standards files above exist and pass a lint (YAML valid; issue forms accepted by GitHub); [MANUAL-GH] checklist ticked; **spikes:** a scratch PR proves the ruleset admin bypass and the `CI result` aggregator behave as intended (a deliberately failing matrix leg turns `CI result` red).
 8. No file under `reference/` or from Paradox is tracked (CI check); a CI step greps for engine-line patterns and API-key-shaped strings (test fixtures use obviously fake keys).
-9. Dependabot is configured for github-actions and vcpkg; the first vcpkg baseline PR goes green in CI (spike).
+9. Dependabot is configured for github-actions; its first vcpkg PR (#1) proposed an older release tag, so Dependabot is told to ignore the vcpkg baseline and the baseline is bumped by hand (research-notes C21, §4.2).
 
 Tests: [CI], [LOCAL], [MANUAL-GH]. Owner: run the build on the Mac (smoke).
 
 **Status (2026-10-04): implemented; CI is green on GitHub (run 37215391227, third attempt) on Windows, macOS arm64, macOS x86_64 + universal binary and Linux x64.** The first run failed on two setup mistakes (PyYAML not pinned for the lint job; Linux system packages), the second on one more (`libltdl-dev`); all were CI-recipe fixes, not code defects. Cold builds took 90–270 s per OS, warm macOS builds about 40 s (vcpkg binary cache works). The `macOS universal binary` job merged both slices with `lipo` and ran them (arm64, x86_64 under the runner's Rosetta, `--smoke`).
 - Verified on the owner's Mac (arm64, macOS 26.5.1): clean build with `-Werror`; 9 unit tests, headless smoke test, idle test and HTTPS test pass; the idle loop drew no frames and used the same CPU time for a 2 s and a 20 s idle run (0.14 s in both, i.e. about zero while idle; peak RSS about 88 MB); the x86_64 slice cross-builds, merges with `lipo` into a 7.4 MB universal binary and passes `--version` and `--smoke` under Rosetta (criterion 2).
 - Verified in an Ubuntu 24.04 container (arm64 Linux, so an arm64 copy of the Linux triplet was used): the exact CI recipe (shallow vcpkg fetch of the pinned baseline, trimmed apt list, SDL3 from vcpkg, GCC 13 `-O2 -Werror`) builds, and all 11 tests pass under `xvfb-run`, including the idle test and HTTPS with default CA handling. All sources also compile cleanly with GCC 13 `-Werror`.
-- **Verified by CI after the first pushes:** Windows (VS 2022 generator, static CRT, `-Werror` on MSVC, unit/smoke/idle/HTTPS tests), the x86_64 Linux triplet, the cache, artifacts and the `CI result` aggregate, clang-tidy, and Dependabot's config. **Still unverified:** the `PR title` workflow and the dependency-review job (both only run on pull requests), issue-form acceptance by GitHub, and the branch ruleset and Actions settings ([MANUAL-GH]).
+- **Verified by CI after the first pushes:** Windows (VS 2022 generator, static CRT, `-Werror` on MSVC, unit/smoke/idle/HTTPS tests), the x86_64 Linux triplet, the cache, artifacts and the `CI result` aggregate, clang-tidy, and Dependabot's config. The `PR title` workflow, the dependency-review job and the branch ruleset were then exercised on pull requests (#2, #3: a bad title failed the check, valid ones passed, merges went through the ruleset). **Still unverified:** issue-form acceptance by GitHub.
 - Deferred, recorded: the event loop draws only after events, so time-driven ImGui features (text-caret blink, held-button repeat, tooltip delays) will need `SDL_WaitEventTimeout` while such an item is active (M4); the `IRenderBackend` seam will take options and own window flags when the transparent overlay needs them (M2); Windows user-folder lookup should use `SHGetKnownFolderPath` (M3).
 
 ## M2. Overlay spike
-Transparent always-on-top window over CK3 on Windows and macOS. macOS fullscreen Spaces is the biggest risk (C1). Target mode: CK3's default **Fullscreen** (borderless underneath per a 2020 Windows player report, unverified on the Mac), fallback **Windowed** (D13). Because a macOS overlay in VOTC-CE is unconfirmed, M2 follows an explicit fallback ladder (FR-OVL-8): (1) overlay over Fullscreen; if that can't appear, (2) overlay with CK3 Windowed; if that fails, (3) a normal companion window (e.g. on a second monitor). The result records which rung works.
+Transparent always-on-top window over CK3 on Windows and macOS. macOS fullscreen Spaces is the biggest risk (C1). Target mode: CK3's default **Fullscreen** (on the Mac a native macOS Space, owner-observed 2026-10-05; the "borderless underneath" reports are not Mac-specific, C19/C26), fallback **Windowed** (D13). Because no macOS overlay over CK3 is confirmed anywhere (VOTC-CE: C25; the separate VOTC org repo: claimed in commit messages only, C33), M2 follows an explicit fallback ladder (FR-OVL-8): (1) overlay over Fullscreen; if that can't appear, (2) overlay with CK3 Windowed; if that fails, (3) a normal companion window (e.g. on a second monitor). The result records which rung works.
 
-**First step [OWNER-MAC]:** the owner reports the display modes CK3 offers on the Mac (the local `pdx_settings.txt` has a `display_mode` setting currently `fullscreen`, plus separate fullscreen/windowed resolutions, but the list of options isn't there) and whether Fullscreen uses a native macOS Space or a borderless window.
+**First step [OWNER-MAC]: done (2026-10-05).** Graphics offers **Fullscreen** and **Windowed** (set to Fullscreen); Fullscreen is a **native macOS Space** (CK3 appears as its own desktop in Mission Control). The primary M2 target is therefore the native-Space case, with Windowed as the first fallback.
 
-Work: macOS Objective-C++ in `platform/mac` (Accessory policy, non-activating `NSPanel`, `screenSaver` level, collection-behaviour combinations from the spike list; re-read Apple DTS thread 826308 first), transparent `SDL_Renderer`+ImGui window, focus take/return, Carbon hotkey, tray; Windows equivalents (topmost, `WS_EX_NOACTIVATE` toggling, `SetForegroundWindow` return, `RegisterHotKey`); game-window finder. A plain always-on-top chat window is the guaranteed fallback on every OS; an attached overlay is the goal where it works (the same fallback VOTC-CE added for Linux/Proton).
+**Scope (owner decision 2026-10-05):** one time-boxed macOS session covering criteria 1–5 and 8, plus a stub scripted-widget probe for T7 in the same session. Windows and Linux (criteria 6–7) stay CI plus tester checklist.
+
+**Proposed (in `docs/spikes/m2-checklist.md`, pending the owner's confirmation):** the experiment order and stop rules. E3 (does the panel recipe appear over the native Space at all) decides the Fullscreen experiments E4–E7; if it fails at every level and flag combination tried, record that, skip E4–E7, and go on to the Windowed rung. The hotkey, game-detection and tray experiments (E8, E9, E11) do not depend on the overlay being visible and run regardless. The checklist also lists what must be built before the session (the macOS probe and the stub mod; not yet written).
+
+Work: macOS Objective-C++ in `platform/mac` (Accessory policy, non-activating `NSPanel`, `screenSaver` level, collection-behaviour combinations from the spike list; Apple DTS thread 826308 re-read 2026-10-05; the native recipe and the SDL 3.4.18 facts are in research-notes §2.5; wrapped-`NSPanel` and key-input behaviour are the main unknowns), transparent `SDL_Renderer`+ImGui window, focus take/return, Carbon hotkey, tray; Windows equivalents (topmost, `WS_EX_NOACTIVATE` toggling, `SetForegroundWindow` return, `RegisterHotKey`); game-window finder. A plain always-on-top chat window is the guaranteed fallback on every OS; an attached overlay is the goal where it works (the same fallback VOTC-CE added for Linux/Proton).
 
 Acceptance criteria:
 1. **macOS [OWNER-MAC]:** for each CK3 display mode the Mac offers, a table records whether the overlay is visible above CK3, is clickable, takes typed input, and where focus lands on close. The supported mode(s) are documented; modes that cannot work are listed with the reason. **The fallback ladder is walked in order and the working rung is recorded:** (1) overlay over Fullscreen, (2) overlay with CK3 Windowed, (3) normal companion window.
@@ -116,7 +120,7 @@ All [OWNER-MAC] in game. The real mod skeleton (`mod/curia/`), a test protocol s
 Test order:
 1. **T10** `script_docs` / `dump_data_types` behaviour on the Mac (throwaway game); populate local `reference/ck3/`.
 2. **T3–T5** flush latency, line format/length/charset, truncation at launch. (The owner's `debug.log` already shows the engine line shape: bracketed time, level, source file and line, then text; multi-line entries exist.)
-3. **T7** scripted-widget button: visible, clickable, root scope = player, behaviour in each display mode and on pause.
+3. **T7** scripted-widget button: visible, clickable, root scope = player, behaviour in each display mode and on pause. (A first pass runs as a stub-widget probe in the M2 session; M3 repeats it with the real mod and decides.)
 4. **T8** bytes per export; total bytes appended per hour of normal play; cap reproduction (long run).
 5. **T9** optional clipboard-vs-log comparison.
 6. **T11/T12** metadata/launcher behaviour; local ck3-tiger pass (`--game <install path>`).
