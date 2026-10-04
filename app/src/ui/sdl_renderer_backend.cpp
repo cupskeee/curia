@@ -4,6 +4,8 @@
 #include <imgui_impl_sdl3.h>
 #include <imgui_impl_sdlrenderer3.h>
 
+#include <array>
+#include <cstdint>
 #include <cstdio>
 
 #include "ui/render_backend.h"
@@ -50,10 +52,14 @@ public:
         ImGui::Render();
         const ImGuiIO& io = ImGui::GetIO();
         SDL_SetRenderScale(renderer_, io.DisplayFramebufferScale.x, io.DisplayFramebufferScale.y);
-        SDL_SetRenderDrawColor(renderer_, 24, 20, 16, 255);
+        SDL_SetRenderDrawColor(renderer_, clear_[0], clear_[1], clear_[2], clear_[3]);
         SDL_RenderClear(renderer_);
         ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer_);
         SDL_RenderPresent(renderer_);
+    }
+
+    void setClearColor(std::uint8_t r, std::uint8_t g, std::uint8_t b, std::uint8_t a) override {
+        clear_ = {r, g, b, a};
     }
 
     void shutdown() override {
@@ -75,6 +81,7 @@ public:
 
 private:
     SDL_Renderer* renderer_ = nullptr;
+    std::array<std::uint8_t, 4> clear_ = {24, 20, 16, 255};
     bool initialised_ = false;
 };
 

@@ -1,0 +1,16 @@
+﻿# SPDX-License-Identifier: MIT
+# Curia M2 probe (T7). THROWAWAY, never shipped.
+# One marker line when a new game starts, so the helper can tell the mod loaded. This hook fires at the start of a
+# new game only (the game has no on-load hook for existing saves), so run the probe in a NEW throwaway game.
+# Marker: CURIAPROBE1| (not the real CURIA1| marker). debug_log_date adds a separate, unmarked DATE line after it.
+
+on_game_start_after_lobby = {
+	on_actions = { curia_m2_probe_load }
+}
+
+curia_m2_probe_load = {
+	effect = {
+		debug_log = "CURIAPROBE1|T7|load|mod=curia_m2_probe"
+		debug_log_date = yes
+	}
+}
