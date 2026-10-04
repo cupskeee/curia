@@ -69,12 +69,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Linux system packages for SDL3 (X11, Wayland, EGL, ibus) and xvfb
+      - name: Linux system packages for SDL3 (X11, Wayland, EGL, ibus), vcpkg's autotools ports and xvfb
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends pkg-config libx11-dev libxext-dev libxft-dev \
-            libxkbcommon-dev libwayland-dev wayland-protocols libegl1-mesa-dev libibus-1.0-dev xvfb xauth
+          sudo apt-get install -y --no-install-recommends pkg-config autoconf autoconf-archive automake libtool \
+            libx11-dev libxext-dev libxft-dev libxkbcommon-dev libwayland-dev wayland-protocols \
+            libegl1-mesa-dev libibus-1.0-dev xvfb xauth
       - uses: ./.github/actions/setup-vcpkg
         id: vcpkg
         with:
