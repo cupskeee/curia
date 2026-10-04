@@ -5,7 +5,7 @@
   "description": "In-game AI strategy advisor for Crusader Kings III (companion app).",
   "homepage": "https://github.com/cupskeee/curia",
   "license": "MIT",
-  "builtin-baseline": "19780d9cdf84d0944cf9a318666703b89ab6629c",
+  "builtin-baseline": "9e593bb18ea69cc5095e012465dcd675a822ed0d",
   "dependencies": [
     "nlohmann-json",
     "doctest"
