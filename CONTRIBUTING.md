@@ -52,8 +52,10 @@ You need:
   is the only way third-party code enters the project. The vcpkg triplets in
   `cmake/triplets/` are release-only, so only Release and RelWithDebInfo builds link.
 - Ubuntu 24.04 system packages for SDL3 (the same list CI uses):
-  `sudo apt-get install pkg-config libx11-dev libxext-dev libxft-dev libxkbcommon-dev
-  libwayland-dev wayland-protocols libegl1-mesa-dev libibus-1.0-dev xvfb xauth`
+  `sudo apt-get install pkg-config autoconf autoconf-archive automake libtool libltdl-dev
+  libx11-dev libxext-dev libxft-dev libxkbcommon-dev libwayland-dev wayland-protocols
+  libegl1-mesa-dev libibus-1.0-dev xvfb xauth` (the autotools packages and `libltdl-dev` are for
+  vcpkg's D-Bus/systemd ports, which SDL3's ibus feature pulls in on x86_64)
 - Python 3, for the helper scripts under `tools/`. The `.sh` scripts need bash and `jq`
   (Git Bash on Windows).
 
