@@ -1,0 +1,9 @@
+{
+  "name": "Curia",
+  "id": "curia",
+  "version": "0.1.0",
+  "supported_game_version": "1.20.*",
+  "short_description": "Curia companion data export: writes a read-only realm snapshot to the game log for the Curia app. Changes nothing in the game.",
+  "tags": ["Utilities"],
+  "relationships": []
+}

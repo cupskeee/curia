@@ -1,0 +1,23 @@
+﻿# SPDX-License-Identifier: MIT
+# Curia (M3 spike): the two scripted GUIs run by the HUD buttons (gui/curia_widget.gui).
+# The GUI passes the player as root scope, so the effects run as the player character. Read-only: the effects
+# only write debug_log lines and Curia's own global counters; nothing in the game state is changed.
+# curia_probe_mode (0 or 1) tells curia_export_run (common/scripted_effects/curia_export.txt) whether to add the probe section.
+
+curia_run_advisor = {
+	scope = character
+
+	effect = {
+		set_global_variable = { name = curia_probe_mode value = 0 }
+		curia_export_run = yes
+	}
+}
+
+curia_run_probes = {
+	scope = character
+
+	effect = {
+		set_global_variable = { name = curia_probe_mode value = 1 }
+		curia_export_run = yes
+	}
+}

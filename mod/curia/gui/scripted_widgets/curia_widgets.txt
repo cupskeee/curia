@@ -1,0 +1,5 @@
+﻿# SPDX-License-Identifier: MIT
+# Curia (M3 spike): registers the HUD widget without touching any vanilla GUI file.
+# Form from the game's own note (gui/scripted_widgets/_scripted_widgets.info): "<gui file> = <widget name>".
+# The window is defined in gui/curia_widget.gui.
+gui/curia_widget.gui = curia_widget

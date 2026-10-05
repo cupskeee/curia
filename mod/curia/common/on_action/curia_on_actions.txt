@@ -1,0 +1,14 @@
+﻿# SPDX-License-Identifier: MIT
+# Curia (M3 spike): one marker line when a NEW game starts, so the app (and the owner) can tell the mod is loaded.
+# Pattern proven in the M0/M2 stubs: on_game_start_after_lobby with a custom on_action and a literal string.
+# No on-load hook was found in the game's on_action files, so loading an existing save is not expected to print it (not tested).
+
+on_game_start_after_lobby = {
+	on_actions = { curia_on_game_start }
+}
+
+curia_on_game_start = {
+	effect = {
+		debug_log = "CURIA1|0|LOAD|mod=curia|version=0.1.0"
+	}
+}

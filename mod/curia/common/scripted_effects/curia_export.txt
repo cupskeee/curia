@@ -1,0 +1,140 @@
+﻿# SPDX-License-Identifier: MIT
+# Curia (M3 spike): the realm export. Runs as the player character (root of the scripted GUI) and writes one
+# debug_log call per output line. Read-only: the only state it touches is Curia's own global counters.
+#
+# Frame (docs/architecture.md section 4; every line starts with CURIA1| and the snapshot id):
+#   CURIA1|<snap>|BEGIN|<date>|<ruler>|<ruler primary title>|<probe mode 0/1>
+#   CURIA1|<snap>|FIN|<gold>
+#   CURIA1|<snap>|HEIR|<name>|<opinion of ruler>|<has liege 0/1>|<landed 0/1>      or  HEIR|none
+#   CURIA1|<snap>|VASSAL|<rank>|<name>|<primary title>|<gold>|<opinion of ruler>    or  VASSAL|0|none
+#   CURIA1|<snap>|WAR|<n>|NAME|<war name>   then  WAR|<n>|ATTACKER|<name>   and  WAR|<n>|DEFENDER|<name>   or  WAR|0|none
+#   CURIA1|<snap>|CLAIM|<n>|<title>                                                  or  CLAIM|0|none
+#   CURIA1|<snap>|PROBE|<name>|<value>     (only when curia_probe_mode = 1; curia_probes.txt)
+#   CURIA1|<snap>|END|<line count>         (all lines of the frame, BEGIN and END included)
+# Fields are separated by |. Only value forms proven in M0/M0b are used here; candidate forms live in curia_probes.txt.
+# Every global variable set here is also read in script (by a script value in curia_values.txt), so the engine
+# does not report a variable that is set but never used. No effect here logs an error in normal use.
+#
+# Each section is its own effect, so a section can be skipped by removing one line from curia_export_run.
+# Counters: curia_snap_id (frame id, +1 per export), curia_export_lines (+1 before every debug_log call),
+# curia_rank, curia_war_index, curia_claim_index (numbering inside a section), curia_probe_mode (set by the scripted GUI).
+
+curia_export_run = {
+	curia_export_begin = yes
+	curia_export_fin = yes
+	curia_export_heir = yes
+	curia_export_vassals = yes
+	curia_export_wars = yes
+	curia_export_claims = yes
+	if = {
+		limit = {
+			exists = global_var:curia_probe_mode
+			global_var:curia_probe_mode = 1
+		}
+		curia_export_probes = yes
+	}
+	curia_export_end = yes
+}
+
+curia_export_begin = {
+	if = {
+		limit = { exists = global_var:curia_snap_id }
+		change_global_variable = { name = curia_snap_id add = 1 }
+	}
+	else = {
+		set_global_variable = { name = curia_snap_id value = 1 }
+	}
+	# BEGIN is line 1 of the frame.
+	set_global_variable = { name = curia_export_lines value = 1 }
+	set_global_variable = { name = curia_rank value = 0 }
+	set_global_variable = { name = curia_war_index value = 0 }
+	set_global_variable = { name = curia_claim_index value = 0 }
+	debug_log = curia_line_begin
+}
+
+curia_export_fin = {
+	change_global_variable = { name = curia_export_lines add = 1 }
+	debug_log = curia_line_fin
+}
+
+curia_export_heir = {
+	if = {
+		limit = { exists = player_heir }
+		player_heir = {
+			change_global_variable = { name = curia_export_lines add = 1 }
+			debug_log = curia_line_heir
+		}
+	}
+	else = {
+		change_global_variable = { name = curia_export_lines add = 1 }
+		debug_log = curia_line_heir_none
+	}
+}
+
+curia_export_vassals = {
+	if = {
+		limit = { any_vassal = { } }
+		ordered_vassal = {
+			max = curia_max_vassals
+			order_by = current_military_strength
+			change_global_variable = { name = curia_rank add = 1 }
+			change_global_variable = { name = curia_export_lines add = 1 }
+			debug_log = curia_line_vassal
+		}
+	}
+	else = {
+		change_global_variable = { name = curia_export_lines add = 1 }
+		debug_log = curia_line_vassal_none
+	}
+}
+
+# Three lines per war: the war name is only reachable from the war scope, the attacker and defender names only from their
+# own scopes (value forms proven in M0b). The app joins them on <n>. The ruler is one of the two sides.
+curia_export_wars = {
+	if = {
+		limit = { any_character_war = { } }
+		every_character_war = {
+			change_global_variable = { name = curia_war_index add = 1 }
+			change_global_variable = { name = curia_export_lines add = 1 }
+			debug_log = curia_line_war_name
+			primary_attacker = {
+				change_global_variable = { name = curia_export_lines add = 1 }
+				debug_log = curia_line_war_attacker
+			}
+			primary_defender = {
+				change_global_variable = { name = curia_export_lines add = 1 }
+				debug_log = curia_line_war_defender
+			}
+		}
+	}
+	else = {
+		change_global_variable = { name = curia_export_lines add = 1 }
+		debug_log = curia_line_war_none
+	}
+}
+
+# Claims of the ruler. ordered_claim (with max and order_by = tier, as vanilla's own suggestions use it) is the iterator
+# that caps the number of lines; it has the same title scope as the proven random_claim, and the title name form is the
+# one proven there. ordered_claim itself was not run in M0b.
+curia_export_claims = {
+	if = {
+		limit = { any_claim = { } }
+		ordered_claim = {
+			max = curia_max_claims
+			order_by = tier
+			change_global_variable = { name = curia_claim_index add = 1 }
+			change_global_variable = { name = curia_export_lines add = 1 }
+			debug_log = curia_line_claim
+		}
+	}
+	else = {
+		change_global_variable = { name = curia_export_lines add = 1 }
+		debug_log = curia_line_claim_none
+	}
+}
+
+curia_export_end = {
+	# END counts itself.
+	change_global_variable = { name = curia_export_lines add = 1 }
+	debug_log = curia_line_end
+}
