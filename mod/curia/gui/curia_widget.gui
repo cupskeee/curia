@@ -1,0 +1,34 @@
+# SPDX-License-Identifier: MIT
+# Curia (M3 spike): two small HUD buttons, bottom left, to the right of the bottom-left HUD bar.
+#   Advisor       runs the scripted GUI curia_run_advisor (the export).
+#   Curia probes  runs the scripted GUI curia_run_probes (the export plus the unproven probe lines; spike only).
+# Both pass the player as root scope. The widget is registered in gui/scripted_widgets/curia_widgets.txt, so no
+# vanilla GUI file is overridden. Position and size of the first button are the M2 stub's (clear of the HUD in
+# the owner's Fullscreen screenshot); the second button sits to its right (not yet seen on screen).
+
+widget = {
+	name = "curia_widget"
+	layer = hud_layer
+	parentanchor = bottom|left
+	widgetanchor = bottom|left
+	position = { 570 -12 }
+	size = { 296 33 }
+	visible = "[IsDefaultGUIMode]"
+
+	button_standard = {
+		name = "curia_advisor_button"
+		size = { 140 33 }
+		text = "curia_button_advisor"
+		tooltip = "curia_button_advisor_tt"
+		onclick = "[GetScriptedGui('curia_run_advisor').Execute( GuiScope.SetRoot( GetPlayer.MakeScope ).End )]"
+	}
+
+	button_standard = {
+		name = "curia_probes_button"
+		position = { 148 0 }
+		size = { 148 33 }
+		text = "curia_button_probes"
+		tooltip = "curia_button_probes_tt"
+		onclick = "[GetScriptedGui('curia_run_probes').Execute( GuiScope.SetRoot( GetPlayer.MakeScope ).End )]"
+	}
+}

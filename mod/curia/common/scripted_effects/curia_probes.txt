@@ -1,0 +1,185 @@
+﻿# SPDX-License-Identifier: MIT
+# Curia (M3 spike): the probe section, run only by the "Curia probes" button (curia_probe_mode = 1), inside the frame
+# between the last export section and END. Every line is CURIA1|<snap>|PROBE|<name>|<value>.
+# Each line tests ONE candidate form that was NOT proven in M0/M0b, so a failure is isolated to its own line: a wrong
+# guess should print an empty value or 0, and the other lines still print.
+#
+# Turn probes off:
+#   * everything: remove the line "curia_export_probes = yes" from curia_export_run (curia_export.txt);
+#   * one group: remove its line from curia_export_probes below;
+#   * one candidate: remove its change_global_variable + debug_log pair.
+# Candidates that could raise a script error rather than print an empty value (each is isolated in its own group):
+#   * faction group: faction_leader / faction_target links (guarded with exists, so no error expected) and the faction-scope
+#     script values (curia_probe_faction_*), because faction scope forms were never run;
+#   * script values that iterate (every_vassal, every_vassal_or_below, every_claim, every_faction_member) and the
+#     value-only triggers (monthly_character_income, yearly_character_income, realm_size, tier, faction_power,
+#     faction_discontent): valid in the game's own files, never run here.
+# A data function that does not exist would be reported when the localization is loaded (error.log); the names below are
+# the ones the game's own GUI and localization files use.
+
+curia_export_probes = {
+	curia_probe_ruler = yes
+	curia_probe_heir = yes
+	curia_probe_vassal = yes
+	curia_probe_claim = yes
+	curia_probe_war = yes
+	curia_probe_factions = yes
+}
+
+# Ruler scope.
+curia_probe_ruler = {
+	# Is a global-variable script value readable from the current scope (the main lines use EmptyScope)?
+	change_global_variable = { name = curia_export_lines add = 1 }
+	debug_log = curia_probe_snap_id_this
+	change_global_variable = { name = curia_export_lines add = 1 }
+	debug_log = curia_probe_ruler_id
+	change_global_variable = { name = curia_export_lines add = 1 }
+	debug_log = curia_probe_ruler_first_name
+	change_global_variable = { name = curia_export_lines add = 1 }
+	debug_log = curia_probe_ruler_income_monthly
+	change_global_variable = { name = curia_export_lines add = 1 }
+	debug_log = curia_probe_ruler_income_yearly
+	change_global_variable = { name = curia_export_lines add = 1 }
+	debug_log = curia_probe_ruler_strength
+	change_global_variable = { name = curia_export_lines add = 1 }
+	debug_log = curia_probe_ruler_realm_size
+	change_global_variable = { name = curia_export_lines add = 1 }
+	debug_log = curia_probe_ruler_landless_ruler
+	change_global_variable = { name = curia_export_lines add = 1 }
+	debug_log = curia_probe_vassal_count_trigger
+	change_global_variable = { name = curia_export_lines add = 1 }
+	debug_log = curia_probe_vassal_count_iterator
+	change_global_variable = { name = curia_export_lines add = 1 }
+	debug_log = curia_probe_vassal_count_below
+	change_global_variable = { name = curia_export_lines add = 1 }
+	debug_log = curia_probe_ruler_claim_count
+}
+
+# Heir scope.
+curia_probe_heir = {
+	if = {
+		limit = { exists = player_heir }
+		player_heir = {
+			change_global_variable = { name = curia_export_lines add = 1 }
+			debug_log = curia_probe_heir_id
+			change_global_variable = { name = curia_export_lines add = 1 }
+			debug_log = curia_probe_heir_first_name
+			change_global_variable = { name = curia_export_lines add = 1 }
+			debug_log = curia_probe_heir_landless_ruler
+			change_global_variable = { name = curia_export_lines add = 1 }
+			debug_log = curia_probe_heir_claim_count
+		}
+	}
+	else = {
+		change_global_variable = { name = curia_export_lines add = 1 }
+		debug_log = curia_probe_heir_none
+	}
+}
+
+# Strongest vassal (one vassal only; the proven ordered_vassal form).
+curia_probe_vassal = {
+	if = {
+		limit = { any_vassal = { } }
+		ordered_vassal = {
+			max = 1
+			order_by = current_military_strength
+			change_global_variable = { name = curia_export_lines add = 1 }
+			debug_log = curia_probe_vassal_id
+			change_global_variable = { name = curia_export_lines add = 1 }
+			debug_log = curia_probe_vassal_first_name
+			change_global_variable = { name = curia_export_lines add = 1 }
+			debug_log = curia_probe_vassal_landed
+			change_global_variable = { name = curia_export_lines add = 1 }
+			debug_log = curia_probe_vassal_strength
+			change_global_variable = { name = curia_export_lines add = 1 }
+			debug_log = curia_probe_vassal_claim_count
+		}
+	}
+	else = {
+		change_global_variable = { name = curia_export_lines add = 1 }
+		debug_log = curia_probe_vassal_none
+	}
+}
+
+# Highest-tier claim of the ruler (title scope).
+curia_probe_claim = {
+	if = {
+		limit = { any_claim = { } }
+		ordered_claim = {
+			max = 1
+			order_by = tier
+			change_global_variable = { name = curia_export_lines add = 1 }
+			debug_log = curia_probe_claim_tier
+		}
+	}
+	else = {
+		change_global_variable = { name = curia_export_lines add = 1 }
+		debug_log = curia_probe_claim_none
+	}
+}
+
+# One war of the ruler (war scope; random_character_war picks any one).
+curia_probe_war = {
+	if = {
+		limit = { any_character_war = { } }
+		random_character_war = {
+			change_global_variable = { name = curia_export_lines add = 1 }
+			debug_log = curia_probe_war_score
+			change_global_variable = { name = curia_export_lines add = 1 }
+			debug_log = curia_probe_war_start_date
+			change_global_variable = { name = curia_export_lines add = 1 }
+			debug_log = curia_probe_war_enemy
+		}
+	}
+	else = {
+		change_global_variable = { name = curia_export_lines add = 1 }
+		debug_log = curia_probe_war_none
+	}
+}
+
+# Factions that target the ruler (faction scope). Never tested in M0b (the test ruler had none).
+curia_probe_factions = {
+	if = {
+		limit = { any_targeting_faction = { } }
+		every_targeting_faction = {
+			change_global_variable = { name = curia_export_lines add = 1 }
+			debug_log = curia_probe_faction_name
+			change_global_variable = { name = curia_export_lines add = 1 }
+			debug_log = curia_probe_faction_power_df
+			change_global_variable = { name = curia_export_lines add = 1 }
+			debug_log = curia_probe_faction_discontent_df
+			change_global_variable = { name = curia_export_lines add = 1 }
+			debug_log = curia_probe_faction_power_sv
+			change_global_variable = { name = curia_export_lines add = 1 }
+			debug_log = curia_probe_faction_discontent_sv
+			change_global_variable = { name = curia_export_lines add = 1 }
+			debug_log = curia_probe_faction_member_count
+			if = {
+				limit = { exists = faction_leader }
+				faction_leader = {
+					change_global_variable = { name = curia_export_lines add = 1 }
+					debug_log = curia_probe_faction_leader
+				}
+			}
+			else = {
+				change_global_variable = { name = curia_export_lines add = 1 }
+				debug_log = curia_probe_faction_leader_none
+			}
+			if = {
+				limit = { exists = faction_target }
+				faction_target = {
+					change_global_variable = { name = curia_export_lines add = 1 }
+					debug_log = curia_probe_faction_target
+				}
+			}
+			else = {
+				change_global_variable = { name = curia_export_lines add = 1 }
+				debug_log = curia_probe_faction_target_none
+			}
+		}
+	}
+	else = {
+		change_global_variable = { name = curia_export_lines add = 1 }
+		debug_log = curia_probe_faction_none
+	}
+}

@@ -119,6 +119,8 @@ In-game button writes a marker to `debug.log`; the app detects it. Answers: log 
 
 All [OWNER-MAC] in game. The real mod skeleton (`mod/curia/`), a test protocol sheet and the log-reading tool are prepared first; the owner plays and reports. Any step using `-debug_mode` + console runs in a **throwaway game only**.
 
+**Status (2026-10-05): preparation done; the owner sessions have not run.** Prepared and checked without the game: the real spike mod `mod/curia/` (two HUD buttons, the `CURIA1` export frame, a probe section for unproven forms; ck3-tiger clean), `tools/m3/install_mod.sh` (installer with the T11 variants), `tools/m3/logwatch.py` (millisecond-polling log watcher with unit tests that run in CI) and the owner's session sheet `docs/spikes/m3-protocol.md`, split into two sessions: Session 1 (T10, T5, T4, T3, T7 repeat, error.log and achievements checks) is what the wire-format freeze needs; Session 2 (T8 hour and baseline stretches, T11 launcher variants) can be a different day. After the results: the wire-format freeze, the watcher and parser in the app, the fuzz harness, `tools/fake_ck3` and the fixtures (acceptance criteria 4 and 5).
+
 Test order:
 1. **T10** `script_docs` / `dump_data_types` behaviour on the Mac (throwaway game); populate local `reference/ck3/`.
 2. **T3–T5** flush latency, line format/length/charset, truncation at launch. (The owner's `debug.log` already shows the engine line shape: bracketed time, level, source file and line, then text; multi-line entries exist.)

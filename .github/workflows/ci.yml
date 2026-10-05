@@ -28,6 +28,8 @@ jobs:
         run: tools/ci/check_versions.sh
       - name: Mod structure lint (no game files involved)
         run: python3 tools/ci/lint_mod.py
+      - name: M3 log watcher unit tests (synthetic data only)
+        run: python3 -m unittest discover -s tools/m3
       - name: Developer tools (pinned versions)
         run: |
           python3 -m venv .venv-tools

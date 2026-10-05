@@ -1,0 +1,122 @@
+﻿# SPDX-License-Identifier: MIT
+# Curia (M3 spike): script values used by the export. Numbers are read in localization with
+# [EmptyScope.ScriptValue('name')|0] (any scope) or [THIS.ScriptValue('name')|0] (the current scope), the forms proven in M0/M0b.
+# Rule from M0b: no saved scopes and no scope: references inside a script value (they come back empty and log errors);
+# ROOT is never used. global_var: is not a scope reference.
+
+# ---- caps (one named constant each) ----
+# Number of vassals exported by VASSAL lines (top N by military strength).
+curia_max_vassals = 10
+# Number of claims exported by CLAIM lines (highest tier first).
+curia_max_claims = 10
+
+# ---- frame counters: Curia's own global variables, set by common/scripted_effects/curia_export.txt ----
+curia_snap_id_value = {
+	value = global_var:curia_snap_id
+}
+curia_line_count_value = {
+	value = global_var:curia_export_lines
+}
+curia_probe_mode_value = {
+	value = global_var:curia_probe_mode
+}
+curia_rank_value = {
+	value = global_var:curia_rank
+}
+curia_war_index_value = {
+	value = global_var:curia_war_index
+}
+curia_claim_index_value = {
+	value = global_var:curia_claim_index
+}
+
+# ---- opinion of the ruler ----
+# Proven in M0b (vassal and heir scopes): a character's opinion of their liege.
+curia_opinion_of_liege = {
+	value = "opinion(liege)"
+}
+# The same string behind a guard, for the heir (who may have no liege): 0 when there is none.
+# A variant of the proven form (wrapped in if/add), so it is not itself proven; curia_has_liege_value tells the cases apart.
+curia_opinion_of_liege_guarded = {
+	value = 0
+	if = {
+		limit = { exists = liege }
+		add = "opinion(liege)"
+	}
+}
+curia_has_liege_value = {
+	value = 0
+	if = {
+		limit = { exists = liege }
+		add = 1
+	}
+}
+
+# ---- character flags ----
+# 1 when the character holds land (is_landed is the trigger vanilla uses for "has any title with land").
+curia_is_landed_value = {
+	value = 0
+	if = {
+		limit = { is_landed = yes }
+		add = 1
+	}
+}
+
+# ======================================================================
+# Probe-only values (candidates, NOT proven; used only by common/scripted_effects/curia_probes.txt)
+# ======================================================================
+curia_probe_income_monthly = {
+	value = monthly_character_income
+}
+curia_probe_income_yearly = {
+	value = yearly_character_income
+}
+curia_probe_military_strength = {
+	value = current_military_strength
+}
+curia_probe_realm_size = {
+	value = realm_size
+}
+curia_probe_vassal_count_trigger = {
+	value = vassal_count
+}
+curia_probe_vassal_count_iterator = {
+	value = 0
+	every_vassal = {
+		add = 1
+	}
+}
+curia_probe_vassal_count_below = {
+	value = 0
+	every_vassal_or_below = {
+		add = 1
+	}
+}
+curia_probe_claim_count = {
+	value = 0
+	every_claim = {
+		add = 1
+	}
+}
+curia_probe_is_landless_ruler = {
+	value = 0
+	if = {
+		limit = { is_landless_ruler = yes }
+		add = 1
+	}
+}
+curia_probe_title_tier = {
+	value = tier
+}
+curia_probe_faction_power = {
+	value = faction_power
+}
+curia_probe_faction_discontent = {
+	value = faction_discontent
+}
+curia_probe_faction_member_count = {
+	value = 0
+	every_faction_member = {
+		add = 1
+	}
+}
