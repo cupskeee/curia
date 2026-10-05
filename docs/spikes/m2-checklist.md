@@ -1,6 +1,6 @@
 # Milestone 2 session checklist (owner, macOS 26.5.1, one sitting)
 
-Status: scope, stop rules and the changes below were confirmed by the owner on 2026-10-05. The probe (`app/probe/`) and the stub mod (`mod/curia-m2-probe/`) are written; section 1 has the build command and section 3 the launch line for every stage. Both were exercised without CK3 only (the probe's stages ran, logged and exited on their own, and the code was reviewed; the mod has never been loaded by the game). Nothing in this sheet is a result: every "does it work" below is answered by running it (hard rule 4). Background and sources: `research-notes.md` §2.5, §5.2, C26, C33.
+Status: **run by the owner on 2026-10-05; the results are in `docs/spikes/m2-results.md`.** CK3 Windowed (E10 and the T7 button check in Windowed) was not run and is deferred to the M4 testing. Scope, stop rules and the changes below were confirmed by the owner on 2026-10-05. The probe (`app/probe/`) and the stub mod (`mod/curia-m2-probe/`) were used as written here. Nothing in this sheet is a result: every "does it work" below was answered by running it (hard rule 4). Background and sources: `research-notes.md` §2.5, §5.2, C26, C33, C34.
 
 ## Scope (owner decision 2026-10-05)
 Milestone 2 acceptance criteria **1–5 and 8** on the Mac, plus the **T7 stub-widget probe** in the same session. Windows and Linux (criteria 6–7) are CI plus a separate tester checklist. Primary target: CK3 **Fullscreen** (a native macOS Space). First fallback: **Windowed**. Third rung: a normal companion window (FR-OVL-8); the probe does not test that rung (it is derived if E3 and E10 fail, and assumed to work).
@@ -122,3 +122,12 @@ Criteria 2 (hotkey prompt: yes/no, text), 3 (CK3 stays in front: yes/no, excepti
 
 ## 6. Afterwards
 Send back the filled tables and the contents of `~/curia_m2_results/` (probe logs `probe-*.log` and the helper's `t7-*.txt` files). The answers go into `research-notes.md` §5.2 (marked answered), `milestones.md` M2 (status and the ladder result) and, if the recipe fails, a re-plan before any further macOS overlay code.
+
+## 7. Optional follow-up: typing with CK3 frontmost (E6 re-run)
+In the session's typing phase another app was frontmost, so the E6 question (does typing in the overlay reach CK3?) is still open. A re-run takes a couple of minutes, Fullscreen only. After `tools/m2/preflight.sh` is `PREFLIGHT_OK`:
+1. CK3 in Fullscreen, game **paused**; launch `open -g -n "$APP" --args --stage interactive --combo 1` and click into CK3 (keep it the frontmost app) until the "go" sound.
+2. Click the overlay's text field, then type letters, a few spaces and the digits 1–5.
+3. Record: do the characters appear in the field; does CK3 unpause or change speed (Space, digits) or react to letters; does the frontmost app (shown in the overlay's focus text and logged) stay CK3.
+4. Press Esc, then Space: the game should unpause (this part passed on 2026-10-05).
+5. Quit the probe with Ctrl+Cmd+J.
+Send the new `probe-interactive-*.log` and your three answers; the outcome goes into `m2-results.md` (criterion 3) or moves to the M4 testing if you skip it.

@@ -32,7 +32,7 @@ Inspired by the mod "Voices of the Court" (VOTC). Curia is **not** a fork and co
 | D10 | Identifiers: GitHub user `cupskeee`, repo `github.com/cupskeee/curia`, mod id `curia`, macOS bundle id `io.github.cupskeee.curia`. Apple Developer account deferred to just before M7. |
 | D11 | Linux key storage with no Secret Service provider: session-only, in memory. |
 | D12 | Dear ImGui: accept vcpkg's version (1.92.9); vendor 1.92.9b only if a specific bug requires it. |
-| D13 | Target CK3's default **Fullscreen** mode with **Windowed** as fallback. On the Mac the owner reported (2026-10-05) that Graphics offers exactly these two and that Fullscreen is a **native macOS Space**, so the primary M2 target there is the native-Space case; "borderless underneath" is a 2020 Windows player report with later agreeing posts and one hedged staff post, nothing Mac-specific (C19, C26). |
+| D13 | Target CK3's default **Fullscreen** mode with **Windowed** as fallback. On the Mac the owner reported (2026-10-05) that Graphics offers exactly these two and that Fullscreen is a **native macOS Space**, so the primary M2 target there is the native-Space case; "borderless underneath" is a 2020 Windows player report with later agreeing posts and one hedged staff post, nothing Mac-specific (C19, C26). **M2 (2026-10-05):** Fullscreen passes on the Mac; Windowed is deferred to the M4 testing (owner decision, not a failure); a plain always-on-top window is not a fallback over Fullscreen (`docs/spikes/m2-results.md`). |
 | D14 | The project is run as a tidy, fully managed open-source project (section 9). |
 
 ## 4. Functional requirements
@@ -60,11 +60,12 @@ Inspired by the mod "Voices of the Court" (VOTC). Curia is **not** a fork and co
 - **FR-OVL-1** Transparent, borderless, always-on-top chat window positioned over the CK3 window. Target mode: CK3's default **Fullscreen** (on the Mac a native macOS Space, owner-observed 2026-10-05; on Windows "borderless underneath" is an unverified player report, C26/A8), fallback **Windowed** (D13). The Mac offers exactly Fullscreen and Windowed (owner-reported).
 - **FR-OVL-2** Takes keyboard focus when open; returns focus to CK3 when closed (platform layer: SDL has no API for this).
 - **FR-OVL-3** Styled for a medieval game: bundled redistributable font, parchment-like palette. No network fetch for assets.
-- **FR-OVL-4** Opening: in-game button (primary), tray menu, optional global hotkey. Closing: Esc, close control, hotkey.
+- **FR-OVL-4** Opening: the **in-game button and the global hotkey are the primary controls** (owner decision after M2, 2026-10-05); the tray menu is secondary. Closing: Esc, close control, hotkey.
 - **FR-OVL-5** Chat: streaming tokens, cancel generation, conversation history within a game session, "new snapshot" indicator, copy answer.
-- **FR-OVL-6** Tray icon (`SDL_CreateTray`): Show/Hide, Settings, Quit. Best effort on Linux (C8).
-- **FR-OVL-7** Global hotkey (optional, secondary): Windows `RegisterHotKey`; macOS Carbon `RegisterEventHotKey` (no TCC prompt believed, to be verified in M2; default binding must include Cmd or Ctrl, C10); Linux per research-notes §2.6.
-- **FR-OVL-8** Display fallback ladder (M2 records which rung works, per OS): (1) the overlay over CK3's default Fullscreen; if it cannot appear, (2) the overlay with CK3 in Windowed; if that fails too, (3) a normal companion window (for example on a second monitor). The app is fully usable as a normal window.
+- **FR-OVL-6** Tray icon (`SDL_CreateTray`): Show/Hide, Settings, Quit; **secondary**. On macOS the menu bar does not appear on CK3's Fullscreen display, so the tray cannot be relied on while playing (two-display setup, M2); creating it activates the app, so it is created at start-up, never while CK3 is frontmost. Best effort on Linux (C8).
+- **FR-OVL-7** Global hotkey (primary, on by default, configurable): Windows `RegisterHotKey`; macOS Carbon `RegisterEventHotKey` (**verified in M2 on macOS 26.5.1: fires with CK3 frontmost, no permission prompt**; the default binding includes Cmd or Ctrl, C10); Linux per research-notes §2.6.
+- **FR-OVL-8** Display fallback ladder (M2 records which rung works, per OS): (1) the overlay over CK3's default Fullscreen (**works on the Mac, M2**); if it cannot appear, (2) the overlay with CK3 in Windowed (deferred to the M4 testing); if that fails too, (3) a normal companion window (for example on a second monitor). The app is fully usable as a normal window.
+- **FR-OVL-9** Placement: every time the overlay is shown it is placed on the display that contains CK3's window (macOS: the bounds of the `ck3` process's largest window from `CGWindowListCopyWindowInfo`, readable without a permission, M2), not on the display under the pointer; the pointer's display is only the fallback when the window cannot be found.
 
 ### 4.4 LLM providers (one `Provider` interface)
 - **FR-LLM-1** Common interface: `streamChat(messages, onToken)` plus cancel, usage and typed errors (see `architecture.md`).
