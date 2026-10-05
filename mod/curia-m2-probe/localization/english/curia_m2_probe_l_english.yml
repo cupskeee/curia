@@ -1,0 +1,3 @@
+﻿l_english:
+ curia_m2_probe_button_text: "Curia T7 probe"
+ curia_m2_probe_click_line: "CURIAPROBE1|T7|click|date=[GetCurrentDate.GetString]|name=[THIS.GetCharacter.GetNameNoTooltip]|title=[THIS.GetCharacter.GetPrimaryTitle.GetNameNoTierNoTooltip]|gold=[THIS.GetCharacter.GetGold|0]"

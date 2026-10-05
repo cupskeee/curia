@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <string>
 
@@ -20,6 +21,9 @@ public:
     virtual void processEvent(const SDL_Event& event) = 0;
     virtual void beginFrame() = 0;  // starts a Dear ImGui frame
     virtual void endFrame() = 0;    // renders the ImGui draw data and presents
+    // Colour the frame is cleared to before the ImGui draw data; alpha 0 gives a transparent
+    // window.
+    virtual void setClearColor(std::uint8_t r, std::uint8_t g, std::uint8_t b, std::uint8_t a) = 0;
     virtual void shutdown() = 0;
     virtual std::string rendererName() const = 0;
 };

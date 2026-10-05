@@ -1,0 +1,5 @@
+﻿# SPDX-License-Identifier: MIT
+# Curia M2 probe (T7). THROWAWAY, never shipped. Registers one HUD widget without touching any vanilla GUI file.
+# The game's own note (gui/scripted_widgets/_scripted_widgets.info) describes the form: "<gui file> = <widget name>".
+# The window itself is defined in gui/curia_m2_probe_widget.gui.
+gui/curia_m2_probe_widget.gui = curia_m2_probe_widget

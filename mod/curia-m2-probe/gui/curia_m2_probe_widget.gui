@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: MIT
+# Curia M2 probe (T7): one small test button on the HUD. Throwaway.
+# Clicking it runs the scripted GUI curia_m2_probe_click with the player as root scope.
+
+widget = {
+	name = "curia_m2_probe_widget"
+	layer = hud_layer
+	parentanchor = bottom|left
+	widgetanchor = bottom|left
+	position = { 570 -12 }
+	size = { 170 33 }
+	visible = "[IsDefaultGUIMode]"
+
+	button_standard = {
+		name = "curia_m2_probe_button"
+		size = { 170 33 }
+		text = "curia_m2_probe_button_text"
+		onclick = "[GetScriptedGui('curia_m2_probe_click').Execute( GuiScope.SetRoot( GetPlayer.MakeScope ).End )]"
+	}
+}

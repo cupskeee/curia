@@ -38,6 +38,12 @@ for mod in mods:
                 problems.append(f"{rel}: CRLF line endings")
             if not path.name.startswith("curia_"):
                 problems.append(f"{rel}: file name must start with curia_")
+        elif path.suffix == ".gui":
+            # GUI files carry no BOM requirement (the game's own do not); keep LF and the curia_ prefix.
+            if b"\r\n" in data:
+                problems.append(f"{rel}: CRLF line endings")
+            if not path.name.startswith("curia_"):
+                problems.append(f"{rel}: file name must start with curia_")
         if path.suffix == ".yml":
             body = data[len(BOM):] if data.startswith(BOM) else data
             if not body.startswith(b"l_english:"):
