@@ -68,12 +68,16 @@ int runApp(const CliOptions& options) {
     ImGui::CreateContext();
     ImGui::GetIO().IniFilename = nullptr;  // no imgui.ini next to the binary
     ImGui::StyleColorsDark();
-    float displayScale = SDL_GetWindowDisplayScale(window);
-    if (displayScale <= 0.0F) {
-        displayScale = 1.0F;
+    // The content scale only (the DPI scale on Windows and Linux, 1.0 on macOS). The pixel density
+    // is already applied through the framebuffer scale by the renderer backend, so using
+    // SDL_GetWindowDisplayScale (density times content scale) here would draw the UI twice as
+    // large on a Retina Mac.
+    float uiScale = SDL_GetDisplayContentScale(SDL_GetDisplayForWindow(window));
+    if (uiScale <= 0.0F) {
+        uiScale = 1.0F;
     }
-    ImGui::GetStyle().ScaleAllSizes(displayScale);
-    ImGui::GetStyle().FontScaleDpi = displayScale;
+    ImGui::GetStyle().ScaleAllSizes(uiScale);
+    ImGui::GetStyle().FontScaleDpi = uiScale;
 
     auto backend = ui::createSdlRendererBackend();
     if (!backend->init(window)) {
@@ -108,8 +112,9 @@ int runApp(const CliOptions& options) {
         for (int i = 0; i < 3; ++i) {
             drawFrame();
         }
-        std::printf("CURIA_SMOKE_OK frames=%llu renderer=%s\n",
-                    static_cast<unsigned long long>(frames), backend->rendererName().c_str());
+        std::printf("CURIA_SMOKE_OK frames=%llu renderer=%s ui_scale=%.2f\n",
+                    static_cast<unsigned long long>(frames), backend->rendererName().c_str(),
+                    static_cast<double>(uiScale));
     } else {
         IdleTest idle;
         const bool idleMode = options.idleSeconds > 0;
