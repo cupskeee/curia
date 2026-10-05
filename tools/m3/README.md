@@ -3,7 +3,7 @@
 
 `logwatch.py` watches CK3's `debug.log` and `error.log` while the game runs and measures what the M3 spike
 needs: flush latency of the `CURIA1|` marker lines (T3), line format, length and charset (T4), truncation at
-launch (T5), bytes per export and bytes appended per hour (T8), and whether anything mentioning the mod
+launch (T5), bytes per export and bytes appended per hour (T8; per-hour figures are taken in normal play after M4), and whether anything mentioning the mod
 lands in `error.log` (lines matching `curia[_/]`, case-insensitive). Python 3.9+, standard library only. It only reads the logs; it never writes to the game
 folders.
 
@@ -102,4 +102,4 @@ log folder.
 `python3 tools/m3/frame_table.py [watch-*.jsonl]` prints one row per frame of a watcher run (lines, the count the END line states, text bytes, file bytes, longest line, span, complete), the number of complete frames per label and button, and min / median / max of lines and bytes per button. Without an argument it reads the newest `watch-*.jsonl` in `~/curia_m3_results`. It reads only the watcher's output and prints only counts, sizes, the snapshot number and the label (cut to 40 characters); an unreadable line (for example a truncated last line) is skipped and counted.
 
 ## session_env.sh and install_mod.sh
-`source tools/m3/session_env.sh` (from the checkout, in the Terminal tab used for commands) sets `CK3`, `LOGS`, `MODDIR`, `GAME` and defines `t11_snap`, `t11_check`, `errcount` and `errlines` for the session sheets; it works in bash and zsh. `tools/m3/install_mod.sh` installs and uninstalls the spike mod (see its header).
+`source tools/m3/session_env.sh` (from the checkout, in the Terminal tab used for commands) sets `CK3`, `LOGS`, `MODDIR`, `GAME` and defines `t11_snap`, `t11_check`, `errcount` and `errlines` for the session sheets; it works in bash and zsh. `tools/m3/install_mod.sh` installs and uninstalls the spike mod (see its header; its `--variant` and `--supported-version` options are for T11, deferred to M7).

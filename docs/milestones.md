@@ -47,7 +47,7 @@ Acceptance criteria:
 2. **Pass condition to proceed:** `debug_log` writes on a normal launch **or** the cost of `-debug_mode` (achievement impact) is known and accepted by the owner; and T6 shows values can be exported (or a workaround format is identified).
 3. **If any test fails, stop and re-plan with the owner before any C++ is written (D9).** No M1 work starts until the owner confirms.
 4. If T1/T2 pass: "achievement-compatible, no debug mode required" is recorded as a confirmed design goal (NFR-6). If not: the exact consequence is recorded and requirements are revisited.
-5. The number of bytes each test export line adds to `debug.log` is recorded (feeds the log-budget work in M3/M6a).
+5. The number of bytes each test export line adds to `debug.log` is recorded (feeds the log-budget work: per-export bytes in M3, per hour in M4, the threshold in M6a).
 6. The stub mod and protocol are the only artefacts; nothing from M0 is shipped.
 
 **Status (2026-10-04): run by the owner; result PASS (T6 resolved by M0b below).** T0, T1 (normal launch and Ironman) and T2 (normal launch and Ironman) pass; `debug_log` needs no `-debug_mode`; a debug-mode launch showed achievements "Not available". T6 is partial (names and numbers resolve with some scope forms; others don't). Record: `docs/spikes/m0-results.md`. Per the protocol, a partial T6 needs the owner's decision before M1: proceed and pin the remaining forms in the first M3 iteration (recommended), or run a short M0b first.
@@ -115,29 +115,29 @@ Acceptance criteria:
 9. `research-notes.md` M2 spike list is updated with the answers. **Result: done** (`research-notes.md` §2.5, §5.2, C34; `m2-results.md`).
 
 ## M3. Mod spike
-In-game button writes a marker to `debug.log`; the app detects it. Answers: log flush latency, clipboard vs log trigger, line format, log budget. (T0, T1, T2 and T6 were answered in M0 and are not repeated.)
+In-game button writes a marker to `debug.log`; the app detects it. Answers: log flush latency, clipboard vs log trigger, line format, bytes per export (the per-hour log budget moves to M4's normal play, see below). (T0, T1, T2 and T6 were answered in M0 and are not repeated.)
 
 All [OWNER-MAC] in game. The real mod skeleton (`mod/curia/`), a test protocol sheet and the log-reading tool are prepared first; the owner plays and reports. Any step using `-debug_mode` + console runs in a **throwaway game only**.
 
-**Status (2026-10-05): preparation done; the owner sessions have not run.** Prepared and checked without the game: the real spike mod `mod/curia/` (two HUD buttons, the `CURIA1` export frame, a probe section for unproven forms; ck3-tiger clean), `tools/m3/install_mod.sh` (installer with the T11 variants), `tools/m3/logwatch.py` (millisecond-polling log watcher with unit tests that run in CI) and the owner's session sheet `docs/spikes/m3-protocol.md`, split into two sessions: Session 1 (T10, T5, T4, T3, T7 repeat, error.log and achievements checks) is what the wire-format freeze needs; Session 2 (T8 hour and baseline stretches, T11 launcher variants) can be a different day. After the results: the wire-format freeze, the watcher and parser in the app, the fuzz harness, `tools/fake_ck3` and the fixtures (acceptance criteria 4 and 5).
+**Status (2026-10-05, updated 2026-10-06): preparation done; the owner session has not run.** Prepared and checked without the game: the real spike mod `mod/curia/` (two HUD buttons, the `CURIA1` export frame, a probe section for unproven forms; ck3-tiger clean), `tools/m3/install_mod.sh` (installer with the T11 variants), `tools/m3/logwatch.py` (millisecond-polling log watcher with unit tests that run in CI) and the owner's session sheet `docs/spikes/m3-protocol.md`: one session (T10, T5, T4, T3, T7 repeat, T8 bytes per export, the launcher check for the default install, error.log and achievements checks, a save/load note). **Owner decision of 2026-10-06:** the second session is dropped. The T8 one-hour and baseline stretches move to **normal play after M4** (Curia installed, measured with `tools/m3/logwatch.py` or the app's own watcher; the watcher separates CURIA bytes from the game's own, so any normal-play window gives the baseline), and **T11 moves to M7** (packaging, beside the Paradox Mods path decision). The cap reproduction (C3, 17MB) stays deferred as before. The deferred procedures and recording tables are kept in `docs/spikes/m3-deferred-t8-t11.md` and are not part of M3. After the results: the wire-format freeze, the watcher and parser in the app, the fuzz harness, `tools/fake_ck3` and the fixtures (acceptance criteria 4 and 5).
 
 Test order:
 1. **T10** `script_docs` / `dump_data_types` behaviour on the Mac (throwaway game); populate local `reference/ck3/`.
 2. **T3–T5** flush latency, line format/length/charset, truncation at launch. (The owner's `debug.log` already shows the engine line shape: bracketed time, level, source file and line, then text; multi-line entries exist.)
 3. **T7** scripted-widget button: visible, clickable, root scope = player, behaviour in each display mode and on pause. (First pass done in the M2 session with a stub: **Fullscreen pass**, clicks recorded unpaused and paused with name, title, gold and date; the Windowed check is deferred to the M4 testing; M3 repeats it with the real mod and decides.)
-4. **T8** bytes per export; total bytes appended per hour of normal play; cap reproduction (long run).
+4. **T8** bytes per export (the click protocol), plus, as a by-product, the growth over the session's own window (start-up burst, a new game and many clicks: not representative of normal play, and not an input to the wire-format freeze). Deferred: total bytes appended per hour of normal play, with and without exports, to normal play after M4 (M4 criterion 8); the cap reproduction (long run, C3) stays deferred as before.
 5. **T9** optional clipboard-vs-log comparison.
-6. **T11/T12** metadata/launcher behaviour; local ck3-tiger pass (`--game <install path>`).
+6. **T12** local ck3-tiger pass (`--game <install path>`). **T11** only for the default install (both metadata files, `supported_version` `1.20.*`: listed by the launcher, mod loaded); the variants (which of `descriptor.mod` / `.metadata/metadata.json` the macOS launcher needs, `supported_version` values) are deferred to M7 (criterion 10 there).
 
 Work: real mod skeleton (widget, scripted GUI, minimal export), `tools/fake_ck3` v0 with the real format after capture, watcher + frame parser in the app with unit tests (fuzz harness on the pure parser function), `docs/wire-format.md`, `tests/fixtures/` from real captures (Curia marker lines only).
 
 Acceptance criteria:
-1. Every T-question in this milestone has a recorded answer in `research-notes.md` with the date, game version, and OS; none is estimated.
+1. Every T-question in this milestone has a recorded answer in `research-notes.md` with the date, game version, and OS; none is estimated. Not unanswered but deferred by the owner (2026-10-06), and recorded as open in `research-notes.md` §5.1 with their milestone: T8 bytes per hour of normal play (M4, criterion 8; the cap question C3 stays deferred as before) and T11 beyond the default-install row (M7, criterion 10).
 2. Pressing the in-game button produces a marker the app detects; measured latency distribution (not a guess) is recorded for pause, menu and fast-forward.
 3. Trigger decision (D2) is confirmed or revised with the data; if clipboard (T9) wins, the owner decides.
-4. The wire format is frozen as `CURIA1` in `docs/wire-format.md` (macOS-verified only; Windows/Linux log behaviour goes to the tester checklist), with bytes-per-export and bytes-per-hour numbers and a log-budget threshold default derived from T8.
+4. The wire format is frozen as `CURIA1` in `docs/wire-format.md` (macOS-verified only; Windows/Linux log behaviour goes to the tester checklist), on the bytes-per-export numbers (T8). The log-budget threshold default is **not** set in M3: it is set from normal-play data (M4 criterion 8) by M6a (M6a criterion 6), and until then the app's budget warning ships off/unset.
 5. Parser unit tests pass against real captured fixtures; the libFuzzer harness runs a fixed budget in CI; fake CK3 reproduces the captured structure (prefix shape, interleaving, truncation) and the app handles it in a CI end-to-end test.
-6. Mod loads with no `curia_` entries in `error.log`; ck3-tiger local run reviewed; supported-version behaviour (T11) documented.
+6. Mod loads with no `curia_` entries in `error.log`; ck3-tiger local run reviewed (T12); the supported-version behaviour is documented in M7 (T11, deferred). Until M7 the current layout (`descriptor.mod` plus the outer `.mod` file; both files are kept in `mod/curia/`) is what installs; the installer's `--variant` and `--supported-version` options stay in the repository as tools for M7.
 
 ## M4. Vertical slice
 Button → export gold + heir → overlay opens → question to the Anthropic API → streamed answer.
@@ -152,6 +152,7 @@ Acceptance criteria:
 5. Log-silence detection shows the "restart CK3" message when the fake CK3 dies after N bytes.
 6. No API key in logs or crash output (test greps the app log; CI key-pattern scan clean).
 7. **[OWNER-MAC]** Deferred from M2: with CK3 in **Windowed**, the overlay is visible, clickable, takes typed input and returns the keys to CK3 on close, and the in-game button works; with CK3 **Fullscreen**, typing in the overlay while CK3 is frontmost does not reach the game (the E6 check: owner-observed in M2, not confirmed in the log). The overlay appears on CK3's display (FR-OVL-9), no Dock icon shows (`LSUIElement`), and the tray, if shown, is created at start-up.
+8. **[OWNER-MAC]** T8 deferred from M3 (owner decision 2026-10-06): bytes appended per hour of normal play, measured during normal play with Curia installed (`tools/m3/logwatch.py` or the app's watcher once it counts bytes), with and without exports. Record the per-hour figures with the game speed noted. They feed the log-budget threshold default (M6a criterion 6). The separate no-click stretch is expected to be unnecessary, since the watcher reports the bytes with and without the CURIA lines; confirm when the data comes in. The 17MB cap reproduction (C3) stays deferred; the log-silence detection (criterion 5) reports silence only after it happens and does not warn before the cap. Procedure notes: `docs/spikes/m3-deferred-t8-t11.md` (re-check commands first).
 
 ## M5. Providers + settings
 OpenAI-compatible provider, settings UI, secure key storage per OS, models endpoint (D4). (Agent Mode moved to M8, post-v1.)
@@ -168,11 +169,12 @@ Acceptance criteria:
 Full realm export, prompt caching tuned, advisor quality.
 
 Acceptance criteria:
-1. Export includes gold/income, heir and succession, top vassals with opinions, factions, wars, claims; per-export size is within the budget from M3 T8; sections can be switched off.
+1. Export includes gold/income, heir and succession, top vassals with opinions, factions, wars, claims; per-export size is within the per-export numbers measured in M3 (T8); sections can be switched off.
 2. Prompt caching: persona and snapshot are separate breakpoints; measured cache-hit rate across a realistic 30-minute session is recorded; TTL choice (5 min vs 1 h) justified with data.
 3. **[OWNER-MAC]** The owner asks ten representative questions ("what should I focus on?", "is my heir safe?", "who might rebel?") and rates the answers; failures lead to prompt changes, not code changes. No fabricated data (answers cite only fields present in the snapshot).
 4. Snapshot size vs context cost documented; Haiku-class minimums (4,096 tokens) noted for users picking small models.
 5. A CK3 patch regression checklist exists for the mod (what to re-test on every patch).
+6. The log-budget threshold default (FR-BRG-5, `architecture.md` log budget) is chosen from the normal-play bytes-per-hour data recorded in M4 (criterion 8). Until it is chosen the app's budget warning ships off/unset.
 
 ## M6b. Council personas (post-v1, confirmed)
 Steward, Marshal, Spymaster, Chancellor advise in character; skill affects advice quality (FR-ADV-5). Requires council data in the export and per-persona prompts. Acceptance criteria are written when scheduled.
@@ -190,6 +192,7 @@ Work and acceptance criteria:
 7. README: install steps per OS, how to enable the mod, how to set an API key, display-mode guidance (Fullscreen/Windowed), troubleshooting (log silence → restart CK3; never use the console), checksum and `gh attestation verify` steps, the one-line VOTC credit, license, third-party licenses.
 8. Security hygiene verified: secret scanning and push protection on; `SECURITY.md` current; release secrets (signing, notarization) only in a protected `release` GitHub Environment; CI tests use fake keys and a local mock server; CodeQL (C/C++, scheduled) and OpenSSF Scorecard (weekly) running; Best Practices badge deferred until after 1.0.
 9. At least one Windows and one Linux tester have run the release candidate; their reports are in the repo. Anything unverified is listed under "Known limitations". `CHANGELOG.md` has the 1.0.0 section; version is `1.0.0` only if the public contract (wire protocol, config schema) is declared stable, otherwise stay `0.y.z`.
+10. **[OWNER-MAC]** T11 deferred from M3 (owner decision 2026-10-06), beside the Paradox Mods path decision (criterion 2): does a mod declaring `supported_version` 1.19 on game 1.20.0.3 load, does `1.20.*` work (the default-install row ran in M3), and which of `descriptor.mod` / `.metadata/metadata.json` does the macOS launcher need. The variants are installed with `tools/m3/install_mod.sh --variant ... / --supported-version ...`; procedure and recording table: `docs/spikes/m3-deferred-t8-t11.md` (re-check commands first). The README's install steps (criterion 7) follow the answer.
 
 ## M8. Agent Mode (post-v1)
 Claude Code CLI as a provider, **API-key auth only**, scoped **read-only** tools (D3). Bedrock / Google Cloud Agent Platform / Foundry stay out until someone can test them. Kept here so the research is not lost; **re-plan before starting** (the CLI evolves quickly).

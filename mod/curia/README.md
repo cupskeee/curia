@@ -37,8 +37,8 @@ Script and localization files carry a UTF-8 BOM and tabs, like the game's own; `
 ## Install and remove (maintainer, macOS; quit CK3 completely first)
 ```sh
 tools/m3/install_mod.sh                        # installs into ~/Documents/Paradox Interactive/Crusader Kings III/mod
-tools/m3/install_mod.sh --variant descriptor   # T11: descriptor.mod only; --variant metadata: .metadata/metadata.json only
-tools/m3/install_mod.sh --supported-version 1.19.*   # T11: rewrites supported_version in the installed copy only
+tools/m3/install_mod.sh --variant descriptor   # T11 (deferred to M7): descriptor.mod only; --variant metadata: .metadata/metadata.json only
+tools/m3/install_mod.sh --supported-version 1.19.*   # T11 (deferred to M7): rewrites supported_version in the installed copy only
 tools/m3/install_mod.sh --uninstall            # removes <mod folder>/curia and curia.mod
 ```
 Options `--mod-dir <dir>`, `--dry-run` and `--force` exist; `--help` lists them. The script refuses to run while CK3 runs and
