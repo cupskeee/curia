@@ -97,3 +97,9 @@ temporary folder with real timing and checks that the measured arrival falls wit
 time and that the true latency lies inside the computed bounds; it retries once if the first run fails. It is
 not part of the unit test run because it depends on the machine's scheduling. Neither needs CK3 or the real
 log folder.
+
+## frame_table.py
+`python3 tools/m3/frame_table.py [watch-*.jsonl]` prints one row per frame of a watcher run (lines, the count the END line states, text bytes, file bytes, longest line, span, complete), the number of complete frames per label and button, and min / median / max of lines and bytes per button. Without an argument it reads the newest `watch-*.jsonl` in `~/curia_m3_results`. It reads only the watcher's output and prints only counts, sizes, the snapshot number and the label (cut to 40 characters); an unreadable line (for example a truncated last line) is skipped and counted.
+
+## session_env.sh and install_mod.sh
+`source tools/m3/session_env.sh` (from the checkout, in the Terminal tab used for commands) sets `CK3`, `LOGS`, `MODDIR`, `GAME` and defines `t11_snap`, `t11_check`, `errcount` and `errlines` for the session sheets; it works in bash and zsh. `tools/m3/install_mod.sh` installs and uninstalls the spike mod (see its header).

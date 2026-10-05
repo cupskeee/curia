@@ -80,29 +80,11 @@ Tab 1 (watcher only):
 ```sh
 cd ~/PycharmProjects/curia
 ```
-Tab 2 (all other commands; paste the block, then the helper functions):
+Tab 2 (all other commands): set up the variables and the helper functions with one command (`tools/m3/session_env.sh`; it works in bash and zsh and only reads the game's logs and the mod folder and writes small files under `~/curia_m3_results/`):
 ```sh
-cd ~/PycharmProjects/curia
-CK3="$HOME/Documents/Paradox Interactive/Crusader Kings III"
-LOGS="$CK3/logs"; MODDIR="$CK3/mod"
-GAME="$HOME/Library/Application Support/Steam/steamapps/common/Crusader Kings III"
-mkdir -p ~/curia_m3_results
+cd ~/PycharmProjects/curia && source tools/m3/session_env.sh
 ```
-The helper functions only read the logs and the mod folder and write small files under `~/curia_m3_results/`. `t11_snap <tag>` stores a checksum list of the mod folder; `t11_check <tag>` prints and saves counts from the logs (counts of lines, not their text); `errcount` and `errlines` are the error.log check of the stop rules:
-```sh
-t11_snap() { find "$MODDIR" -type f ! -name .DS_Store -exec shasum -a 256 {} + | sort -k2 > ~/curia_m3_results/t11-$1.sha.txt; }
-errcount() { grep -a -i -c -E 'curia[_/]' "$LOGS/error.log"; }
-errlines() { grep -a -i -n -E 'curia[_/]' "$LOGS/error.log" | cut -c1-260; }
-t11_check() {
-  {
-    echo "== T11 check, label $1, $(date '+%Y-%m-%d %H:%M:%S')"
-    echo "LOAD lines in debug.log (CURIA1|0|LOAD|): $(grep -a -c 'CURIA1|0|LOAD|' "$LOGS/debug.log")"
-    echo "other debug.log lines mentioning curia (CURIA1 lines excluded; a wide match, vanilla words can count): $(grep -a -i curia "$LOGS/debug.log" | grep -a -v -c 'CURIA1|')"
-    echo "error.log lines matching curia[_/]: $(errcount)"
-    echo "debug.log: $(stat -f '%z bytes, inode %i' "$LOGS/debug.log"); error.log: $(stat -f '%z bytes' "$LOGS/error.log")"
-  } 2>&1 | tee ~/curia_m3_results/t11-$1-$(date +%Y%m%d-%H%M%S).txt
-}
-```
+It sets `CK3`, `LOGS`, `MODDIR`, `GAME` and creates `~/curia_m3_results`. The functions: `t11_snap <tag>` stores a checksum list of the mod folder; `t11_check <tag>` prints and saves counts from the logs (counts of lines, not their text); `errcount` and `errlines` are the error.log check of the stop rules.
 
 **0.2 Checkout** (tab 2). Switch the local checkout to `main` and pull, then check the M3 files are there:
 ```sh
@@ -231,30 +213,7 @@ Observations to write down for every condition (R4): does the game visibly keep 
 **2.7 End of the T3 run.** In tab 1 press **Ctrl+C**. It prints the summary and the three saved paths (`summary-*.txt`, `watch-*.jsonl`, `raw-curia-*.txt`, all in `~/curia_m3_results/`). Read it for R4 (summary section 2), R5 (sections 3, 4, 9) and R2 (sections 1, 5). Note that sample counts in section 2 are **lines**, not clicks; the frames are the clicks. Frames beyond the first 40 appear only in the `.jsonl`, so tabulate all of them (tab 2; also gives bytes per export per button for Part 3):
 ```sh
 JSON=$(ls -t ~/curia_m3_results/watch-*.jsonl | head -1)
-python3 - "$JSON" <<'EOF'
-import collections, json, statistics, sys
-frames = []
-with open(sys.argv[1], encoding="utf-8") as f:
-    for line in f:
-        rec = json.loads(line)
-        if rec["type"] == "frame":
-            rec["button"] = "probes" if "PROBE" in rec["kinds"] else "advisor"
-            frames.append(rec)
-print("snap | button | label | lines | END says | text bytes | file bytes | longest line | span s | complete")
-for r in frames:
-    print(r["snap_id"], r["button"], r["label"], r["lines"], r["declared_count"], r["payload_bytes"],
-          r["raw_bytes_with_prefix"], r["longest_line_bytes"], r["span_s"], r["complete"], sep=" | ")
-print("\ncomplete frames per label and button (compare with the click tally):")
-for key, n in sorted(collections.Counter((r["label"], r["button"]) for r in frames if r["complete"]).items()):
-    print(" ", key[0], key[1], n)
-print("\nper button, complete frames (min / median / max):")
-for button in ("advisor", "probes"):
-    rows = [r for r in frames if r["complete"] and r["button"] == button]
-    for k, name in (("lines", "lines"), ("payload_bytes", "text bytes"), ("raw_bytes_with_prefix", "file bytes")):
-        v = [r[k] for r in rows]
-        if v:
-            print(f"  {button} {name}: {min(v)} / {statistics.median(v)} / {max(v)} (n={len(v)})")
-EOF
+python3 tools/m3/frame_table.py "$JSON"
 ```
 Questions for the output: a frame with `snap_id` 0, one line and "no BEGIN; no END" is the game-start line `CURIA1|0|LOAD|...`, not a defect. Does the END count equal all lines of the frame or only those between BEGIN and END (the summary prints both; the README states "all lines")? Do the lines of one export arrive together (frame `span s` near 0) or spread over time? Is a frame ever interleaved with other output or another frame? Did any line need more than one read? Is any line over 4000 bytes? Is the engine prefix the same shape for every line, and how many bytes precede the marker (summary section 3, min / median / max)?
 
@@ -290,7 +249,7 @@ The first pass was the M2 stub (`m2-results.md`: Fullscreen, visible, clickable,
 # Session 2
 
 ## Session 2 preflight (CK3 and the launcher closed; record in R0)
-1. Tab 1: `cd` as in 0.1. Tab 2: paste the 0.1 block and the helper functions again.
+1. Tab 1: `cd` as in 0.1. Tab 2: `cd ~/PycharmProjects/curia && source tools/m3/session_env.sh` again (0.1).
 2. `python3 tools/m3/logwatch.py --selftest` (tab 2) ends with `SELFTEST_OK`. If the checkout changed since Session 1, repeat 0.2 first.
 3. **Mod installed?** `ls -l "$MODDIR" "$MODDIR/curia" "$MODDIR/curia/.metadata"` (tab 2) must show `curia.mod`, `curia/descriptor.mod` and `curia/.metadata/metadata.json`. If not, `tools/m3/install_mod.sh` (CK3 closed) and look again after the launcher is open (0.7).
 4. Pre-launch check (0.7): playset `curia-m3` active with "Curia" enabled, and the **debug-mode setting in the launcher off**.
