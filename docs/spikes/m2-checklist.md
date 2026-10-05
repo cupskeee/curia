@@ -118,13 +118,13 @@ Criterion 1 (one row per display mode):
 
 Which rung of the ladder works: ______ (1 overlay over Fullscreen / 2 overlay with Windowed / 3 normal companion window)
 
-Criteria 2 (hotkey prompt: yes/no, text), 3 (CK3 stays in front: yes/no, exceptions), 4 (fringe: yes/no; CPU TIME delta), 5 (tray and Dock behaviour), 8 (rect: ok / prompt / empty), T7 (items 1–6).
+Criteria 2 (hotkey prompt: yes/no, text), 3 (CK3 stays in front: yes/no, exceptions), 4 (fringe: yes/no; CPU TIME delta), 5 (tray behaviour; whether a Dock tile appears), 8 (rect: ok / prompt / empty), T7 (items 1–6).
 
 ## 6. Afterwards
 Send back the filled tables and the contents of `~/curia_m2_results/` (probe logs `probe-*.log` and the helper's `t7-*.txt` files). The answers go into `research-notes.md` §5.2 (marked answered), `milestones.md` M2 (status and the ladder result) and, if the recipe fails, a re-plan before any further macOS overlay code.
 
 ## 7. Optional follow-up: typing with CK3 frontmost (E6 re-run)
-In the session's typing phase another app was frontmost, so the E6 question (does typing in the overlay reach CK3?) is still open. A re-run takes a couple of minutes, Fullscreen only. After `tools/m2/preflight.sh` is `PREFLIGHT_OK`:
+In the session's logged typing phase another app was frontmost. The owner reports that typing in the overlay with CK3 in front never made the game react, but no such stretch is in the logs, so E6 is recorded as owner-observed and not confirmed in the log. An optional re-run (or the M4 testing) confirms it; it takes a couple of minutes, Fullscreen only. After `tools/m2/preflight.sh` is `PREFLIGHT_OK`:
 1. CK3 in Fullscreen, game **paused**; launch `open -g -n "$APP" --args --stage interactive --combo 1` and click into CK3 (keep it the frontmost app) until the "go" sound.
 2. Click the overlay's text field, then type letters, a few spaces and the digits 1–5.
 3. Record: do the characters appear in the field; does CK3 unpause or change speed (Space, digits) or react to letters; does the frontmost app (shown in the overlay's focus text and logged) stay CK3.
