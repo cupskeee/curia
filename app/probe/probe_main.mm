@@ -879,6 +879,12 @@ int main(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
         args.emplace_back(argv[i]);
     }
+    if (args.size() == 1 && args[0] == "--selftest-observers") {
+        std::string report;
+        const bool ok = mac::selfTestWorkspaceObservers(&report);
+        std::printf("%s %s\n", ok ? "PROBE_SELFTEST_OK" : "PROBE_SELFTEST_FAIL", report.c_str());
+        return ok ? 0 : 1;
+    }
     const ParseResult parsed = parseArgs(args);
     if (!parsed.ok) {
         std::fprintf(stderr, "curia_m2_probe: %s\n", parsed.error.c_str());

@@ -93,7 +93,7 @@ if(CURIA_BUILD_APP)
             probe/probe_mac.mm
             src/ui/sdl_renderer_backend.cpp)
         target_link_libraries(curia_m2_probe PRIVATE curia_core curia_probe_core SDL3::SDL3 imgui::imgui
-            "-framework AppKit" "-framework Carbon" "-framework CoreGraphics" "-framework ApplicationServices")
+            "-framework AppKit" "-framework Carbon" "-framework CoreGraphics" "-framework AudioToolbox")
         target_compile_options(curia_m2_probe PRIVATE $<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>)
         set_target_properties(curia_m2_probe PROPERTIES
             MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/probe/Info.plist.in
@@ -102,6 +102,11 @@ if(CURIA_BUILD_APP)
             MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
             MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}")
         curia_configure_target(curia_m2_probe)
+        # The workspace-observer path crashed once (a block captured a dead local); this posts synthetic
+        # notifications after install and needs no window and no focus change.
+        add_test(NAME probe_observers COMMAND $<TARGET_FILE:curia_m2_probe> --selftest-observers)
+        set_tests_properties(probe_observers PROPERTIES LABELS smoke TIMEOUT 30
+                             PASS_REGULAR_EXPRESSION "PROBE_SELFTEST_OK")
         # Ad-hoc signature over the whole bundle so the Info.plist is bound to it.
         add_custom_command(TARGET curia_m2_probe POST_BUILD
             COMMAND codesign --force --sign - "$<TARGET_BUNDLE_DIR:curia_m2_probe>"

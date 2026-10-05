@@ -24,6 +24,12 @@ export VCPKG_ROOT=~/vcpkg
 cmake --preset macos-arm64 && cmake --build --preset macos-arm64 --target curia_m2_probe
 APP="$PWD/build/macos-arm64/app/curia_m2_probe.app"; ls "$APP/Contents/MacOS/"
 ```
+Then run the **preflight** (after every rebuild; it opens no window and changes no focus):
+```sh
+tools/m2/preflight.sh
+```
+It runs the observer self-test, a one-second `detect` run launched with `open` that must end cleanly, and fails if a new crash report for the probe appears. It must print `PREFLIGHT_OK`; if it does not, stop and send me the output. (The first E1 attempt on 2026-10-05 crashed the probe on the first app-activation notification; the cause was a dangling capture in the notification code, fixed and covered by the self-test.)
+
 The bundle is ad-hoc signed by the build and has its own identifier (`io.github.cupskeee.curia.m2probe`), so any privacy-settings entry it causes is separate from the real app's. Keep `APP` set in the terminal you launch from (launching with `open` does not tie the probe to that terminal).
 
 **Log files:** every run writes `~/curia_m2_results/probe-<stage>-<date>-<time>.log` (one line per event, flushed immediately). If the arguments are wrong the reason is written to `probe-error-*.log` in the same folder.
@@ -35,7 +41,8 @@ The bundle is ad-hoc signed by the build and has its own identifier (`io.github.
 ## 2. Before you start (record, do not change)
 - macOS 26.5.1 arm64, CK3 1.20.0.3. Number of displays.
 - System Settings → Desktop & Dock → Mission Control: **"Displays have separate Spaces"** (on/off) and **Stage Manager** (on/off). **Do not toggle them** (the macOS 26 notes list a WindowServer crash at login when separate Spaces is off).
-- System Settings → Privacy & Security: note which apps are listed under **Accessibility**, **Input Monitoring** and **Screen & System Audio Recording** now (for the end-of-session comparison).
+- System Settings → Privacy & Security: note which apps are listed under **Accessibility**, **Input Monitoring** and **Screen & System Audio Recording** now (for the end-of-session comparison). Keep your list of other apps to yourself; only the Curia-related entries matter here.
+- An entry named `curia_m2_probe` may already be listed under Accessibility (toggle off) from earlier runs: until 2026-10-05 the probe called `AXIsProcessTrusted()` at start-up, and the system log shows the probe's launches making an Accessibility request at that point (research-notes §2.5). The call is removed. To start the session without that stale row you may run `tccutil reset Accessibility io.github.cupskeee.curia.m2probe` (it removes only that bundle's entry); the probe's own log now reports `accessibility=not_queried`.
 - CK3: normal launch (never debug mode), no console, a **throwaway save**. After loading, check the achievements indicator (pause menu icon next to Game Rules) and record it.
 
 ## 3. Experiments

@@ -2,7 +2,7 @@
 #include "probe_mac.h"
 
 #import <AppKit/AppKit.h>
-#import <ApplicationServices/ApplicationServices.h>
+#import <AudioToolbox/AudioToolbox.h>
 #import <Carbon/Carbon.h>
 #import <CoreGraphics/CoreGraphics.h>
 #include <unistd.h>
@@ -312,11 +312,14 @@ std::string focusSnapshot(void* panelOrNull) {
 }
 
 std::string permissionSnapshot() {
-    // None of these three calls shows a prompt: they only report the current authorization.
+    // Both calls only report the current authorization and show no prompt. Accessibility is
+    // deliberately not queried: AXIsProcessTrusted() made tccd log a TCCAccessRequest for
+    // kTCCServiceAccessibility at every launch (observed on macOS 26.5.1), which puts the probe in
+    // the Accessibility list and would make "did an entry appear" meaningless.
     return fields({
         kv("screen_capture", CGPreflightScreenCaptureAccess() ? 1LL : 0LL),
         kv("listen_event", CGPreflightListenEventAccess() ? 1LL : 0LL),
-        kv("accessibility", AXIsProcessTrusted() ? 1LL : 0LL),
+        kv("accessibility", "not_queried"),
     });
 }
 
@@ -462,23 +465,36 @@ std::vector<int> otherProbePids() {
     }
 }
 
+namespace {
+
+using ObserverCallback = std::shared_ptr<std::function<void(const std::string&)>>;
+
+// `callback` is taken BY VALUE on purpose: the block copies it, so it outlives the installing
+// function. (A block inside a by-reference lambda capture kept a pointer to a dead local and
+// crashed on the first app-activation notification.)
+void observeApp(NSNotificationCenter* center, NSNotificationName name, const char* label,
+                ObserverCallback callback) {
+    id token = [center addObserverForName:name
+                                   object:nil
+                                    queue:NSOperationQueue.mainQueue
+                               usingBlock:^(NSNotification* note) {
+                                 NSRunningApplication* app =
+                                     note.userInfo[NSWorkspaceApplicationKey];
+                                 (*callback)(fields({kv("event", label), appLabel(app)}));
+                               }];
+    [observerTokens() addObject:token];
+}
+
+}  // namespace
+
 void installWorkspaceObservers(std::function<void(const std::string&)> onEvent) {
-    auto callback = std::make_shared<std::function<void(const std::string&)>>(std::move(onEvent));
+    const ObserverCallback callback =
+        std::make_shared<std::function<void(const std::string&)>>(std::move(onEvent));
     NSNotificationCenter* center = NSWorkspace.sharedWorkspace.notificationCenter;
 
-    const auto observeApp = [&](NSNotificationName name, const char* label) {
-        id token = [center addObserverForName:name
-                                       object:nil
-                                        queue:NSOperationQueue.mainQueue
-                                   usingBlock:^(NSNotification* note) {
-                                     NSRunningApplication* app =
-                                         note.userInfo[NSWorkspaceApplicationKey];
-                                     (*callback)(fields({kv("event", label), appLabel(app)}));
-                                   }];
-        [observerTokens() addObject:token];
-    };
-    observeApp(NSWorkspaceDidActivateApplicationNotification, "app_activated");
-    observeApp(NSWorkspaceDidDeactivateApplicationNotification, "app_deactivated");
+    observeApp(center, NSWorkspaceDidActivateApplicationNotification, "app_activated", callback);
+    observeApp(center, NSWorkspaceDidDeactivateApplicationNotification, "app_deactivated",
+               callback);
 
     id spaceToken = [center addObserverForName:NSWorkspaceActiveSpaceDidChangeNotification
                                         object:nil
@@ -487,6 +503,51 @@ void installWorkspaceObservers(std::function<void(const std::string&)> onEvent) 
                                       (*callback)(kv("event", "active_space_changed"));
                                     }];
     [observerTokens() addObject:spaceToken];
+}
+
+bool selfTestWorkspaceObservers(std::string* report) {
+    @autoreleasepool {
+        struct Seen {
+            bool activated = false;
+            bool deactivated = false;
+            bool space = false;
+            int total = 0;
+        };
+        auto seen = std::make_shared<Seen>();
+        installWorkspaceObservers([seen](const std::string& line) {
+            ++seen->total;
+            seen->activated =
+                seen->activated || line.find("event=app_activated") != std::string::npos;
+            seen->deactivated =
+                seen->deactivated || line.find("event=app_deactivated") != std::string::npos;
+            seen->space =
+                seen->space || line.find("event=active_space_changed") != std::string::npos;
+        });
+        // The installing function has returned: its locals are gone, which is when a block that
+        // captured them by reference would crash.
+        NSNotificationCenter* center = NSWorkspace.sharedWorkspace.notificationCenter;
+        NSDictionary* info = @{NSWorkspaceApplicationKey : NSRunningApplication.currentApplication};
+        [center postNotificationName:NSWorkspaceDidActivateApplicationNotification
+                              object:NSWorkspace.sharedWorkspace
+                            userInfo:info];
+        [center postNotificationName:NSWorkspaceDidDeactivateApplicationNotification
+                              object:NSWorkspace.sharedWorkspace
+                            userInfo:info];
+        [center postNotificationName:NSWorkspaceActiveSpaceDidChangeNotification
+                              object:NSWorkspace.sharedWorkspace
+                            userInfo:nil];
+        [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.5]];
+        removeWorkspaceObservers();
+        // Real system notifications may arrive as well, so check the kinds, not an exact count.
+        const bool ok = seen->activated && seen->deactivated && seen->space;
+        if (report != nullptr) {
+            *report = "activated=" + std::to_string(seen->activated) +
+                      " deactivated=" + std::to_string(seen->deactivated) +
+                      " space=" + std::to_string(seen->space) +
+                      " callbacks=" + std::to_string(seen->total);
+        }
+        return ok;
+    }
 }
 
 void removeWorkspaceObservers() {
@@ -535,20 +596,28 @@ bool registerHotkeys(std::function<void(int)> onHotkey, std::string* error) {
     return ok;
 }
 
+// System sounds through AudioServices. NSSound made the audio daemon ask for microphone access on
+// behalf of the probe (a request tccd refused for lack of a usage description); the cues need no
+// permission at all.
 void playSound(const std::string& name) {
     @autoreleasepool {
-        static NSMutableDictionary<NSString*, NSSound*>* cache = [NSMutableDictionary dictionary];
+        static NSMutableDictionary<NSString*, NSNumber*>* ids = [NSMutableDictionary dictionary];
         NSString* key = [NSString stringWithUTF8String:name.c_str()];
-        NSSound* sound = cache[key];
-        if (sound == nil) {
-            sound = [NSSound soundNamed:key];
-            if (sound != nil) {
-                cache[key] = sound;
+        NSNumber* cached = ids[key];
+        if (cached == nil) {
+            SystemSoundID created = 0;
+            NSURL* url = [NSURL
+                fileURLWithPath:[NSString stringWithFormat:@"/System/Library/Sounds/%@.aiff", key]];
+            if (AudioServicesCreateSystemSoundID((__bridge CFURLRef)url, &created) !=
+                kAudioServicesNoError) {
+                created = 0;
             }
+            cached = @(created);
+            ids[key] = cached;
         }
-        if (sound != nil) {
-            [sound stop];
-            [sound play];
+        const SystemSoundID id = static_cast<SystemSoundID>(cached.unsignedIntValue);
+        if (id != 0) {
+            AudioServicesPlaySystemSound(id);
         } else {
             NSBeep();
         }

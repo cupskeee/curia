@@ -35,7 +35,7 @@ std::string placeWindow(void* nswindow, int margin, int displayIndex);
 
 // One line of key=value text per call.
 std::string focusSnapshot(void* panelOrNull);  // frontmost app, whether we are active, panel state
-std::string permissionSnapshot();              // pre-checks that never prompt
+std::string permissionSnapshot();              // screen-capture and input-monitoring pre-checks
 std::string environmentSnapshot();             // OS, screens, "separate Spaces" setting, bundle id
 std::string displaysSnapshot();                // active displays: id, bounds, main, captured
 std::string ck3Snapshot();                     // running process whose executable is "ck3"
@@ -56,11 +56,17 @@ std::vector<int> otherProbePids();
 void installWorkspaceObservers(std::function<void(const std::string&)> onEvent);
 void removeWorkspaceObservers();
 
+// Installs the observers, lets the installing function return, then posts one synthetic activation,
+// deactivation and Space-change notification and checks that the callback ran for each. Touches no
+// window and no focus. `report` gets a one-line result.
+bool selfTestWorkspaceObservers(std::string* report);
+
 // Carbon global hot keys Ctrl+Cmd+K / L / J / H, ids 1..4. Returns false and fills `error` when a
 // registration fails; `onHotkey` runs on the main thread.
 bool registerHotkeys(std::function<void(int)> onHotkey, std::string* error);
 
-// A macOS system sound by name ("Tink", "Glass", ...); falls back to the system beep.
+// A macOS system sound by name ("Tink", "Glass", ...) through AudioServices; falls back to the
+// system beep.
 void playSound(const std::string& name);
 std::string homeDirectory();
 
