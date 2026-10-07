@@ -76,6 +76,7 @@ curia_export_vassals = {
 		limit = { any_vassal = { } }
 		ordered_vassal = {
 			max = curia_max_vassals
+			check_range_bounds = no
 			order_by = current_military_strength
 			change_global_variable = { name = curia_rank add = 1 }
 			change_global_variable = { name = curia_export_lines add = 1 }
@@ -116,11 +117,14 @@ curia_export_wars = {
 # Claims of the ruler. ordered_claim (with max and order_by = tier, as vanilla's own suggestions use it) is the iterator
 # that caps the number of lines; it has the same title scope as the proven random_claim, and the title name form is the
 # one proven there. ordered_claim itself was not run in M0b.
+# check_range_bounds = no (here and on ordered_vassal): without it the engine writes an error.log entry on every run
+# whenever max is bigger than the list (M3, 2026-10-06: 1 claim, max 10). Vanilla script uses the same key for the same reason.
 curia_export_claims = {
 	if = {
 		limit = { any_claim = { } }
 		ordered_claim = {
 			max = curia_max_claims
+			check_range_bounds = no
 			order_by = tier
 			change_global_variable = { name = curia_claim_index add = 1 }
 			change_global_variable = { name = curia_export_lines add = 1 }
