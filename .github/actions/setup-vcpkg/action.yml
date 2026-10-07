@@ -2,7 +2,8 @@ name: Set up vcpkg
 description: >
   Checks out vcpkg at the commit pinned as builtin-baseline in vcpkg.json (so the tool and the port
   versions always match), bootstraps it, and restores the binary cache. The calling job saves the cache
-  afterwards with actions/cache/save (an always() step), so a failed build still keeps the compiled ports.
+  afterwards with actions/cache/save, as soon as its Configure step (which runs vcpkg install) has succeeded,
+  so a failed compile still keeps the built ports but a failed vcpkg install never leaves a partial cache.
 inputs:
   cache-key-suffix:
     description: Extra cache key part (usually the vcpkg triplet).

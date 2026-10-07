@@ -83,13 +83,16 @@ jobs:
         with:
           cache-key-suffix: ${{ matrix.triplet }}
       - name: Configure
+        id: configure
         shell: bash
         run: cmake --preset ${{ matrix.preset }} -DCURIA_WARNINGS_AS_ERRORS=ON
       - name: Build
         shell: bash
         run: cmake --build --preset ${{ matrix.preset }}
-      - name: Save the vcpkg binary cache (even if a later step failed)
-        if: always() && steps.vcpkg.outputs.cache-hit != 'true'
+      # Configure runs vcpkg install, so a successful Configure means every port is in the cache. Saving after a failed
+      # Configure would store a partial cache under the exact key, and an exact hit is never saved again.
+      - name: Save the vcpkg binary cache (when every port was built, even if a later step failed)
+        if: always() && steps.configure.outcome == 'success' && steps.vcpkg.outputs.cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .vcpkg-cache
@@ -159,11 +162,14 @@ jobs:
         with:
           cache-key-suffix: curia-x64-linux-core
       - name: Configure (core and tests only, ASan and UBSan)
+        id: configure
         run: cmake --preset linux-x64-sanitize -DCURIA_WARNINGS_AS_ERRORS=ON
       - name: Build
         run: cmake --build --preset linux-x64-sanitize
-      - name: Save the vcpkg binary cache (even if a later step failed)
-        if: always() && steps.vcpkg.outputs.cache-hit != 'true'
+      # Configure runs vcpkg install, so a successful Configure means every port is in the cache. Saving after a failed
+      # Configure would store a partial cache under the exact key, and an exact hit is never saved again.
+      - name: Save the vcpkg binary cache (when every port was built, even if a later step failed)
+        if: always() && steps.configure.outcome == 'success' && steps.vcpkg.outputs.cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .vcpkg-cache
