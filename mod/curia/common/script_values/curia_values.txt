@@ -120,3 +120,142 @@ curia_probe_faction_member_count = {
 		add = 1
 	}
 }
+
+# ---- M3 session 2 probes (candidates, NOT proven): claim filters and faction fields ----
+# Claim counts for one explicit/pressed filter pair; the game's own documentation lists explicit and pressed as
+# yes/no/all parameters of the claim iterators and does not state the default (docs/spikes/m3-results.md).
+curia_probe_claims_eyes_pyes = {
+	value = 0
+	every_claim = {
+		explicit = yes
+		pressed = yes
+		add = 1
+	}
+}
+curia_probe_claims_eyes_pno = {
+	value = 0
+	every_claim = {
+		explicit = yes
+		pressed = no
+		add = 1
+	}
+}
+curia_probe_claims_eyes_pall = {
+	value = 0
+	every_claim = {
+		explicit = yes
+		pressed = all
+		add = 1
+	}
+}
+curia_probe_claims_eno_pyes = {
+	value = 0
+	every_claim = {
+		explicit = no
+		pressed = yes
+		add = 1
+	}
+}
+curia_probe_claims_eno_pno = {
+	value = 0
+	every_claim = {
+		explicit = no
+		pressed = no
+		add = 1
+	}
+}
+curia_probe_claims_eno_pall = {
+	value = 0
+	every_claim = {
+		explicit = no
+		pressed = all
+		add = 1
+	}
+}
+curia_probe_claims_eall_pyes = {
+	value = 0
+	every_claim = {
+		explicit = all
+		pressed = yes
+		add = 1
+	}
+}
+curia_probe_claims_eall_pno = {
+	value = 0
+	every_claim = {
+		explicit = all
+		pressed = no
+		add = 1
+	}
+}
+curia_probe_claims_eall_pall = {
+	value = 0
+	every_claim = {
+		explicit = all
+		pressed = all
+		add = 1
+	}
+}
+# Flags of one claim, set per claim by curia_probe_claim_detail (curia_probes.txt) and read here.
+curia_claim_flag_explicit_strong_value = {
+	value = global_var:curia_claim_f_es
+}
+curia_claim_flag_explicit_weak_value = {
+	value = global_var:curia_claim_f_ew
+}
+curia_claim_flag_implicit_strong_value = {
+	value = global_var:curia_claim_f_is
+}
+curia_claim_flag_implicit_weak_value = {
+	value = global_var:curia_claim_f_iw
+}
+# Faction scope (the scope of these values is the faction).
+curia_probe_faction_power_threshold = {
+	value = faction_power_threshold
+}
+curia_probe_faction_at_war = {
+	value = 0
+	if = {
+		limit = { faction_is_at_war = yes }
+		add = 1
+	}
+}
+curia_probe_faction_can_press = {
+	value = 0
+	if = {
+		limit = { faction_can_press_demands = yes }
+		add = 1
+	}
+}
+# 1 independence, 2 liberty, 3 claimant, 4 populist, 5 peasant, 6 nomadic, 7 any other type (nation fracturing, escalated
+# peasant and the ceremonial / imperial-policy types all give 7; identify those in the Factions window). 0 is never printed.
+curia_probe_faction_type_code = {
+	value = 0
+	if = {
+		limit = { faction_is_type = independence_faction }
+		add = 1
+	}
+	else_if = {
+		limit = { faction_is_type = liberty_faction }
+		add = 2
+	}
+	else_if = {
+		limit = { faction_is_type = claimant_faction }
+		add = 3
+	}
+	else_if = {
+		limit = { faction_is_type = populist_faction }
+		add = 4
+	}
+	else_if = {
+		limit = { faction_is_type = peasant_faction }
+		add = 5
+	}
+	else_if = {
+		limit = { faction_is_type = nomadic_faction }
+		add = 6
+	}
+	else = {
+		add = 7
+	}
+}
