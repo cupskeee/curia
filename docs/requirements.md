@@ -131,7 +131,7 @@ Supported through X11/XWayland (run with `SDL_VIDEO_DRIVER=x11`; SDL3 defaults t
 | ID | Risk | Mitigation |
 |---|---|---|
 | R1 | macOS overlay can't appear above CK3 in some display modes | M2 spike first; Objective-C++ panel; if some modes can't work, document the supported mode(s) (target: default Fullscreen, fallback Windowed; D13). |
-| R2 | `debug_log` needs `-debug_mode`, or values don't resolve in `debug_log` (T6) | Retired by M0/M0b: it works without debug mode, and names, numbers and opinions resolve with `THIS`-based forms (`research-notes.md` §2.14). Only faction-scope forms remain; they never ran in M3 (no faction existed in the realms tested; `docs/spikes/m3-results.md`). |
+| R2 | `debug_log` needs `-debug_mode`, or values don't resolve in `debug_log` (T6) | Retired by M0/M0b: it works without debug mode, and names, numbers and opinions resolve with `THIS`-based forms (`research-notes.md` §2.14). Faction-scope forms ran in M3 session 2 (three factions, no error); the faction name still carries link markup in the `NoTooltip` form (`research-notes.md` C35, §2.16), and the `special_character` claimant form has not run. |
 | R3 | A CK3 patch breaks the mod GUI or script | Scripted widget, `curia_` prefix, local tiger runs, version tags. |
 | R4 | Log cap (~17MB cumulative) silences the log mid-session | Small exports, silence detection, restart advice (C3). |
 | R5 | Windows/Linux defects the owner can't see, including Windows log-watch behaviour (shared read, buffering, line endings, change-notification timing) which M3 measures on macOS only | CI matrix, fake-CK3 e2e on every OS, tester checklist and tester-report issue form, community beta before M7. |

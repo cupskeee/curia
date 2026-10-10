@@ -1,6 +1,15 @@
 <!-- SPDX-License-Identifier: MIT -->
 # M3 session 2: Ironman, claims, factions (owner, macOS, about 20 minutes)
 
+> **Ran on 2026-10-11; the results are in `m3-results.md`, section "Session 2 (2026-10-11): Ironman, claims, factions".** This page stays as the record of what was asked; it is not edited to match what happened. Things to change next time, from the run:
+> - Part 3 worked as a stop rule: the first faction was probed at once, and factions appeared in both paths. The "N minutes" the sheet asked for in path B was not recorded (real minutes were not tracked), so the cap of 5 real minutes cannot be checked afterwards; ask for a start and an end note in the owner's notes.
+> - The sheet asked for path B only if path A offered nothing; both paths were run. Say whether B is still wanted when A succeeds.
+> - The sheet did not ask for the game state (paused or speed) at each click, so the T3 phase coverage of session 2 is unrecorded; ask for one word per click group if phase coverage matters.
+> - Ironman got one Advisor and one probes click, as asked; repeated clicks in Ironman were not part of the sheet.
+> - Step 4 reads `claim_detail` for the ruler only; add the heir if per-claim kinds of the heir are wanted, and ask for the heir's UI claim list in step 4.
+> - The claimant has no probe line of its own; it showed only through the markup in the faction name. If a dedicated claimant field is wanted, the probes need the `special_character` forms first.
+> - The watcher's `LOAD` line can appear twice; write down in the notes whether the game was started twice.
+
 Rules as in `m3-quickrun-session1.md`: throwaway games only; words and numbers only, never game text; anything that differs from this page is the result, write it down. Two Terminal tabs, both `cd ~/PycharmProjects/curia`; tab 1 only runs the watcher, tab 2 also runs `source tools/m3/session_env.sh`. One watcher run per game or load (Ctrl+C at the end of each): the game's snapshot counter restarts at 1 in a new game, and the watcher flags a repeated number as `duplicate_snap_id`. Check tab 1 after each group of clicks.
 
 **Stop rules.** `errcount` counts error.log lines since the game was launched, so write its value at each check and compare with the previous one; only a rise is a new Curia error. Run it after the first **Advisor** click and again after the first **Curia probes** click. On a rise: `errlines`, stop clicking, write every line (cut to 260 characters, kept local). Also stop and write the exact text on a crash, a popup after a click, a permission prompt (before answering it), or an achievements line that changes in a plain Play. An empty field or a 0 is a result, not a stop.
