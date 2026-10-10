@@ -9,7 +9,7 @@
 #   CURIA1|<snap>|VASSAL|<rank>|<name>|<primary title>|<gold>|<opinion of ruler>    or  VASSAL|0|none
 #   CURIA1|<snap>|WAR|<n>|NAME|<war name>   then  WAR|<n>|ATTACKER|<name>   and  WAR|<n>|DEFENDER|<name>   or  WAR|0|none
 #   CURIA1|<snap>|CLAIM|<n>|<title>                                                  or  CLAIM|0|none
-#   CURIA1|<snap>|PROBE|<name>|<value>     (only when curia_probe_mode = 1; curia_probes.txt)
+#   CURIA1|<snap>|PROBE|<name>|<value>...  (only when curia_probe_mode = 1; curia_probes.txt; claim_detail has more fields)
 #   CURIA1|<snap>|END|<line count>         (all lines of the frame, BEGIN and END included)
 # Fields are separated by |. Only value forms proven in M0/M0b are used here; candidate forms live in curia_probes.txt.
 # Every global variable set here is also read in script (by a script value in curia_values.txt), so the engine

@@ -1,6 +1,7 @@
 ﻿# SPDX-License-Identifier: MIT
 # Curia (M3 spike): the probe section, run only by the "Curia probes" button (curia_probe_mode = 1), inside the frame
-# between the last export section and END. Every line is CURIA1|<snap>|PROBE|<name>|<value>.
+# between the last export section and END. Most lines are CURIA1|<snap>|PROBE|<name>|<value>; claim_detail has more
+# fields (CURIA1|<snap>|PROBE|claim_detail|<index>|<title>|<4 flags>|<tier>).
 # Each line tests ONE candidate form that was NOT proven in M0/M0b, so a failure is isolated to its own line: a wrong
 # guess should print an empty value or 0, and the other lines still print.
 #
@@ -9,8 +10,15 @@
 #   * one group: remove its line from curia_export_probes below;
 #   * one candidate: remove its change_global_variable + debug_log pair.
 # Candidates that could raise a script error rather than print an empty value (each is isolated in its own group):
-#   * faction group: faction_leader / faction_target links (guarded with exists, so no error expected) and the faction-scope
-#     script values (curia_probe_faction_*), because faction scope forms were never run;
+#   * claim_detail group (new): save_temporary_scope_as in the effect, scope:curia_probe_claimant = { has_*_claim_on = prev }
+#     inside an ordered_claim body and its limit blocks (valid in the game's own effects, never run here; the M0b rule
+#     against scope: only covers script values, which read the flags through global variables instead), and the
+#     explicit / pressed parameters on ordered_claim (vanilla passes them to any_claim / every_claim / random_claim only);
+#   * claim filter values (curia_probe_claims_e*_p*): explicit = no and seven of the nine explicit/pressed pairs appear in no
+#     vanilla file, only in the trigger documentation;
+#   * faction groups: faction_leader / faction_target links and joined_faction (all guarded with exists, so no error
+#     expected), and the faction-scope script values (curia_probe_faction_*, faction_is_type, faction_power_threshold),
+#     because faction scope forms were never run; the output is not capped (about 16 lines per faction);
 #   * script values that iterate (every_vassal, every_vassal_or_below, every_claim, every_faction_member) and the
 #     value-only triggers (monthly_character_income, yearly_character_income, realm_size, tier, faction_power,
 #     faction_discontent): valid in the game's own files, never run here.
@@ -22,8 +30,11 @@ curia_export_probes = {
 	curia_probe_heir = yes
 	curia_probe_vassal = yes
 	curia_probe_claim = yes
+	curia_probe_claim_filters = yes
+	curia_probe_claim_detail = yes
 	curia_probe_war = yes
 	curia_probe_factions = yes
+	curia_probe_factions_joined = yes
 }
 
 # Ruler scope.
@@ -137,49 +148,179 @@ curia_probe_war = {
 	}
 }
 
-# Factions that target the ruler (faction scope). Never tested in M0b (the test ruler had none).
+# Claim counts under every explicit/pressed filter pair, for the ruler and the heir, to compare with the default-filter
+# count (ruler_claim_count, heir_claim_count) and with what the game's character window lists.
+curia_probe_claim_filters = {
+	change_global_variable = { name = curia_export_lines add = 1 }
+	debug_log = curia_probe_ruler_claims_eyes_pyes
+	change_global_variable = { name = curia_export_lines add = 1 }
+	debug_log = curia_probe_ruler_claims_eyes_pno
+	change_global_variable = { name = curia_export_lines add = 1 }
+	debug_log = curia_probe_ruler_claims_eyes_pall
+	change_global_variable = { name = curia_export_lines add = 1 }
+	debug_log = curia_probe_ruler_claims_eno_pyes
+	change_global_variable = { name = curia_export_lines add = 1 }
+	debug_log = curia_probe_ruler_claims_eno_pno
+	change_global_variable = { name = curia_export_lines add = 1 }
+	debug_log = curia_probe_ruler_claims_eno_pall
+	change_global_variable = { name = curia_export_lines add = 1 }
+	debug_log = curia_probe_ruler_claims_eall_pyes
+	change_global_variable = { name = curia_export_lines add = 1 }
+	debug_log = curia_probe_ruler_claims_eall_pno
+	change_global_variable = { name = curia_export_lines add = 1 }
+	debug_log = curia_probe_ruler_claims_eall_pall
+	if = {
+		limit = { exists = player_heir }
+		player_heir = {
+			change_global_variable = { name = curia_export_lines add = 1 }
+			debug_log = curia_probe_heir_claims_eyes_pyes
+			change_global_variable = { name = curia_export_lines add = 1 }
+			debug_log = curia_probe_heir_claims_eyes_pno
+			change_global_variable = { name = curia_export_lines add = 1 }
+			debug_log = curia_probe_heir_claims_eyes_pall
+			change_global_variable = { name = curia_export_lines add = 1 }
+			debug_log = curia_probe_heir_claims_eno_pyes
+			change_global_variable = { name = curia_export_lines add = 1 }
+			debug_log = curia_probe_heir_claims_eno_pno
+			change_global_variable = { name = curia_export_lines add = 1 }
+			debug_log = curia_probe_heir_claims_eno_pall
+			change_global_variable = { name = curia_export_lines add = 1 }
+			debug_log = curia_probe_heir_claims_eall_pyes
+			change_global_variable = { name = curia_export_lines add = 1 }
+			debug_log = curia_probe_heir_claims_eall_pno
+			change_global_variable = { name = curia_export_lines add = 1 }
+			debug_log = curia_probe_heir_claims_eall_pall
+		}
+	}
+}
+
+# One line per claim (all claims, highest tier first, at most curia_max_claims), with the four claim kinds the game's
+# triggers tell apart: explicit strong (pressed), explicit weak (unpressed), implicit strong, implicit weak.
+# The ruler is saved as a scope so the title-scope iterator can ask the ruler about each title.
+curia_probe_claim_detail = {
+	save_temporary_scope_as = curia_probe_claimant
+	set_global_variable = { name = curia_claim_index value = 0 }
+	if = {
+		limit = {
+			any_claim = {
+				explicit = all
+				pressed = all
+			}
+		}
+		ordered_claim = {
+			explicit = all
+			pressed = all
+			max = curia_max_claims
+			check_range_bounds = no
+			order_by = tier
+			change_global_variable = { name = curia_claim_index add = 1 }
+			set_global_variable = { name = curia_claim_f_es value = 0 }
+			set_global_variable = { name = curia_claim_f_ew value = 0 }
+			set_global_variable = { name = curia_claim_f_is value = 0 }
+			set_global_variable = { name = curia_claim_f_iw value = 0 }
+			if = {
+				limit = { scope:curia_probe_claimant = { has_strong_claim_on = prev } }
+				set_global_variable = { name = curia_claim_f_es value = 1 }
+			}
+			if = {
+				limit = { scope:curia_probe_claimant = { has_weak_claim_on = prev } }
+				set_global_variable = { name = curia_claim_f_ew value = 1 }
+			}
+			if = {
+				limit = { scope:curia_probe_claimant = { has_strong_implicit_claim_on = prev } }
+				set_global_variable = { name = curia_claim_f_is value = 1 }
+			}
+			if = {
+				limit = { scope:curia_probe_claimant = { has_weak_implicit_claim_on = prev } }
+				set_global_variable = { name = curia_claim_f_iw value = 1 }
+			}
+			change_global_variable = { name = curia_export_lines add = 1 }
+			debug_log = curia_probe_claim_detail
+		}
+	}
+	else = {
+		change_global_variable = { name = curia_export_lines add = 1 }
+		debug_log = curia_probe_claim_detail_none
+	}
+}
+
+# Faction fields, in faction scope. Used for factions that target the ruler and for the faction the ruler joined or leads.
+# Never run before M3 session 2 (no faction existed in the earlier realms), so every line here is a candidate form.
+curia_probe_faction_fields = {
+	change_global_variable = { name = curia_export_lines add = 1 }
+	debug_log = curia_probe_faction_name
+	change_global_variable = { name = curia_export_lines add = 1 }
+	debug_log = curia_probe_faction_type_code
+	change_global_variable = { name = curia_export_lines add = 1 }
+	debug_log = curia_probe_faction_power_df
+	change_global_variable = { name = curia_export_lines add = 1 }
+	debug_log = curia_probe_faction_power_sv
+	change_global_variable = { name = curia_export_lines add = 1 }
+	debug_log = curia_probe_faction_power_threshold
+	change_global_variable = { name = curia_export_lines add = 1 }
+	debug_log = curia_probe_faction_discontent_df
+	change_global_variable = { name = curia_export_lines add = 1 }
+	debug_log = curia_probe_faction_discontent_sv
+	change_global_variable = { name = curia_export_lines add = 1 }
+	debug_log = curia_probe_faction_member_count
+	change_global_variable = { name = curia_export_lines add = 1 }
+	debug_log = curia_probe_faction_at_war
+	change_global_variable = { name = curia_export_lines add = 1 }
+	debug_log = curia_probe_faction_can_press
+	change_global_variable = { name = curia_export_lines add = 1 }
+	debug_log = curia_probe_faction_dangerous
+	if = {
+		limit = { exists = faction_leader }
+		faction_leader = {
+			change_global_variable = { name = curia_export_lines add = 1 }
+			debug_log = curia_probe_faction_leader
+		}
+	}
+	else = {
+		change_global_variable = { name = curia_export_lines add = 1 }
+		debug_log = curia_probe_faction_leader_none
+	}
+	if = {
+		limit = { exists = faction_target }
+		faction_target = {
+			change_global_variable = { name = curia_export_lines add = 1 }
+			debug_log = curia_probe_faction_target
+		}
+	}
+	else = {
+		change_global_variable = { name = curia_export_lines add = 1 }
+		debug_log = curia_probe_faction_target_none
+	}
+}
+
+# Factions that target the ruler (faction scope).
 curia_probe_factions = {
 	if = {
 		limit = { any_targeting_faction = { } }
 		every_targeting_faction = {
 			change_global_variable = { name = curia_export_lines add = 1 }
-			debug_log = curia_probe_faction_name
-			change_global_variable = { name = curia_export_lines add = 1 }
-			debug_log = curia_probe_faction_power_df
-			change_global_variable = { name = curia_export_lines add = 1 }
-			debug_log = curia_probe_faction_discontent_df
-			change_global_variable = { name = curia_export_lines add = 1 }
-			debug_log = curia_probe_faction_power_sv
-			change_global_variable = { name = curia_export_lines add = 1 }
-			debug_log = curia_probe_faction_discontent_sv
-			change_global_variable = { name = curia_export_lines add = 1 }
-			debug_log = curia_probe_faction_member_count
-			if = {
-				limit = { exists = faction_leader }
-				faction_leader = {
-					change_global_variable = { name = curia_export_lines add = 1 }
-					debug_log = curia_probe_faction_leader
-				}
-			}
-			else = {
-				change_global_variable = { name = curia_export_lines add = 1 }
-				debug_log = curia_probe_faction_leader_none
-			}
-			if = {
-				limit = { exists = faction_target }
-				faction_target = {
-					change_global_variable = { name = curia_export_lines add = 1 }
-					debug_log = curia_probe_faction_target
-				}
-			}
-			else = {
-				change_global_variable = { name = curia_export_lines add = 1 }
-				debug_log = curia_probe_faction_target_none
-			}
+			debug_log = curia_probe_faction_source_targeting
+			curia_probe_faction_fields = yes
 		}
 	}
 	else = {
 		change_global_variable = { name = curia_export_lines add = 1 }
 		debug_log = curia_probe_faction_none
+	}
+}
+
+# The faction the ruler has joined or leads (for example one the player created as a vassal).
+curia_probe_factions_joined = {
+	if = {
+		limit = { exists = joined_faction }
+		joined_faction = {
+			change_global_variable = { name = curia_export_lines add = 1 }
+			debug_log = curia_probe_faction_source_joined
+			curia_probe_faction_fields = yes
+		}
+	}
+	else = {
+		change_global_variable = { name = curia_export_lines add = 1 }
+		debug_log = curia_probe_faction_joined_none
 	}
 }
