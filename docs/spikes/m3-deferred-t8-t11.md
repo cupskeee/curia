@@ -1,10 +1,12 @@
 # Deferred measurements: T8 per hour and T11 launcher variants (not part of M3)
 
-Status: **deferred, not run, not part of M3.** Owner decision of 2026-10-06: the T8 one-hour stretches move to **normal play after M4** (Curia installed, measured with `tools/m3/logwatch.py` or the app's own watcher once it counts bytes), and T11 (which launcher metadata the macOS launcher needs, and how `supported_version` values behave on game 1.20.0.3) moves to **M7 packaging**, beside the Paradox Mods path decision. The maintainer's analysis, approved by the owner, is in `docs/milestones.md` (M3, M4, M7) and `docs/research-notes.md` §5.1 and §4.1.
+> Note, 2026-10-10: the M3 sheets this file refers to are `m3-protocol.md` (reference) and `m3-quickrun-session1.md` (the sheet followed on 2026-10-06/07); the results are in `docs/spikes/m3-results.md`. This file itself was not run. Wording corrected afterwards: Debug mode is not a launcher setting that stays on or off. In the launcher, Game Settings, Game tab, next to the entry "Open game in Debug Mode", there is a one-shot **launch button**: only a game started with it is a debug launch, there is nothing to switch on or off afterwards, and a plain Play is never a debug launch. The display mode can also be set in the launcher's Game Settings. The console was reached only in the debug launch; one press of the console key in the plain launch of the session opened none. The pre-launch checks, stop rules, cleanup and table rows that treated debug mode as a persistent setting are reworded below; the commands are unchanged and the table rows keep their positions.
+
+Status: **deferred, not run, not part of M3.** Owner decision of 2026-10-06: the T8 one-hour stretches move to **normal play after M4** (Curia installed, measured with `tools/m3/logwatch.py` or the app's own watcher once it counts bytes), and T11 (which launcher metadata the macOS launcher needs, and how `supported_version` values behave on the installed 1.20.x game) moves to **M7 packaging**, beside the Paradox Mods path decision. The maintainer's analysis, approved by the owner, is in `docs/milestones.md` (M3, M4, M7) and `docs/research-notes.md` §5.1 and §4.1.
 
 This file keeps the procedures and recording tables that were prepared for the second M3 sitting and checked on paper only. Nothing here is a result. They were written for a different moment than the one they will now run in (M4 normal play for T8, M7 for T11): **re-check every command against the tools before use** (`tools/m3/session_env.sh`, `tools/m3/install_mod.sh`, `tools/m3/logwatch.py`, `tools/m3/frame_table.py` exist; their options may have changed) and adapt the steps: in normal play with Curia installed the watcher separates CURIA bytes from the game's own, so a normal-play window is expected to yield the baseline and the separate no-click stretch below may be dropped. Row A of the T11 table (both metadata files, `supported_version` `1.20.*`, default install) is **not** deferred: it is observed in the M3 session (`m3-protocol.md`, R7). The per-export bytes (T8) are also measured there (R6).
 
-The rules of `m3-protocol.md` (two Terminal tabs, throwaway games only, words and numbers only, no game text in tables, stop rules, normal launch with debug mode off) apply here unchanged. The C3 cap (17MB) stays deferred as before; its start procedure is kept in 3.6 below.
+The rules of `m3-protocol.md` (two Terminal tabs, throwaway games only, words and numbers only, no game text in tables, stop rules, plain Play only) apply here unchanged. The C3 cap (17MB) stays deferred as before; its start procedure is kept in 3.6 below.
 
 ## Protocol parameters (T8 stretches)
 Chosen values of the protocol, not predictions.
@@ -19,7 +21,7 @@ Chosen values of the protocol, not predictions.
 1. Tab 1: `cd` as in 0.1 of `m3-protocol.md`. Tab 2: `cd ~/PycharmProjects/curia && source tools/m3/session_env.sh` again.
 2. `python3 tools/m3/logwatch.py --selftest` (tab 2) ends with `SELFTEST_OK`. If the checkout changed since the M3 session, repeat 0.2 first.
 3. **Mod installed?** `ls -l "$MODDIR" "$MODDIR/curia" "$MODDIR/curia/.metadata"` (tab 2) must show `curia.mod`, `curia/descriptor.mod` and `curia/.metadata/metadata.json`. If not, `tools/m3/install_mod.sh` (CK3 closed) and look again after the launcher is open (0.7).
-4. Pre-launch check (0.7): playset `curia-m3` active with "Curia" enabled, and the **debug-mode setting in the launcher off**.
+4. Pre-launch check (0.7): playset `curia-m3` active with "Curia" enabled, and the game started with the **plain Play button** (never the debug launch button).
 5. **Achievements baseline:** at the new-game setup screen of the first launch of the sitting the Achievements line must read "Available"; if "Not available", the stop rule applies. Display mode Fullscreen (confirm at the main menu).
 
 ## Part 3. T8: bytes per hour, baseline and the cap (originally launch 3)
@@ -56,7 +58,7 @@ Note the HUD date at the start and the end of this stretch as well.
 
 1. Quit CK3 **and** the launcher. Install the row's variant (tab 2; command in the table). Then `t11_snap <row>-before`.
 2. Open the launcher. Look at the mod list of the playset `curia-m3`: is "Curia" listed, enabled or disabled, is there any warning or "outdated" mark (exact text), did the playset need the mod added again, did the launcher need a restart to see it. Then `t11_snap <row>-after` and `diff ~/curia_m3_results/t11-<row>-before.sha.txt ~/curia_m3_results/t11-<row>-after.sha.txt` (empty output = the launcher changed nothing; a difference = it changed or removed something: say what, with `ls -l "$MODDIR" "$MODDIR/curia"`).
-3. Play (normal, debug mode off). Does the game start without a warning of its own about the mod (exact text if one appears)? At the main menu run `t11_check <row>-menu` (tab 2).
+3. Play (plain Play). Does the game start without a warning of its own about the mod (exact text if one appears)? At the main menu run `t11_check <row>-menu` (tab 2).
 4. Start a **new game** (any bookmark, Ironman off, name `curia_m3_t11_<row>`; the game-start line is expected at a new game, whether a loaded save prints it is not known), wait about 15 s, run `t11_check <row>-game`. **Mod-loaded evidence = the `LOAD` count above is 1 after the new game** (the second evidence is the "other lines mentioning curia" count, a count of lines, not their text, compared with the `-menu` count; the M0 stub's load showed up as mount lines). If the launcher refused the mod or the game started without it, skip the new game and record that.
 5. Quit CK3. Next row.
 
@@ -65,7 +67,7 @@ Note the HUD date at the start and the end of this stretch as well.
 | A | `tools/m3/install_mod.sh` (M3 session, 0.6 there; the observations are made in 0.7 and 2.3 there) | the default: `descriptor.mod` and `metadata.json` both present, `supported_version` `1.20.*` |
 | B | `tools/m3/install_mod.sh --variant descriptor` | `descriptor.mod` only inside the folder, no `.metadata` folder, outer file present: listed, loaded? |
 | C | `tools/m3/install_mod.sh --variant metadata` | `.metadata/metadata.json` only inside the folder, no `descriptor.mod`, outer file present: listed, loaded? |
-| D | `tools/m3/install_mod.sh --supported-version '1.19.*'` | both files, `supported_version` 1.19.* on game 1.20.0.3: outdated warning? loaded? |
+| D | `tools/m3/install_mod.sh --supported-version '1.19.*'` | both files, `supported_version` 1.19.* on the installed 1.20.x game: outdated warning? loaded? |
 | E | `tools/m3/install_mod.sh --supported-version '1.18.*'` | both files, `supported_version` 1.18.*: same questions, one more version back |
 | **F (required)** | `tools/m3/install_mod.sh --variant metadata && rm "$MODDIR/curia.mod"` | the folder with `metadata.json` only and **no outer `curia.mod`**: does the launcher find a mod that has no outer file at all? |
 | **G (required)** | `tools/m3/install_mod.sh --variant descriptor && rm "$MODDIR/curia.mod"` | the folder with `descriptor.mod` only and **no outer `curia.mod`**: the counterpart of F |
@@ -78,7 +80,7 @@ Words and numbers, no game text.
 **R0 cells**
 | Item | Value |
 |---|---|
-| Debug-mode setting in the launcher: off at the start of the sitting (yes/no) | |
+| Sitting started with plain Play, not the debug launch button (yes/no) | |
 | Achievements line at the setup screen of the first launch of the sitting (baseline) | |
 
 **R6 T8 stretches** (the per-export bytes table stays in `m3-protocol.md`)
@@ -108,4 +110,4 @@ Cap (C3): **deferred** (state, reason in 3.6).
 The cells and tables of this file, and the files of these runs in `~/curia_m3_results/` (they hold the game's own log text: privately to the maintainer, never committed or posted); anything written down verbatim under the stop rules. Same rules as in `m3-protocol.md`.
 
 ## Cleanup (after the results are in; CK3 and the launcher closed)
-Tab 2: `tools/m3/install_mod.sh --uninstall`, then `ls -l "$MODDIR"` (the listing should show only the workshop `.mod` files again, the M0b state), unless the mod is meant to stay installed. In the launcher confirm the **debug-mode setting is off**, switch back to the usual playset, delete the `curia-m3` playset if it was used, and confirm the achievements indicator reads "Available" at a plain Play's new-game setup screen. Delete the throwaway games (`curia_m3_t8_throwaway`, `curia_m3_t11_*`) in Load Game. `caffeinate` ends by itself (`killall caffeinate` if it still runs). Keep `~/curia_m3_results/`.
+Tab 2: `tools/m3/install_mod.sh --uninstall`, then `ls -l "$MODDIR"` (the listing should show only the workshop `.mod` files again, the M0b state), unless the mod is meant to stay installed. In the launcher switch back to the usual playset (the debug launch is a button, not a setting that stays on), delete the `curia-m3` playset if it was used, and confirm the achievements indicator reads "Available" at a plain Play's new-game setup screen. Delete the throwaway games (`curia_m3_t8_throwaway`, `curia_m3_t11_*`) in Load Game. `caffeinate` ends by itself (`killall caffeinate` if it still runs). Keep `~/curia_m3_results/`.

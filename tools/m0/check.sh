@@ -44,7 +44,7 @@ OUT="$OUTDIR/run-$RUN-$(date +%Y%m%d-%H%M%S).txt"
   echo "== 4. Errors mentioning the mod in error.log"
   grep -a -i -B1 -A3 -E 'curia_m0|curia m0' "$LOGDIR/error.log" 2>/dev/null | head -30
   echo
-  echo "== 4b. error.log tail (last 60 lines, cut to 220 characters; it is recreated at each launch)"
+  echo "== 4b. error.log tail (last 60 lines, cut to 220 characters; M3 found it truncated in place at launch)"
   tail -n 60 "$LOGDIR/error.log" 2>/dev/null | cut -c1-220
   echo
   echo "== 5. Sizes in bytes"

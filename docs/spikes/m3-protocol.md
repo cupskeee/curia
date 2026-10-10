@@ -1,6 +1,10 @@
-# Milestone 3 session protocol (owner, macOS 26.5.1, CK3 1.20.0.3)
+# Milestone 3 session protocol (owner, macOS 26.5.1, CK3 1.20.0.3 as prepared; the session ran 1.20.0.4)
 
-Status: **prepared, not yet run.** Nothing in this sheet is a result: every "does it work" below is answered by running it and reading the tool's output (runtime facts are measured, never estimated); no number is estimated. Sources: `docs/milestones.md` (M3), `docs/research-notes.md` §2.1, §2.2, §2.14, §5.1, `docs/spikes/m0-results.md`, `docs/spikes/m2-results.md`; lessons from `m0b-checklist.md` and `m2-checklist.md`.
+> Note, 2026-10-10: the quick-run sheet `m3-quickrun-session1.md` was followed on 2026-10-06/07, with this protocol as its reference (the game was updated to 1.20.0.4 by Steam before the launcher was opened); the results are in `docs/spikes/m3-results.md`. Wording corrected afterwards: Debug mode is not a launcher setting that stays on or off. In the launcher, Game Settings, Game tab, next to the entry "Open game in Debug Mode", there is a one-shot **launch button**: only a game started with it is a debug launch, there is nothing to switch on or off afterwards, and a plain Play is never a debug launch. The display mode can also be set in the launcher's Game Settings. The console was reached only in the debug launch; one press of the console key in the plain launch of the session opened none. The pre-launch checks, stop rules, cleanup and table rows that treated debug mode as a persistent setting are reworded below; the commands are unchanged and the table rows keep their positions.
+>
+> Lessons from the session: (1) as the sheet ordered it, the first `errcount` gate came before the first click, so it could not catch the engine error that every export wrote (71 Curia entries for 71 exports in that launch's `error.log`; fixed afterwards in PR #11); take the gate after the first click of each button. (2) On a single screen the Terminal cannot stay in view next to CK3: reach it with Cmd+Tab and check the watcher tab after each group of clicks instead of watching it live (the re-check of 2026-10-10 was run this way). (3) The sheet asked for irregular gaps of about 4 to 10 s; the session clicked faster (median gaps 0.54 s paused, 2.5 s after_unpause, 1.5 s normal, 1.1 s fast), and the T3 brackets stay valid, but the phase coverage of the engine second was not controlled, and the `fast` label has samples only in session 1 (see `m3-results.md`, T3).
+
+Status: **reference sheet of the session of 2026-10-06/07 (the quick-run sheet was the one followed); the text below is the sheet as prepared, with the debug-mode wording corrected and the lesson notes of 2026-10-10 added.** Nothing in this sheet is a result: every "does it work" below is answered by running it and reading the tool's output (runtime facts are measured, never estimated); no number is estimated. Sources: `docs/milestones.md` (M3), `docs/research-notes.md` §2.1, §2.2, §2.14, §5.1, `docs/spikes/m0-results.md`, `docs/spikes/m2-results.md`; lessons from `m0b-checklist.md` and `m2-checklist.md`.
 
 The spike mod is `mod/curia/` (build 0.1.0; description and line frame in `mod/curia/README.md`), installed with `tools/m3/install_mod.sh`, and the measuring tool is `tools/m3/logwatch.py` (description in `tools/m3/README.md`).
 
@@ -11,7 +15,7 @@ The spike mod is `mod/curia/` (build 0.1.0; description and line frame in `mod/c
 ## Scope
 | Question | Answered by | Part |
 |---|---|---|
-| **T10** `script_docs` / `dump_data_types` on the Mac: spelling, where the output lands, does it need debug mode | a debug-mode launch in a throwaway game, **its own launch, nothing else is measured in it** | 1 |
+| **T10** `script_docs` / `dump_data_types` on the Mac: spelling, where the output lands, does it need a debug launch | a debug launch in a throwaway game, **its own launch, nothing else is measured in it** | 1 |
 | **T5** is `debug.log` truncated or recreated at launch; what a tailer sees | watcher started before CK3 | 2 |
 | **T4** line format, length, charset, END count | watcher plus the raw lines | 2 |
 | **T3** flush latency per condition (paused, menu, after unpause, normal, fast), both buttons | watcher plus a click protocol | 2 |
@@ -26,7 +30,7 @@ The spike mod is `mod/curia/` (build 0.1.0; description and line frame in `mod/c
 Not in this session: the deferred items in the table above, T0, T1, T2, T6 (answered in M0, not repeated), T9 (optional clipboard comparison, skipped), CK3 **Windowed** (deferred to the M4 testing, as in M2), Windows and Linux (CI plus testers later). Also not measured here, so left open in `research-notes.md` §5.1 (the maintainer marks them open, not answered): T3 whether OS file-change notifications fire (A15; the watcher polls) and buffered versus line-flushed as a mechanism (T3 here measures the delay per condition only); T4 whether quotes, braces and newlines are preserved (only non-ASCII bytes and the byte-order mark are looked at; the 8,000-character line was M0b) and the maximum line length and truncation beyond 8,000 characters (the mod's lines are far shorter); T7 in the loading screen, in observer mode and in an Ironman game (map view and pause are covered). Everything here is **macOS arm64 only**; log behaviour on other systems stays unverified.
 
 ## Rules for the whole session
-- **Normal launch (plain Play, debug mode off) for everything except Part 1.** Console use happens only in Part 1 and in the optional last step 7 of Part 5, both in throwaway games, both maintenance tests and never user-facing steps (Curia itself never asks a user to use the console); a game that had console use loses achievements (a debug-mode launch already showed "Not available" in M0).
+- **Plain Play for everything except Part 1** (the debug launch button is used only in Part 1; a plain Play is never a debug launch). Console use happens only in Part 1 and in the optional last step 7 of Part 5, both in throwaway games, both maintenance tests and never user-facing steps (Curia itself never asks a user to use the console); a game that had console use loses achievements (a debug launch already showed "Not available" in M0).
 - Throwaway games only: `curia_m3_t10_throwaway` (Part 1), `curia_m3_throwaway` (Parts 2 and 5). Never the real campaign, never a game with a cheat mod in the playset.
 - **Two Terminal tabs.** Tab 1 only runs the watcher (labels and `!` notes are typed there). Tab 2 is for every other shell command. Each command below says which tab. While tab 2 is in front the watcher keeps running and keeps its output; switch back to tab 1 before typing a label.
 - Dump files, raw log lines and screenshots stay on the Mac (`reference/ck3/` is gitignored; `~/curia_m3_results/` is outside the repository). The tables in this sheet take words and numbers, **not game text**: never paste dump content or engine log lines into an issue, a document or a chat (no Paradox-generated content in the repository).
@@ -37,7 +41,7 @@ Not in this session: the deferred items in the table above, T0, T1, T2, T6 (answ
 | Step | Launch | What |
 |---|---|---|
 | 0 | none (CK3 closed) | Part 0: preflight, install the mod, playset |
-| 1 | **launch 1, debug mode, throwaway game** | Part 1 (T10), nothing else; then turn the debug-mode setting off and confirm it |
+| 1 | **launch 1, debug launch, throwaway game** | Part 1 (T10), nothing else; the next launch is started with plain Play (the debug launch is a button, not a setting that stays on) |
 | 2 | **launch 2, plain Play** (watcher running before the launch) | Part 2 (T5 at launch, T4, T3). Part 5 steps 1 to 3 at the gate 2.4, steps 4 and 5 after 2.8, then step 6, then the optional 2.9, then the optional step 7 last |
 | 3 | none | end of the session: send back now, cleanup |
 
@@ -50,7 +54,7 @@ These are **chosen values of the protocol**, not predictions. The tool reports m
 |---|---|---|
 | Advisor clicks per condition | 12 | a protocol choice |
 | Curia probes clicks per condition | 4 | the probe export is larger |
-| Gap between clicks | irregular, about 4 to 10 s, never a fixed beat, never counted | the engine stamps whole seconds; irregular gaps spread the clicks over sub-second phases |
+| Gap between clicks | irregular, about 4 to 10 s, never a fixed beat, never counted (the session clicked faster; see the note at the top) | the engine stamps whole seconds; irregular gaps spread the clicks over sub-second phases |
 | "normal" and "fast" conditions | speed 3 and speed 5 (digit keys; M0: key 5 is top speed) | |
 | Wait after the last click of a condition | until the terminal shows the END line of that export, plus about 5 s | a late line must not be filed under the next label |
 | No-line limit | a click with no line in the terminal within 60 s is counted as "no line" in the tally; if a condition has any such click, see 2.6 before changing the label | the limit is a protocol choice |
@@ -59,8 +63,8 @@ These are **chosen values of the protocol**, not predictions. The tool reports m
 - **CK3 crashes**, stutters badly or shows an error popup after a click: stop, write down what was clicked and the exact text, save the outputs (the watcher saves on Ctrl+C), do not repeat the click.
 - **A permission prompt you did not expect** (any app, including Terminal asking for the Documents folder): write down the exact text and the app name it shows before answering it.
 - **error.log lines about this mod:** the watcher does not print them live (only in its summary and `.jsonl`). The check is the case-insensitive pattern `curia[_/]` (vanilla files contain `curia` inside other words, so the bare word is not used); `errcount` (0.1) prints the count. A nonzero count is **first read line by line** (`errlines`, on screen, kept local). Only a line about this mod (a `curia_` identifier of this mod or its path) stops the session: stop clicking, record every such line (cut to 260 characters), save the outputs and quit. A line that is plainly about something else is written down as a note and the session goes on. Check at the points marked "error.log check".
-- **The achievements indicator reads "Not available" in a plain-Play game** at any point: first look at the debug-mode setting in the launcher (it must be off), then stop and write down exactly when it changed and what was done just before (without a debug-mode cause this would contradict M0).
-- **Part 1 only:** if the console does not open in debug mode, record that and skip the rest of Part 1.
+- **The achievements indicator reads "Not available" in a plain-Play game** at any point: first check that this game was started with the plain Play button and not the debug launch button, then stop and write down exactly when it changed and what was done just before (without a debug-launch cause this would contradict M0).
+- **Part 1 only:** if the console does not open in the debug launch, record that and skip the rest of Part 1.
 - Everything else (an empty field, a missing line, a probe printing 0) is a result, not a stop.
 
 ## Part 0. Preflight (CK3 and the launcher closed)
@@ -110,11 +114,11 @@ ls -l "$MODDIR" "$MODDIR/curia" "$MODDIR/curia/.metadata"
 ```
 The listing must still show `curia.mod`, `curia/descriptor.mod` and `curia/.metadata/metadata.json`; then `t11_snap A-after` and `diff ~/curia_m3_results/t11-A-before.sha.txt ~/curia_m3_results/t11-A-after.sha.txt` (empty output = the launcher changed nothing). If the launcher removed them: quit the launcher, run `tools/m3/install_mod.sh` again, reopen the launcher, and write down that it happened. Record in R0 (and, for the default install, in R7): is "Curia" listed, is it enabled, is there any warning or "outdated" mark and its exact text, did the add-mod screen find it by itself, what the screen was called.
 
-**Pre-launch check (before every launch):** (1) the playset `curia-m3` is active and shows "Curia" enabled; (2) the **debug-mode setting in the launcher is off** (it is on only for launch 1; where it lives is in Part 1 step 2); (3) CK3 and, for an install, the launcher are closed as the step says. Do not launch yet.
+**Pre-launch check (before every launch):** (1) the playset `curia-m3` is active and shows "Curia" enabled; (2) the launch is started with the **plain Play button** (the debug launch button is used only for launch 1; where it lives is in Part 1 step 2); (3) CK3 and, for an install, the launcher are closed as the step says. Do not launch yet.
 
-## Part 1. T10: `script_docs` and `dump_data_types` (launch 1, debug mode, throwaway game)
+## Part 1. T10: `script_docs` and `dump_data_types` (launch 1, debug launch, throwaway game)
 
-**This launch is only for T10. No watcher, no Curia button, no latency or size measurement; nothing from this launch goes into the T3/T4/T5/T8 tables.** Part 1 is a maintenance test run by the owner in a throwaway game, never a user-facing step. The game started here loses achievements (console use disables them; a debug-mode launch already showed "Not available" in M0). It is separate because every other part needs a plain launch to keep the achievements indicator valid.
+**This launch is only for T10. No watcher, no Curia button, no latency or size measurement; nothing from this launch goes into the T3/T4/T5/T8 tables.** Part 1 is a maintenance test run by the owner in a throwaway game, never a user-facing step. The game started here loses achievements (console use disables them; a debug launch already showed "Not available" in M0). It is separate because every other part needs a plain launch to keep the achievements indicator valid.
 
 In the repo (`research-notes.md` §2.2, §2.3, C20): the wiki says `script_docs` writes to the `logs` folder and the data-types dump writes `data_types.log` there, and spells the second command `DumpDataTypes` on one page and `dump_data_types` on another; in M0 the console key was `` ` `` and `help` worked. Whether the output lands there **on the Mac** is not known; step 1 finds out.
 
@@ -122,7 +126,7 @@ In the repo (`research-notes.md` §2.2, §2.3, C20): the wiki says `script_docs`
    ```sh
    touch ~/curia_m3_results/t10-marker
    ```
-2. **Turn debug mode on in the launcher.** M0 run C started debug mode from the launcher's Game Settings, so it is a launcher setting, and it is treated as **persistent until seen off again**; write down where the entry is and what it is called. Use the menus only until step 3: **new game**, Ironman off, single player, any bookmark, save name `curia_m3_t10_throwaway`. Record what the achievements indicator reads at the setup screen (M0: "Not available" immediately in a debug-mode launch). At the main menu set the display mode to Fullscreen (0.5).
+2. **Start the debug launch from the launcher.** In Game Settings (Game tab) there is a launch button next to the entry "Open game in Debug Mode"; it is a one-shot launch, not a toggle, so nothing is switched on and nothing has to be switched off afterwards. Write down where the button is and what it is called, and start the game with it instead of Play. Use the menus only until step 3: **new game**, Ironman off, single player, any bookmark, save name `curia_m3_t10_throwaway`. Record what the achievements indicator reads at the setup screen (M0: "Not available" immediately in a debug launch). At the main menu set the display mode to Fullscreen (0.5; it can also be set in the launcher's Game Settings).
 3. Once the game is running, open the console with `` ` ``. Type **only** these, in this order, one Enter each, waiting for each to finish (watch for a freeze, and note how long it took in words):
    - `script_docs`
    - `dump_data_types`; if the console says the command is unknown, try `DumpDataTypes`. Record the exact spelling that worked and the console's reply text.
@@ -139,12 +143,12 @@ In the repo (`research-notes.md` §2.2, §2.3, C20): the wiki says `script_docs`
    ls -lR reference/ck3
    ```
    `git check-ignore -v` must print the `.gitignore` rule for `/reference/`; if it prints nothing, stop and do not copy anything (the rule must hold before any dump is stored). Record **file names and sizes only** (`ls -l`); a line count per file (`wc -l`) is allowed. **Never open the dump in a document that is shared, never paste any of it anywhere.**
-6. Record whether the commands needed `-debug_mode`: in this launch the console was reached **in debug mode only**. Whether the commands work without it is not tested here (the console is not opened in a plain launch to keep Part 5's achievements check clean); the optional step 7 of Part 5 closes that at the end of launch 2.
-7. Quit CK3. **Turn debug mode off again in the launcher (Game Settings) and confirm it reads off before launch 2.** Delete the throwaway save from Load Game if wanted. The launch-2 setup screen is the check: the achievements indicator must read "Available" there (M0 reference); the M0 run recorded no warning mark in debug mode, so a mark is not the signal.
+6. Record whether the commands needed a debug launch: in this launch the console was reached **in the debug launch only**. Whether the commands work without it is not tested here (the console is not opened in a plain launch to keep Part 5's achievements check clean); the optional step 7 of Part 5 closes that at the end of launch 2.
+7. Quit CK3. **The debug launch is over; there is nothing to turn off.** Start launch 2 with plain Play. Delete the throwaway save from Load Game if wanted. The launch-2 setup screen is the check: the achievements indicator must read "Available" there (M0 reference); the M0 run recorded no warning mark in a debug launch, so a mark is not the signal.
 
 ## Part 2. Launch 2: T5 (launch), T4 (format), T3 (latency)
 
-Plain Play, playset `curia-m3`, Fullscreen, debug mode off (pre-launch check). The watcher runs in tab 1 on the other display and is started **before** CK3.
+Plain Play, playset `curia-m3`, Fullscreen (pre-launch check). The watcher runs in tab 1 on the other display and is started **before** CK3.
 
 **2.1 Before the launch** (CK3 closed). Record the log files' identity independently of the watcher, so T5 has a second witness (tab 2):
 ```sh
@@ -157,12 +161,12 @@ python3 tools/m3/logwatch.py --label before_launch
 ```
 It prints `watching ... results in ...`. If `debug.log` exists it attaches at its end (default; existing content is not counted) and prints an `attached` line; if not, it prints `waiting for debug.log`. Leave it running. **Labels:** type a word and Enter in tab 1 to tag what the game is doing; every CURIA line is filed under the label current when it arrived. A line starting with `!` is a free-text note. The window prints `label -> <word>` or `note recorded: ...` as confirmation.
 
-**2.2 Launch CK3** (launcher, Play, playset `curia-m3` enabled, debug mode off). Watch tab 1 while the game starts: it prints one line per file event, `<time> debug.log: <kind> (old size ... B, new size ... B)`. The kinds are `attached` (an existing file seen when the watcher started; not a T5 event, only note its size), `truncated`, `recreated`, `disappeared` and `appeared`; a separate `waiting for ...` line means the file did not exist yet. **T5: write down which kind appeared for `debug.log` and for `error.log` after CK3 started, the old and new size, and the time.** When the main menu shows, repeat the `stat` line of 2.1 (tab 2) and compare the inode and size with the "before" values (same inode and a smaller size = truncated in place; a different inode = recreated). Confirm the display mode is Fullscreen (0.5). Then type the label `newgame` in tab 1 (so that the game-start line is filed under it).
+**2.2 Launch CK3** (launcher, plain Play, playset `curia-m3` enabled). Watch tab 1 while the game starts: it prints one line per file event, `<time> debug.log: <kind> (old size ... B, new size ... B)`. The kinds are `attached` (an existing file seen when the watcher started; not a T5 event, only note its size), `truncated`, `recreated`, `disappeared` and `appeared`; a separate `waiting for ...` line means the file did not exist yet. **T5: write down which kind appeared for `debug.log` and for `error.log` after CK3 started, the old and new size, and the time.** When the main menu shows, repeat the `stat` line of 2.1 (tab 2) and compare the inode and size with the "before" values (same inode and a smaller size = truncated in place; a different inode = recreated). Confirm the display mode is Fullscreen (0.5). Then type the label `newgame` in tab 1 (so that the game-start line is filed under it).
 
 **2.3 New game** (throwaway, Ironman off, single player, Fullscreen). Choose a ruler like in M0b: **a count or higher, with vassals, already at war at the bookmark, ideally with an heir**; factions and claims are optional. For T4, prefer a realm whose names contain characters outside plain ASCII (the ruler, the heir, the top vassals or the claimed titles): look for letters such as þ ð æ ø å ä ö é è č š ž ł (Norse, Slavic, Greek, Arabic or Occitan areas are a guess; the first export is the real check, 2.5). On the setup screen read the **Achievements line right of the Ironman checkbox** (R0). Name the save `curia_m3_throwaway`. Start.
 Once the game has started (about 15 s later), run `t11_check A-game` (tab 2; T11 row A: is the `LOAD` count 1, as expected for a new game). Write down (table R3; so that empty fields can be explained): character and title, start date (HUD), number of vassals (Vassals window), heir name and whether the heir holds land, wars (names), the ruler's claims, any faction against the ruler.
 
-**2.4 Gate: Part 5 steps 1 to 3 now, and the error.log check** (`errcount` in tab 2, R8 row "start of the click protocol"; a nonzero count is read with `errlines` first, stop rules). Is the button there, does a click work, is the root the player. If the Advisor button is not visible or not clickable, stop the click protocol and record why (the rest of Part 2 needs the button).
+**2.4 Gate: Part 5 steps 1 to 3 now, and the error.log check** (`errcount` in tab 2, R8 row "start of the click protocol"; a nonzero count is read with `errlines` first, stop rules). *Lesson, 2026-10-10: in the sheet's order no button has been clicked at this point, so this count cannot show an error that each export writes; take `errcount` again after the first Advisor click and after the first Curia probes click, and only then start the click protocol.* Is the button there, does a click work, is the root the player. If the Advisor button is not visible or not clickable, stop the click protocol and record why (the rest of Part 2 needs the button).
 
 **2.5 First look at the data** (tab 2; after the first Advisor click and one Curia probes click, game paused): the lines are in the raw file the watcher writes. Show them without the engine prefix (on screen only):
 ```sh
@@ -184,7 +188,7 @@ Counting the leading `CURIA1` and the snapshot number as fields, the README's fr
 
 **2.6 The click protocol (T3).** Paper tally first: for every condition keep a count of clicks made on each button. Conditions in this order, labels exactly as written. For each condition:
 
-1. Switch to tab 1 (Cmd+Tab to Terminal), type the **label**, Enter, wait for `label -> <label>`.
+1. Switch to tab 1 (Cmd+Tab to Terminal), type the **label**, Enter, wait for `label -> <label>`. (On a single screen the Terminal is not visible next to CK3: check tab 1 after each group of clicks instead of watching it live.)
 2. Cmd+Tab back to CK3 (no click on the map) and set the state in the table.
 3. **12 Advisor clicks**, then **4 Curia probes clicks**, with irregular gaps (see the parameters). Count them on paper.
 4. After the last click wait until tab 1 shows the END line of that export and then about 5 s more (no-line limit: 60 s per click; a click that never shows a line goes into the tally as "no line").
@@ -228,7 +232,7 @@ The first pass was the M2 stub (`m2-results.md`: Fullscreen, visible, clickable,
 4. **error.log** (after Part 2): `errcount` and the watcher summary's section 6. Does the mod load with no `curia[_/]` entry in `error.log` (milestone criterion 6)? Record the count and, for any hit, the line (cut to 260 characters, local).
 5. **Achievements indicator with the real mod:** at the new-game setup screen (Achievements line next to the Ironman checkbox), in the pause menu (the second icon beside Game Rules; the first is Ironman), in the Game Rules window, once at the start and once after the click protocol. Exact text of each. (M0 reference: plain launch "Available"; stop rule above if it reads "Not available".)
 6. **Save and load** (after step 5, before 2.9 and step 7; tab 1: start a short run first, `python3 tools/m3/logwatch.py --label saveload --duration 300`). The mod keeps six counters in the save (`curia_snap_id`, `curia_export_lines`, `curia_rank`, `curia_war_index`, `curia_claim_index`, `curia_probe_mode`). Does saving the game after clicks work normally (save and load `curia_m3_throwaway`)? After loading it, does a click still produce a frame, and does the snapshot number continue (was it kept in the save) or restart? Does the load print a `LOAD` line (not known, observe)? (One minute; write the observation.)
-7. **Optional, last step of launch 2, T10 follow-up:** whether `script_docs` needs debug mode at all. This opens the console in a **plain** launch, so do it only after every step above is finished and recorded, in this throwaway game (the game loses achievements if a command is run): press `` ` `` once. Does a console open? Close it, run **no command**. If a console opens, record it and stop there. If this step is skipped, T10's "needs debug mode" is recorded as "console reached in debug mode only".
+7. **Optional, last step of launch 2, T10 follow-up:** whether `script_docs` needs a debug launch at all. This opens the console in a **plain** launch, so do it only after every step above is finished and recorded, in this throwaway game (the game loses achievements if a command is run): press `` ` `` once. Does a console open? Close it, run **no command**. If a console opens, record it and stop there. If this step is skipped, T10's "needs a debug launch" is recorded as "console reached in the debug launch only".
 
 ## T12 (ck3-tiger), maintainer
 
@@ -238,7 +242,7 @@ Done by the maintainer before the session; the owner does nothing. Re-run on 202
 
 **Send back now** (to the maintainer privately; these hold the game's own log text and are **not committed or posted**): the filled tables R0 to R5, R6, R7 and R8 (rows 1 and 2 and the saving-and-loading notes row); from `~/curia_m3_results/` all files of the session (`summary-*.txt`, `watch-*.jsonl`, `raw-curia-*.txt`, `t11-A*.txt`, `t11-A*.sha.txt`, `t10-marker`); anything written down verbatim under the stop rules. From `reference/ck3/` only **names and sizes**. Screenshots stay local unless asked for.
 
-**Cleanup** (CK3 and the launcher closed). Confirm the **debug-mode setting in the launcher is off** (turned off after Part 1; confirmed before launch 2) and keep the results (`~/curia_m3_results/` and `reference/ck3/` are gitignored or outside the repository; keep `~/curia_m3_backup/` until the Continue pointer is confirmed good). The spike mod and the `curia-m3` playset are the owner's choice, either is fine:
+**Cleanup** (CK3 and the launcher closed). The debug launch is a button, so there is no setting to switch off (launch 2 was started with plain Play). Keep the results (`~/curia_m3_results/` and `reference/ck3/` are gitignored or outside the repository; keep `~/curia_m3_backup/` until the Continue pointer is confirmed good). The spike mod and the `curia-m3` playset are the owner's choice, either is fine:
 - **Remove them now:** tab 2: `tools/m3/install_mod.sh --uninstall`, then `ls -l "$MODDIR"` (the listing should show only the three workshop `.mod` files again, the M0b state); in the launcher switch back to the usual playset and delete the `curia-m3` playset.
 - **Keep both in place** if more M3 checks may follow.
 - Either way: confirm the achievements indicator reads "Available" at a plain Play's new-game setup screen.
@@ -254,19 +258,19 @@ Fill during or right after the session (words and numbers, no game text).
 | Displays; separate Spaces; Stage Manager | |
 | CK3 display mode: read at launch 1 main menu / confirmed at launch 2 main menu | Fullscreen |
 | Launcher after install: "Curia" listed / enabled / warning text; folder still intact (0.7) | |
-| Debug-mode setting in the launcher: off before launch 2 (yes/no) | |
+| Launch 2 started with plain Play, not the debug launch button (yes/no) | |
 | Achievements line at the setup screen of launch 2 | |
 
 **R1 T10** (launch 1)
 | Item | Value |
 |---|---|
-| Debug-mode setting: where, what it is called; turned off again (step 7) | |
+| Debug launch button: where, what it is called; next launch was plain Play (step 7) | |
 | Console key and reply texts; spelling that worked for the data-types dump | |
 | Time each command took, any freeze | |
 | New files (folder, file names, sizes, times; not on the noise list of step 4) | |
 | Existed the folder before | |
 | Copied to `reference/ck3/` (names, sizes); `git check-ignore` printed | |
-| Needed `-debug_mode` | in debug mode only / also tested without (step 7 of Part 5) |
+| Needs a debug launch | console reached in the debug launch only / also tested in a plain launch (step 7 of Part 5) |
 
 **R2 T5, launch of launch 2**
 | Item | Value |
@@ -338,4 +342,4 @@ T12 (maintainer): as reported above.
 | Notes: saving and loading with the mod (Part 5 step 6) | | |
 
 ## What happens with the results
-Not part of the session; Phase 2 work on the maintainer's side, in this order: answers copied into `research-notes.md` §5.1 (each with date, game version 1.20.0.3 and macOS 26.5.1; T3, T4, T5, T7, T10, T12 marked answered, T8 per-export bytes and the T11 default-install check recorded, except the parts listed under "Not in this session", which stay open). **T8 per hour and T11 (the metadata and `supported_version` questions) stay open in §5.1 until their milestones** (normal play after M4, and M7; procedures in `m3-deferred-t8-t11.md`), and C3 stays deferred. Then `milestones.md` M3 (status); D2 confirmed or revised from the latency data (acceptance criterion 3); the wire format frozen as `CURIA1` in `docs/wire-format.md` (field list, END convention, charset and escaping rules, size limits, bytes per export and the by-product growth figure; macOS-verified only; the log-budget threshold default is not set here, it is chosen from normal-play data by M6a); `tests/fixtures/` made by hand from the marker lines with the engine prefix removed; the frame parser with unit tests and a fuzz harness; `tools/fake_ck3` reproducing the captured structure for the CI end-to-end test; the mod's sections and probes trimmed to what the captures proved. Windows and Linux log behaviour goes to the tester checklist.
+Not part of the session; Phase 2 work on the maintainer's side, in this order: the answers were copied into `research-notes.md` (§2.16 and §5.1; each with date, game version (1.20.0.4 in the session) and macOS 26.5.1; T3, T4, T5, T7, T10, T12 marked answered, T8 per-export bytes and the T11 default-install check recorded, except the parts listed under "Not in this session", which stay open). **T8 per hour and T11 (the metadata and `supported_version` questions) stay open in §5.1 until their milestones** (normal play after M4, and M7; procedures in `m3-deferred-t8-t11.md`), and C3 stays deferred. Then `milestones.md` M3 (status); D2 confirmed or revised from the latency data (acceptance criterion 3); the wire format frozen as `CURIA1` in `docs/wire-format.md` (field list, END convention, charset and escaping rules, size limits, bytes per export and the by-product growth figure; macOS-verified only; the log-budget threshold default is not set here, it is chosen from normal-play data by M6a); `tests/fixtures/` (open: whether they are made from the marker lines alone, as `architecture.md` has it, or keep a synthetic engine-style prefix; Phase 2 decides); the frame parser with unit tests and a fuzz harness; `tools/fake_ck3` reproducing the captured structure, with a synthetic engine-style prefix and interleaved lines, for the CI end-to-end test; the mod's sections and probes trimmed to what the captures proved. Windows and Linux log behaviour goes to the tester checklist.
