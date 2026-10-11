@@ -1,23 +1,37 @@
 ﻿# SPDX-License-Identifier: MIT
-# Curia (M3 spike): the realm export. Runs as the player character (root of the scripted GUI) and writes one
-# debug_log call per output line. Read-only: the only state it touches is Curia's own global counters.
+# Curia: the realm export in the CURIA1 format of docs/wire-format.md (sections 2 to 4, 6 and 7). Runs as the player
+# character (root of the scripted GUI) and writes one debug_log call per record. Read-only: the only state it touches is
+# Curia's own global counters.
 #
-# Frame (docs/architecture.md section 4; every line starts with CURIA1| and the snapshot id):
-#   CURIA1|<snap>|BEGIN|<date>|<ruler>|<ruler primary title>|<probe mode 0/1>
-#   CURIA1|<snap>|FIN|<gold>
-#   CURIA1|<snap>|HEIR|<name>|<opinion of ruler>|<has liege 0/1>|<landed 0/1>      or  HEIR|none
-#   CURIA1|<snap>|VASSAL|<rank>|<name>|<primary title>|<gold>|<opinion of ruler>    or  VASSAL|0|none
-#   CURIA1|<snap>|WAR|<n>|NAME|<war name>   then  WAR|<n>|ATTACKER|<name>   and  WAR|<n>|DEFENDER|<name>   or  WAR|0|none
-#   CURIA1|<snap>|CLAIM|<n>|<title>                                                  or  CLAIM|0|none
-#   CURIA1|<snap>|PROBE|<name>|<value>...  (only when curia_probe_mode = 1; curia_probes.txt; claim_detail has more fields)
-#   CURIA1|<snap>|END|<line count>         (all lines of the frame, BEGIN and END included)
-# Fields are separated by |. Only value forms proven in M0/M0b are used here; candidate forms live in curia_probes.txt.
-# Every global variable set here is also read in script (by a script value in curia_values.txt), so the engine
-# does not report a variable that is set but never used. No effect here logs an error in normal use.
+# Frame (every record starts with CURIA1|<snap>|; the exact texts are in the localization file, one key per record form):
+#   BEGIN|<mode 0/1>|<mod version>|<year>|<month>|<day>|<ruler id>|<ruler name>
+#   FIN|<gold>|<income in tenths of a gold piece>
+#   HEIR|none   or   HEIR|<id>|<opinion of liege>|<has liege 0/1>|<landed 0/1>|<name>
+#   VASSALS|<total>|<listed>   then   VASSAL|<rank>|<id>|<gold>|<opinion>|<military strength>|<name>   (top 10 by strength)
+#   WARS|<total>   then per war   WAR|<n>|NAME|<war name>, WAR|<n>|ATTACKER|<id>|<name>, WAR|<n>|DEFENDER|<id>|<name>
+#   CLAIMS|<explicit>|<implicit>|<listed>   then   CLAIM|<n>|strong or weak|<tier>|<title>   (explicit claims only, at most 10)
+#   FACTIONS|<against total>|<member 0/1>|<listed>   then per faction five records with the same n:
+#     FACTION|<n>|INFO|against or member|<type>|<power>|<threshold>|<members>, then LEADER, CLAIMANT, TITLE, TARGET
+#   PROBE|... (only in probe mode, curia_probes.txt)
+#   END|<record count>   (every record of the frame, BEGIN and END included)
+# Every text field is the LAST field of its record and a record has at most one text expression (docs/wire-format.md
+# section 2), so a game string that contains a pipe cannot move another field.
 #
-# Each section is its own effect, so a section can be skipped by removing one line from curia_export_run.
-# Counters: curia_snap_id (frame id, +1 per export), curia_export_lines (+1 before every debug_log call),
-# curia_rank, curia_war_index, curia_claim_index (numbering inside a section), curia_probe_mode (set by the scripted GUI).
+# Counting passes: the headers VASSALS, WARS, CLAIMS and FACTIONS carry a `listed` or `total` number that the app checks
+# against the records that follow. It is never computed as min(total, cap): the SAME iterator with the SAME limit, max and
+# order runs once without output, counts into a global variable, and the header reads that variable. The two passes of a
+# section must keep identical iterator parameters.
+#
+# Only value forms that ran in the game (M0/M0b, M3) or that the game's own files use are written here; the forms that
+# never ran are listed in docs/wire-format.md section 8. Every global variable set here is also read by a script value in
+# curia_values.txt (the engine reports a variable that is set but never read), and every counter is reset in
+# curia_export_begin. Each debug_log is preceded by `change_global_variable = { name = curia_export_lines add = 1 }`
+# (BEGIN by the set to 1); tools/ci/lint_mod.py checks that, because a missed increment makes the END count wrong and the
+# app discards the frame.
+#
+# Globals: curia_snap_id (frame id, +1 per export), curia_export_lines (record counter), curia_rank, curia_war_index,
+# curia_claim_index, curia_faction_index (numbering inside a section), curia_vassals_listed, curia_wars_total,
+# curia_claims_listed, curia_factions_listed (counting passes), curia_probe_mode (set by the scripted GUI).
 
 curia_export_run = {
 	curia_export_begin = yes
@@ -26,6 +40,7 @@ curia_export_run = {
 	curia_export_vassals = yes
 	curia_export_wars = yes
 	curia_export_claims = yes
+	curia_export_factions = yes
 	if = {
 		limit = {
 			exists = global_var:curia_probe_mode
@@ -44,11 +59,17 @@ curia_export_begin = {
 	else = {
 		set_global_variable = { name = curia_snap_id value = 1 }
 	}
-	# BEGIN is line 1 of the frame.
-	set_global_variable = { name = curia_export_lines value = 1 }
+	# Every counter starts at 0; BEGIN is record 1 of the frame (the line counter is set last: the lint wants it directly
+	# before the debug_log).
 	set_global_variable = { name = curia_rank value = 0 }
 	set_global_variable = { name = curia_war_index value = 0 }
 	set_global_variable = { name = curia_claim_index value = 0 }
+	set_global_variable = { name = curia_faction_index value = 0 }
+	set_global_variable = { name = curia_vassals_listed value = 0 }
+	set_global_variable = { name = curia_wars_total value = 0 }
+	set_global_variable = { name = curia_claims_listed value = 0 }
+	set_global_variable = { name = curia_factions_listed value = 0 }
+	set_global_variable = { name = curia_export_lines value = 1 }
 	debug_log = curia_line_begin
 }
 
@@ -71,7 +92,21 @@ curia_export_heir = {
 	}
 }
 
+# check_range_bounds = no (here and on every ordered_* below): without it the engine writes an error.log entry on every run
+# whenever max is bigger than the list (M3, 2026-10-06). Vanilla script uses the same key for the same reason.
 curia_export_vassals = {
+	if = {
+		limit = { any_vassal = { } }
+		# Counting pass: same iterator, no output.
+		ordered_vassal = {
+			max = curia_max_vassals
+			check_range_bounds = no
+			order_by = current_military_strength
+			change_global_variable = { name = curia_vassals_listed add = 1 }
+		}
+	}
+	change_global_variable = { name = curia_export_lines add = 1 }
+	debug_log = curia_line_vassals
 	if = {
 		limit = { any_vassal = { } }
 		ordered_vassal = {
@@ -83,15 +118,19 @@ curia_export_vassals = {
 			debug_log = curia_line_vassal
 		}
 	}
-	else = {
-		change_global_variable = { name = curia_export_lines add = 1 }
-		debug_log = curia_line_vassal_none
-	}
 }
 
-# Three lines per war: the war name is only reachable from the war scope, the attacker and defender names only from their
-# own scopes (value forms proven in M0b). The app joins them on <n>. The ruler is one of the two sides.
+# Three records per war: the war name is only reachable from the war scope, the attacker and defender only from their own
+# scopes (value forms proven in M0b). The app joins them on <n>. Wars are not capped (owner decision W8).
 curia_export_wars = {
+	if = {
+		limit = { any_character_war = { } }
+		every_character_war = {
+			change_global_variable = { name = curia_wars_total add = 1 }
+		}
+	}
+	change_global_variable = { name = curia_export_lines add = 1 }
+	debug_log = curia_line_wars
 	if = {
 		limit = { any_character_war = { } }
 		every_character_war = {
@@ -108,32 +147,166 @@ curia_export_wars = {
 			}
 		}
 	}
-	else = {
-		change_global_variable = { name = curia_export_lines add = 1 }
-		debug_log = curia_line_war_none
-	}
 }
 
-# Claims of the ruler. ordered_claim (with max and order_by = tier, as vanilla's own suggestions use it) is the iterator
-# that caps the number of lines; it has the same title scope as the proven random_claim, and the title name form is the
-# one proven there. ordered_claim itself was not run in M0b.
-# check_range_bounds = no (here and on ordered_vassal): without it the engine writes an error.log entry on every run
-# whenever max is bigger than the list (M3, 2026-10-06: 1 claim, max 10). Vanilla script uses the same key for the same reason.
+# Explicit claims only (docs/wire-format.md section 6). The `limit` keeps the claims the ruler holds as explicit pressed
+# (has_strong_claim_on) or explicit unpressed (has_weak_claim_on); it is written next to explicit = yes so that the cap of
+# 10 applies to explicit claims even if the iterator ignores the parameter. The ruler is saved as a temporary scope so the
+# title-scope iterator can ask the ruler about each title (the claim probe did the same and ran without error).
 curia_export_claims = {
+	save_temporary_scope_as = curia_claimant
+	if = {
+		limit = { any_claim = { } }
+		# Counting pass.
+		ordered_claim = {
+			explicit = yes
+			pressed = all
+			limit = {
+				scope:curia_claimant = {
+					OR = {
+						has_strong_claim_on = prev
+						has_weak_claim_on = prev
+					}
+				}
+			}
+			max = curia_max_claims
+			check_range_bounds = no
+			order_by = tier
+			change_global_variable = { name = curia_claims_listed add = 1 }
+		}
+	}
+	change_global_variable = { name = curia_export_lines add = 1 }
+	debug_log = curia_line_claims
 	if = {
 		limit = { any_claim = { } }
 		ordered_claim = {
+			explicit = yes
+			pressed = all
+			limit = {
+				scope:curia_claimant = {
+					OR = {
+						has_strong_claim_on = prev
+						has_weak_claim_on = prev
+					}
+				}
+			}
 			max = curia_max_claims
 			check_range_bounds = no
 			order_by = tier
 			change_global_variable = { name = curia_claim_index add = 1 }
+			# The limit guarantees one of the two holds; the else branch is the unpressed claim.
+			if = {
+				limit = { scope:curia_claimant = { has_strong_claim_on = prev } }
+				change_global_variable = { name = curia_export_lines add = 1 }
+				debug_log = curia_line_claim_strong
+			}
+			else = {
+				change_global_variable = { name = curia_export_lines add = 1 }
+				debug_log = curia_line_claim_weak
+			}
+		}
+	}
+}
+
+# Factions that target the ruler (strongest by power, at most curia_max_factions) and the faction the ruler has joined
+# (docs/wire-format.md section 7). ordered_targeting_faction has never run in the game; if the pre-freeze check shows it
+# failing, the cap is dropped from the format.
+curia_export_factions = {
+	if = {
+		limit = { any_targeting_faction = { } }
+		# Counting pass.
+		ordered_targeting_faction = {
+			max = curia_max_factions
+			check_range_bounds = no
+			order_by = faction_power
+			change_global_variable = { name = curia_factions_listed add = 1 }
+		}
+	}
+	if = {
+		limit = { exists = joined_faction }
+		change_global_variable = { name = curia_factions_listed add = 1 }
+	}
+	change_global_variable = { name = curia_export_lines add = 1 }
+	debug_log = curia_line_factions
+	if = {
+		limit = { any_targeting_faction = { } }
+		ordered_targeting_faction = {
+			max = curia_max_factions
+			check_range_bounds = no
+			order_by = faction_power
+			change_global_variable = { name = curia_faction_index add = 1 }
 			change_global_variable = { name = curia_export_lines add = 1 }
-			debug_log = curia_line_claim
+			debug_log = curia_line_faction_info_against
+			curia_export_faction_people = yes
+		}
+	}
+	if = {
+		limit = { exists = joined_faction }
+		joined_faction = {
+			change_global_variable = { name = curia_faction_index add = 1 }
+			change_global_variable = { name = curia_export_lines add = 1 }
+			debug_log = curia_line_faction_info_member
+			curia_export_faction_people = yes
+		}
+	}
+}
+
+# The four person and title records of one faction (faction scope), after its INFO record. Always four records, with
+# `none` forms where there is nothing. CLAIMANT and TITLE are written only for a claimant faction (type 3): the installed
+# faction definitions give other types a special character or title too, with another meaning (docs/wire-format.md
+# section 7). The links are all guarded with exists.
+curia_export_faction_people = {
+	if = {
+		limit = { exists = faction_leader }
+		faction_leader = {
+			change_global_variable = { name = curia_export_lines add = 1 }
+			debug_log = curia_line_faction_leader
 		}
 	}
 	else = {
 		change_global_variable = { name = curia_export_lines add = 1 }
-		debug_log = curia_line_claim_none
+		debug_log = curia_line_faction_leader_none
+	}
+	if = {
+		limit = {
+			faction_is_type = claimant_faction
+			has_special_character = yes
+			exists = special_character
+		}
+		special_character = {
+			change_global_variable = { name = curia_export_lines add = 1 }
+			debug_log = curia_line_faction_claimant
+		}
+	}
+	else = {
+		change_global_variable = { name = curia_export_lines add = 1 }
+		debug_log = curia_line_faction_claimant_none
+	}
+	if = {
+		limit = {
+			faction_is_type = claimant_faction
+			has_special_title = yes
+			exists = special_title
+		}
+		special_title = {
+			change_global_variable = { name = curia_export_lines add = 1 }
+			debug_log = curia_line_faction_title
+		}
+	}
+	else = {
+		change_global_variable = { name = curia_export_lines add = 1 }
+		debug_log = curia_line_faction_title_none
+	}
+	if = {
+		limit = { exists = faction_target }
+		faction_target = {
+			change_global_variable = { name = curia_export_lines add = 1 }
+			debug_log = curia_line_faction_target
+		}
+	}
+	else = {
+		change_global_variable = { name = curia_export_lines add = 1 }
+		debug_log = curia_line_faction_target_none
 	}
 }
 

@@ -7,17 +7,20 @@
 # ---- caps (one named constant each) ----
 # Number of vassals exported by VASSAL lines (top N by military strength).
 curia_max_vassals = 10
-# Number of claims exported by CLAIM lines (highest tier first).
+# Number of explicit claims exported by CLAIM lines (highest tier first).
 curia_max_claims = 10
+# Number of factions against the ruler exported by FACTION groups (strongest by power first); the ruler's own faction is extra.
+curia_max_factions = 5
 
 # ---- frame counters: Curia's own global variables, set by common/scripted_effects/curia_export.txt ----
+# Every global variable the mod sets is read by one value here (tools/ci/lint_mod.py checks that).
 curia_snap_id_value = {
 	value = global_var:curia_snap_id
 }
 curia_line_count_value = {
 	value = global_var:curia_export_lines
 }
-curia_probe_mode_value = {
+curia_mode_value = {
 	value = global_var:curia_probe_mode
 }
 curia_rank_value = {
@@ -28,6 +31,136 @@ curia_war_index_value = {
 }
 curia_claim_index_value = {
 	value = global_var:curia_claim_index
+}
+curia_faction_index_value = {
+	value = global_var:curia_faction_index
+}
+# Results of the counting passes (the `listed` and `total` fields of the section headers).
+curia_vassals_listed_value = {
+	value = global_var:curia_vassals_listed
+}
+curia_wars_total_value = {
+	value = global_var:curia_wars_total
+}
+curia_claims_listed_value = {
+	value = global_var:curia_claims_listed
+}
+curia_factions_listed_value = {
+	value = global_var:curia_factions_listed
+}
+
+# ---- date (BEGIN year, month, day) ----
+# current_year is used as a value in the game's own files; current_month and current_day are documented as triggers of the
+# same kind (scope none, compared with numbers) but no vanilla file reads them as a value. Not run in the game yet.
+curia_date_year = {
+	value = current_year
+}
+curia_date_month = {
+	value = current_month
+}
+curia_date_day = {
+	value = current_day
+}
+
+# ---- money ----
+# Monthly income in tenths of a gold piece (7.8 prints as 78), owner decision W7. Ruler scope.
+curia_income_tenths = {
+	value = monthly_character_income
+	multiply = 10
+}
+
+# ---- sizes and counts ----
+# Direct vassals (the iterator count matched the Vassals window in M3). Ruler scope.
+curia_vassal_count = {
+	value = 0
+	every_vassal = {
+		add = 1
+	}
+}
+curia_military_strength = {
+	value = current_military_strength
+}
+# Explicit and implicit claims of the character (every_claim with these filters ran in M3).
+curia_claims_explicit_count = {
+	value = 0
+	every_claim = {
+		explicit = yes
+		pressed = all
+		add = 1
+	}
+}
+curia_claims_implicit_count = {
+	value = 0
+	every_claim = {
+		explicit = no
+		pressed = all
+		add = 1
+	}
+}
+# Title scope: 1 barony to 5 empire.
+curia_title_tier = {
+	value = tier
+}
+
+# ---- factions ----
+# Ruler scope: factions that target the ruler, and whether the ruler has joined one.
+curia_faction_against_count = {
+	value = 0
+	every_targeting_faction = {
+		add = 1
+	}
+}
+curia_faction_member_flag = {
+	value = 0
+	if = {
+		limit = { exists = joined_faction }
+		add = 1
+	}
+}
+# Faction scope.
+curia_faction_power = {
+	value = faction_power
+}
+curia_faction_power_threshold = {
+	value = faction_power_threshold
+}
+curia_faction_member_count = {
+	value = 0
+	every_faction_member = {
+		add = 1
+	}
+}
+# 1 independence, 2 liberty, 3 claimant, 4 populist, 5 peasant, 6 nomadic, 7 any other type (nation fracturing, escalated
+# peasant and the ceremonial / imperial-policy types all give 7). 0 is never printed.
+curia_faction_type_code = {
+	value = 0
+	if = {
+		limit = { faction_is_type = independence_faction }
+		add = 1
+	}
+	else_if = {
+		limit = { faction_is_type = liberty_faction }
+		add = 2
+	}
+	else_if = {
+		limit = { faction_is_type = claimant_faction }
+		add = 3
+	}
+	else_if = {
+		limit = { faction_is_type = populist_faction }
+		add = 4
+	}
+	else_if = {
+		limit = { faction_is_type = peasant_faction }
+		add = 5
+	}
+	else_if = {
+		limit = { faction_is_type = nomadic_faction }
+		add = 6
+	}
+	else = {
+		add = 7
+	}
 }
 
 # ---- opinion of the ruler ----
@@ -63,7 +196,7 @@ curia_is_landed_value = {
 }
 
 # ======================================================================
-# Probe-only values (candidates, NOT proven; used only by common/scripted_effects/curia_probes.txt)
+# Probe-only values (used only by common/scripted_effects/curia_probes.txt; the ones the export now uses are above)
 # ======================================================================
 curia_probe_income_monthly = {
 	value = monthly_character_income
@@ -71,20 +204,11 @@ curia_probe_income_monthly = {
 curia_probe_income_yearly = {
 	value = yearly_character_income
 }
-curia_probe_military_strength = {
-	value = current_military_strength
-}
 curia_probe_realm_size = {
 	value = realm_size
 }
 curia_probe_vassal_count_trigger = {
 	value = vassal_count
-}
-curia_probe_vassal_count_iterator = {
-	value = 0
-	every_vassal = {
-		add = 1
-	}
 }
 curia_probe_vassal_count_below = {
 	value = 0
@@ -105,20 +229,8 @@ curia_probe_is_landless_ruler = {
 		add = 1
 	}
 }
-curia_probe_title_tier = {
-	value = tier
-}
-curia_probe_faction_power = {
-	value = faction_power
-}
 curia_probe_faction_discontent = {
 	value = faction_discontent
-}
-curia_probe_faction_member_count = {
-	value = 0
-	every_faction_member = {
-		add = 1
-	}
 }
 
 # ---- M3 session 2 probes (candidates, NOT proven): claim filters and faction fields ----
@@ -140,14 +252,6 @@ curia_probe_claims_eyes_pno = {
 		add = 1
 	}
 }
-curia_probe_claims_eyes_pall = {
-	value = 0
-	every_claim = {
-		explicit = yes
-		pressed = all
-		add = 1
-	}
-}
 curia_probe_claims_eno_pyes = {
 	value = 0
 	every_claim = {
@@ -161,14 +265,6 @@ curia_probe_claims_eno_pno = {
 	every_claim = {
 		explicit = no
 		pressed = no
-		add = 1
-	}
-}
-curia_probe_claims_eno_pall = {
-	value = 0
-	every_claim = {
-		explicit = no
-		pressed = all
 		add = 1
 	}
 }
@@ -210,9 +306,6 @@ curia_claim_flag_implicit_weak_value = {
 	value = global_var:curia_claim_f_iw
 }
 # Faction scope (the scope of these values is the faction).
-curia_probe_faction_power_threshold = {
-	value = faction_power_threshold
-}
 curia_probe_faction_at_war = {
 	value = 0
 	if = {
@@ -225,37 +318,5 @@ curia_probe_faction_can_press = {
 	if = {
 		limit = { faction_can_press_demands = yes }
 		add = 1
-	}
-}
-# 1 independence, 2 liberty, 3 claimant, 4 populist, 5 peasant, 6 nomadic, 7 any other type (nation fracturing, escalated
-# peasant and the ceremonial / imperial-policy types all give 7; identify those in the Factions window). 0 is never printed.
-curia_probe_faction_type_code = {
-	value = 0
-	if = {
-		limit = { faction_is_type = independence_faction }
-		add = 1
-	}
-	else_if = {
-		limit = { faction_is_type = liberty_faction }
-		add = 2
-	}
-	else_if = {
-		limit = { faction_is_type = claimant_faction }
-		add = 3
-	}
-	else_if = {
-		limit = { faction_is_type = populist_faction }
-		add = 4
-	}
-	else_if = {
-		limit = { faction_is_type = peasant_faction }
-		add = 5
-	}
-	else_if = {
-		limit = { faction_is_type = nomadic_faction }
-		add = 6
-	}
-	else = {
-		add = 7
 	}
 }
