@@ -62,7 +62,7 @@ CURIA1|<snap>|<TYPE>|<field>|<field>|...
   1. No `CURIA1|` in the line (head), or the marker at offset 0: not a Curia line.
   2. The header must parse: `<snap>` an int (grammar below), `<TYPE>` matching `[A-Z][A-Z0-9_]*`. Otherwise (`CURIA1|`, `CURIA1||BEGIN`, `CURIA1|abc|FOO`, a type outside the pattern) the record is invalid.
   3. Snap 0 is valid only on `LOAD`. `LOAD` with a snap of 1 or more, and any other type with snap 0 (`BEGIN`, `END`, ...), is invalid. A snap-0 record, valid or invalid, never touches a frame (section 3); an invalid one is only reported to the app's log.
-  4. A type that matches the pattern but is not in the table of section 4 is an **unknown type**; so is a known `FACTION` or `WAR` whose sub-kind is not in the table. For these only the header is validated: the snap, the type, and for `FACTION` and `WAR` an int `n` and a sub-kind word matching `[A-Z][A-Z0-9_]*` (a missing, empty or non-matching sub-kind, or a non-int `n`, is invalid). The rest of the line is not inspected and is exempt from the byte-class rule and the oversize rule; the record is ignored but **counted** and snap-checked. `PROBE` records are an unknown type and so are never invalid.
+  4. A type that matches the pattern but is not in the table of section 4, or is `PROBE`, is an **unknown type**; so is a known `FACTION` or `WAR` whose sub-kind is not in the table. For these only the header is validated: the snap, the type, and for `FACTION` and `WAR` an int `n` of 1 or more and a sub-kind word matching `[A-Z][A-Z0-9_]*` (a missing, empty or non-matching sub-kind, or a non-int `n`, is invalid). The rest of the line is not inspected and is exempt from the byte-class rule and the oversize rule; the record is ignored but **counted** and snap-checked. `PROBE` records are an unknown type, so the byte-class and oversize rules do not apply to them; the header rules of steps 2 and 3 still do.
   5. A known type is checked against the field grammar below and the oversize rule (section 1).
 - Field kinds:
   - **int**: `0`, or an optional `-` and then `[1-9][0-9]{0,9}`. Leading zeros, a lone `-`, a `+` sign, grouping separators, decimals, exponents and non-ASCII digits are invalid. The value must fit int32 (-2,147,483,648 to 2,147,483,647). `-0` is valid **only in a signed field** and is read as 0 (the game's rounding of a small negative number may print it; section 9). Snap equality is numeric on this canonical form.
@@ -74,9 +74,10 @@ CURIA1|<snap>|<TYPE>|<field>|<field>|...
 
   | Fields | Range |
   |---|---|
-  | `gold`, `income`, `opinion` (heir and vassal) | signed: any int32 |
-  | `snap` | 0 to 2,147,483,647 (0 only on `LOAD`, step 3) |
-  | `rank`, `n`, ids, `strength`, `power`, `threshold`, `members`, `total`, `listed`, `explicit`, `implicit`, `against`, the `END` count | 0 to 2,147,483,647 (`rank` and `n` start at 1) |
+  | `gold` (`FIN` and `VASSAL`), `income`, `opinion` (heir and vassal) | signed: any int32 |
+  | `snap` | 0 to 2,147,483,647 (0 only on `LOAD`, step 3). A snap "parses" when it is a valid int in this range; `-5`, `-0` and `00` do not |
+  | `rank`, `n` | 1 to 2,147,483,647 (0 is an invalid record) |
+  | ids, `strength`, `power`, `threshold`, `members`, `total`, `listed`, `explicit`, `implicit`, `against`, the `END` count | 0 to 2,147,483,647 |
   | `mode` | 0 or 1 |
   | `has_liege`, `landed`, `member` | 0 or 1 |
   | `tier` | 1 to 5 |
@@ -129,7 +130,7 @@ END|<count> ... last record
 
 **Section rules.** `BEGIN` and `END` appear exactly once. `FIN`, `HEIR`, `VASSALS`, `WARS`, `CLAIMS` and `FACTIONS` (each with its items) appear at most once, in the order of section 4; an absent section means "not exported", never "empty". The items of a section follow its header directly and precede the next header. Unknown-type records are ignored for these order and adjacency checks.
 
-**Checked counts** (any violation damages the frame). The parser does not use the mod's caps (10 vassals, 10 claims, 5 factions); the caps are the mod's business.
+**Checked counts** (any violation damages the frame, reason *order* or *count mismatch*). The records of a group all carry the group's `n`, otherwise the frame is damaged (*order*). Unknown-type records, including unknown `FACTION` and `WAR` sub-kinds, are skipped when checking adjacency and order. The parser does not use the mod's caps (10 vassals, 10 claims, 5 factions); the caps are the mod's business.
 
 | Header | Rule |
 |---|---|
@@ -146,11 +147,11 @@ END|<count> ... last record
 | invalid `BEGIN` with an int snap of 1 or more | report "unsupported mod format" (the snap and the raw text of the first three fields after the type, at most 64 bytes, control bytes shown as `?`); stay Idle | Damaged event for the open frame (*incomplete*), then the report; Idle | the report; Idle |
 | any other known type, snap >= 1 | ignored (the watcher may attach mid-frame) | stored; a snap different from the frame's damages it (*snap mismatch*); a shortened text sets *text shortened* | ignored |
 | unknown type, snap >= 1 | ignored | counted; a snap different from the frame's damages it | ignored |
-| invalid record whose snap is 1 or more, or whose snap does not parse | ignored (reported to the app's log only) | Damaged (*invalid record*) | ignored |
+| invalid record other than an invalid `BEGIN`, whose snap is 1 or more or does not parse | ignored (reported to the app's log only) | Damaged (*invalid record*) | ignored |
 | any record with snap 0 | ignored (an invalid one is reported to the app's log) | ignored; never touches the frame, not counted | ignored |
-| `END` (snap >= 1) | ignored | closes the frame: *Complete* if its snap equals the frame's, `<count>` equals the number of frame records **including `BEGIN`, `END` and unknown types**, the section rules and checked counts above hold, and no other rule was broken (a shortened text is not a broken rule; the Complete event carries *text shortened*); otherwise a Damaged event (*snap mismatch*, *count mismatch* or *order*). Then Idle | Idle, no event |
-| the **513th** frame record (even if it is `END`), or frame-record bytes above **128 KiB** (the sum of the records' lengths from marker to end, after the cut of section 1) | n/a | Damaged (*too large*); nothing more is stored | n/a |
-| log truncation | n/a | Damaged event (*truncated log*), then Idle | Idle, no event |
+| `END` (snap >= 1) | ignored | closes the frame: *Complete* if its snap equals the frame's, `<count>` equals the number of frame records **including `BEGIN`, `END` and unknown types**, the section rules and checked counts above hold, and no other rule was broken (a shortened text is not a broken rule; the Complete event carries *text shortened*); otherwise a Damaged event whose reason is the first that applies of *snap mismatch*, *count mismatch*, *order*. Then Idle | Idle, no event |
+| the **513th** frame record (even if it is `END`), or frame-record bytes above **128 KiB** (`BEGIN` rows above are handled first and never count toward the open frame's limits; the new frame starts with a count of 1) (the sum of the records' lengths from marker to end, after the cut of section 1) | n/a | Damaged (*too large*); nothing more is stored | n/a |
+| log truncation | stays Idle, no event (the unterminated tail is discarded, section 1) | Damaged event (*truncated log*), then Idle | Idle, no event |
 
 - The `END` count equalled the number of Curia lines of the frame, `BEGIN` and `END` included, in every complete frame in M3.
 - A damaged, incomplete or truncated frame is discarded whole and reported with one Damaged event; it is never dropped silently and the app never merges records of two frames.
@@ -207,7 +208,7 @@ CURIA1|7|END|16
 
 ## 5. Size
 
-Advisor export, worst case: `BEGIN`, `FIN`, `HEIR` (1 line), `VASSALS` and 10 `VASSAL` (11), `WARS` and 3 per war (1 + 3w), `CLAIMS` and 10 `CLAIM` (11), `FACTIONS` and 5 per faction for up to 6 factions (31), `END` (1): 58 lines plus 3 per war. The average of about 165 bytes per line in the file, prefixes included (155 to 173 per frame; 64 lines were 10,604 bytes), was measured on the old probe and export frames, not on the new lines (`FACTION`, `VASSALS` and `CLAIMS` lines never ran); on that basis roughly 10 KB per click plus about 0.5 KB per war. A typical realm is far less. With wars uncapped (W8), a frame holds at most 151 wars if every other section is at its maximum (169 if all other sections are empty); one with more than 512 records is lost whole ("too large"). If the capped faction iterator of section 7 fails in case A and the cap of 5 is dropped from the format, the worst case grows by 5 lines per extra faction against the ruler. The 17MB figure for the log is anecdotal and untested (C3); the app's byte budget (`architecture.md` §4) is unchanged.
+Advisor export, worst case: `BEGIN`, `FIN`, `HEIR` (1 line), `VASSALS` and 10 `VASSAL` (11), `WARS` and 3 per war (1 + 3w), `CLAIMS` and 10 `CLAIM` (11), `FACTIONS` and 5 per faction for up to 6 factions (31), `END` (1): 58 lines plus 3 per war. The average of about 165 bytes per line in the file, prefixes included (155 to 173 per frame; 64 lines were 10,604 bytes), was measured on the old probe and export frames, not on the new lines (`FACTION`, `VASSALS` and `CLAIMS` lines never ran); on that basis roughly 10 KB per click plus about 0.5 KB per war. A typical realm is far less. With wars uncapped (W8), a frame holds at most 151 wars if every other section is at its maximum (168 if every other section is present but empty, 169 only if the other sections were omitted); one with more than 512 records is lost whole ("too large"). If the capped faction iterator of section 7 fails in case A and the cap of 5 is dropped from the format, the worst case grows by 5 lines per extra faction against the ruler. The 17MB figure for the log is anecdotal and untested (C3); the app's byte budget (`architecture.md` §4) is unchanged.
 
 ## 6. Claims
 
@@ -287,7 +288,7 @@ Every click also exercises, in whatever realm it is made, the new rows that need
 | D | a war, ideally two, one of them a generated claim or CB war | `WARS`, `WAR` ids (the ruler's side or an ally), war-name markup |
 | I | two clicks in rapid succession | frames do not interleave |
 | E (income part) | a realm with at least one vassal; ideally also a negative income | `FIN` income in tenths and its sign (`-0`), plain digits; **at least one negative integer printed and read back** among `income`, `gold` and `opinion` (a vassal or heir with negative opinion is an easy way): the printed form of the minus sign has never been observed, and a non-ASCII or marked-up minus would make every such frame invalid; D15: whether the Vassals window shows a vassal's gold and strength |
-| H (date part) | the first frames of any game | numeric year, month and day against the HUD date; month and day base |
+| H (date part) | the first frames of any game, including the `LOAD` line of a new game | numeric year, month and day against the HUD date; month and day base; the `LOAD` token form |
 
 **Accepted gaps** (the owner accepts them unless they turn out to be easy to set up; a gap is listed in the results as untested, not as passed). If an edge case needs setup (10,000 or more gold, many claims or vassals), a separate throwaway game in debug mode with console commands is fine, as long as debug mode does not change what is measured (number formatting, list caps and the like). What a failure looks like:
 
