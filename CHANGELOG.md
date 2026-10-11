@@ -36,7 +36,7 @@ at `0.y.z` and anything may change between minor versions.
   format of `docs/wire-format.md` instead of the spike layout: records with
   ids, section headers with totals, numeric date and mod version in `BEGIN`,
   the net monthly balance (income minus expenses, approximately as the top bar
-  shows it, ±0.1) in tenths of a gold piece, explicit claims marked `strong` or `weak`, and
+  shows it, ±0.2) in tenths of a gold piece, explicit claims marked `strong` or `weak`, and
   faction groups. The format was frozen on 2026-10-11 after the pre-freeze
   in-game check, and the earlier spike output is not readable by the new
   format. `tools/ci/lint_mod.py` now checks the format's invariants.
