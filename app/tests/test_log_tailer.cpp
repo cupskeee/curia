@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <filesystem>
 #include <fstream>
 #include <memory>
 #include <string>
@@ -268,6 +269,21 @@ TEST_CASE("tailer: the events do not depend on how the file grows (all fixtures)
             CHECK(eventsText(events) == expected);
         }
     }
+}
+
+TEST_CASE("file source: a directory is not a log, whatever the platform's open() allows") {
+    const TempDir dir;
+    const std::string folder = dir.path("logs");
+    REQUIRE(std::filesystem::create_directory(folder));
+
+    FileSource source(folder);
+    CHECK(source.stat().state == IFileSource::State::Error);
+
+    LogTailer tailer(std::make_unique<FileSource>(folder));
+    const PollResult first = tailer.poll();
+    CHECK(hasNotice(first, TailerNotice::Unreadable));
+    CHECK_FALSE(hasNotice(first, TailerNotice::Attached));
+    CHECK(tailer.poll().notices.empty());  // reported once
 }
 
 TEST_CASE("file source: stat and read on a real file, and the tailer on top of it") {

@@ -32,7 +32,7 @@ temporary and removed on exit (`--keep` keeps it).
 | `--repeat N`, `--interval S` | N frames (or fixture rounds), S seconds apart |
 | `--snap-start N` | snap of the first generated frame (it counts up) |
 | `--noise N` | N noise lines before the frames |
-| `--line-buffer` | write each line in two chunks (a reader can catch a torn line) |
+| `--line-buffer` | write each line in two chunks, torn two bytes before its end (the first chunk of `...\|FIN\|312\|78` is `...\|FIN\|312\|7`), so a reader that parses a torn line gets a wrong number; the library API has an `after_first_chunk` hook so a test can make the tear deterministic |
 | `--flush-delay S` | hold every write back for S seconds |
 | `--burst` | all lines of a frame in one write (default: one write per line) |
 | `--prior-frames N`, `--launch-delay S`, `--truncate-at-launch` | N frames of an earlier session, then (after S seconds, in which a reader can attach) empty the log **in place** (same file, size back to 0), as the game does at launch (M3 T5) |

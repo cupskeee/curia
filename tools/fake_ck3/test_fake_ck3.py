@@ -14,7 +14,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from typing import List
+from typing import List, Tuple
 
 import fake_ck3 as fk
 
@@ -133,6 +133,18 @@ class FrameTests(unittest.TestCase):
             self.assertEqual(len(fake.chunks), 32)
             self.assertEqual(len(pauses), 16)
             self.assertEqual(records(read_lines(fake)), fk.example_frame_records(1))
+
+    def test_line_buffer_tears_two_bytes_before_the_end_and_calls_the_hook(self):
+        seen: List[Tuple[bytes, bytes]] = []
+        with fk.FakeCk3(keep_chunks=True, line_buffer=True, sleep=lambda _s: None,
+                        after_first_chunk=lambda a, b: seen.append((a, b))) as fake:
+            fake.launch()
+            fake.append_records([b"CURIA1|7|FIN|312|78"])
+            self.assertEqual(len(seen), 1)
+            first, second = seen[0]
+            self.assertTrue(first.endswith(b"CURIA1|7|FIN|312|7"))
+            self.assertEqual(second, b"8\n")
+            self.assertEqual(fake.chunks, [len(first), 2])
 
     def test_flush_delay_is_applied_to_each_write(self):
         pauses: List[float] = []

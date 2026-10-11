@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 // Feeds files (or every file under a directory) to the fuzz entry point without libFuzzer, so that
 // the seed corpus and the fixtures are replayed on every platform and compiler as an ordinary
-// test. Exit code 0 when every input ran; a violated invariant aborts, as it does under the fuzzer.
+// test. A fixture "<name>.log" with a sibling "<name>.events.json" is also compared with its golden
+// events, which gives the fuzz input format an oracle that does not come from the code under test.
+// Exit code 0 when every input ran; a violated invariant aborts, as it does under the fuzzer.
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -10,7 +12,12 @@
 #include <fstream>
 #include <iterator>
 #include <string>
+#include <string_view>
 #include <vector>
+
+#include <nlohmann/json.hpp>
+
+#include "fuzz_bridge.h"
 
 extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size);
 
@@ -26,6 +33,22 @@ bool replayFile(const fs::path& path) {
     }
     const std::string bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
     LLVMFuzzerTestOneInput(reinterpret_cast<const std::uint8_t*>(bytes.data()), bytes.size());
+
+    fs::path golden = path;
+    golden.replace_extension(".events.json");
+    if (path.extension() != ".log" || !fs::exists(golden)) {
+        return true;
+    }
+    std::ifstream goldenIn(golden, std::ios::binary);
+    const std::string goldenText((std::istreambuf_iterator<char>(goldenIn)),
+                                 std::istreambuf_iterator<char>());
+    const nlohmann::json expected = nlohmann::json::parse(goldenText, nullptr, false);
+    const nlohmann::json actual = nlohmann::json::parse(fuzzEventsJson(bytes), nullptr, false);
+    if (expected.is_discarded() || actual.is_discarded() || expected != actual) {
+        std::fprintf(stderr, "fuzz_replay: events differ from the golden file for %s\n",
+                     path.string().c_str());
+        return false;
+    }
     return true;
 }
 

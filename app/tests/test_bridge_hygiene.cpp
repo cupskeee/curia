@@ -173,3 +173,20 @@ TEST_CASE("hygiene step 1: overlong forms and out-of-range lead bytes give one U
     CHECK(repairUtf8("\xF0\x90\x80\x80") == "\xF0\x90\x80\x80");
     CHECK(repairUtf8("\xF4\x8F\xBF\xBF") == "\xF4\x8F\xBF\xBF");
 }
+
+TEST_CASE("hygiene step 3: a long run of 0x15 is handled in linear time") {
+    // Scanning to the end of the tag word for every 0x15 made this input quadratic: 200,000 bytes
+    // took tens of seconds; the shared run end makes it a single pass.
+    const std::string run(200000, '\x15');
+    CHECK(cleanText(run) == "");
+    // Only the last 0x15 has a known tag word ("L"); the others are followed by longer words.
+    CHECK(cleanText(run + "L x") == "x");
+    // Every word here ends at the one space and is unknown, so only the 0x15 bytes go.
+    std::string stairs;
+    std::string expected;
+    for (int i = 0; i < 20000; ++i) {
+        stairs += kU + "Lx";
+        expected += "Lx";
+    }
+    CHECK(cleanText(stairs + " y") == expected + " y");
+}

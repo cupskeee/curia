@@ -126,7 +126,12 @@ def parse_fixture(data: bytes, prefix_variant_start: int = 0) -> List[FixtureAct
 class FakeCk3:
     """The fake game: owns a user folder and appends to its ``debug.log``.
 
-    ``line_buffer``     write every line in two chunks (a reader can catch a torn line)
+    ``line_buffer``     write every line in two chunks, torn two bytes before its end, so that the
+                        first chunk ends inside the last field and is a valid-looking record with a
+                        wrong value (a reader that parses it gets a wrong number, not noise)
+    ``after_first_chunk`` called as ``hook(first, second)`` between the two chunks of a torn write;
+                        a test uses it to wait until the reader has read the first chunk, which
+                        makes the tear deterministic instead of a matter of poll timing
     ``flush_delay``     seconds the data sits in the "process" before it reaches the file
     ``burst``           write all lines of a frame (or fixture step) in one write instead of one
                         write per line
@@ -148,6 +153,7 @@ class FakeCk3:
         fsync: bool = False,
         snap_start: int = 1,
         chunk_pause: float = 0.002,
+        after_first_chunk: Optional[Callable[[bytes, bytes], None]] = None,
         sleep: Callable[[float], None] = time.sleep,
         keep_chunks: bool = False,
         keep: bool = False,
@@ -165,6 +171,7 @@ class FakeCk3:
         self.fsync = fsync
         self.next_snap = snap_start
         self.chunk_pause = chunk_pause
+        self.after_first_chunk = after_first_chunk
         self._sleep = sleep
         self.written = 0
         self.dead = False
@@ -241,10 +248,14 @@ class FakeCk3:
         if self.flush_delay > 0:
             self._sleep(self.flush_delay)
         if self.line_buffer and len(data) > 1:
-            middle = len(data) // 2
-            self._write_chunk(data[:middle])
+            # Two bytes before the end: "...|FIN|312|7" + "8\n". Torn in the middle, a line would
+            # mostly be cut inside the engine prefix, which no parser takes for a record.
+            cut = len(data) - 2 if len(data) > 2 else 1
+            self._write_chunk(data[:cut])
+            if self.after_first_chunk is not None:
+                self.after_first_chunk(data[:cut], data[cut:])
             self._sleep(self.chunk_pause)
-            self._write_chunk(data[middle:])
+            self._write_chunk(data[cut:])
         else:
             self._write_chunk(data)
         self.written += len(data)

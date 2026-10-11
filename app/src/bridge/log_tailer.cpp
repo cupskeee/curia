@@ -35,6 +35,13 @@ IFileSource::Stat FileSource::stat() {
         const bool exists = std::filesystem::exists(std::filesystem::path(path_), ec);
         return {!ec && !exists ? State::Missing : State::Error, 0};
     }
+    // POSIX lets ifstream open a directory (and seekg then returns a meaningless size) where
+    // Windows refuses; make every platform report "exists but cannot be tailed", so that a log
+    // path that points at the logs folder is told to the user instead of watched silently.
+    std::error_code regularEc;
+    if (!std::filesystem::is_regular_file(std::filesystem::path(path_), regularEc) || regularEc) {
+        return {State::Error, 0};
+    }
     in.seekg(0, std::ios::end);
     const std::streamoff end = in.tellg();
     if (!in || end < 0) {

@@ -218,9 +218,10 @@ jobs:
           UBSAN_OPTIONS: print_stacktrace=1
         run: |
           # libFuzzer writes new inputs into the first corpus folder: a scratch copy, so the checkout stays clean.
+          # -max_len 256 KiB: a frame reaches its 128 KiB cap only with about 33 long records, which a shorter input cannot hold.
           mkdir -p "$RUNNER_TEMP/corpus" "$RUNNER_TEMP/crashes"
           cp -r app/fuzz/corpus/. "$RUNNER_TEMP/corpus/"
-          build/linux-x64-fuzz/app/curia_fuzz_bridge -max_total_time=60 -timeout=10 -rss_limit_mb=2048 -max_len=65536 \
+          build/linux-x64-fuzz/app/curia_fuzz_bridge -max_total_time=60 -timeout=10 -rss_limit_mb=2048 -max_len=262144 \
             -artifact_prefix="$RUNNER_TEMP/crashes/" "$RUNNER_TEMP/corpus" tests/fixtures/curia1
       - name: Keep the crashing input
         if: failure()

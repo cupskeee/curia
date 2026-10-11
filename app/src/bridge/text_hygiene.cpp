@@ -157,6 +157,9 @@ std::string cleanText(std::string_view raw) {
     // whose word is unknown stays for step 4; scanning goes on right after it.
     std::vector<CodePoint> noTags;
     noTags.reserve(noPairs.size());
+    // The end of the last space-free run found. A later 0x15 inside that run has the same word
+    // end, so a run of 0x15 bytes is scanned once, not once per byte (which would be quadratic).
+    std::size_t runEnd = 0;
     for (std::size_t i = 0; i < noPairs.size();) {
         if (noPairs[i] != kLinkMarker) {
             noTags.push_back(noPairs[i]);
@@ -164,8 +167,13 @@ std::string cleanText(std::string_view raw) {
             continue;
         }
         std::size_t wordEnd = i + 1;
-        while (wordEnd < noPairs.size() && noPairs[wordEnd] != kSpace) {
-            ++wordEnd;
+        if (wordEnd <= runEnd) {
+            wordEnd = runEnd;
+        } else {
+            while (wordEnd < noPairs.size() && noPairs[wordEnd] != kSpace) {
+                ++wordEnd;
+            }
+            runEnd = wordEnd;
         }
         if (isKnownTagWord(noPairs, i + 1, wordEnd)) {
             i = wordEnd < noPairs.size() ? wordEnd + 1 : wordEnd;

@@ -210,12 +210,30 @@ def run_fixture(name: str, **fake_options: Any) -> None:
             proc.kill()
 
 
-def run_example(fake_options: Optional[Dict[str, Any]] = None, snaps: Optional[List[int]] = None) -> None:
+def run_example(fake_options: Optional[Dict[str, Any]] = None, snaps: Optional[List[int]] = None,
+                tear_sync: bool = False) -> None:
+    """With `tear_sync`, curia is made to read the first chunk of every torn FIN and END line
+    before the second chunk is written (see test_torn_lines_are_held_back)."""
     snaps = snaps or [7]
     expected = [example_event(s) for s in snaps] + [example_event(SENTINEL_SNAP)]
-    with fk.FakeCk3(**(fake_options or {})) as fake:
+    options = dict(fake_options or {})
+    holder: List[CuriaProcess] = []
+    synced = [0]
+
+    def wait_for_first_chunk(first: bytes, second: bytes) -> None:
+        # Only these lines: torn two bytes before their end, the first chunk is a complete-looking
+        # record with a wrong number ("FIN|312|7", "END|1"), the worst a torn read can do.
+        if holder and (b"|FIN|" in first or b"|END|" in first):
+            holder[0].wait_offset(fake.size())
+            synced[0] += 1
+
+    if tear_sync:
+        options["line_buffer"] = True
+        options["after_first_chunk"] = wait_for_first_chunk
+    with fk.FakeCk3(**options) as fake:
         fake.launch()
         proc = CuriaProcess(fake.log_path, len(expected))
+        holder.append(proc)
         try:
             proc.wait_notice("attached")
             fake.append_noise(2)
@@ -224,6 +242,9 @@ def run_example(fake_options: Optional[Dict[str, Any]] = None, snaps: Optional[L
             fake.append_noise(1)
             fake.append_frame(snap=SENTINEL_SNAP)
             check_events(proc.finish(), expected)
+            if tear_sync and synced[0] != 2 * (len(snaps) + 1):
+                raise AssertionError("expected a synchronised tear of FIN and END in every frame, "
+                                     "got %d" % synced[0])
         finally:
             proc.kill()
 
@@ -339,6 +360,12 @@ class EndToEnd(unittest.TestCase):
 
     def test_lines_written_in_two_chunks(self):
         run_example({"line_buffer": True})
+
+    def test_torn_lines_are_held_back(self):
+        # Deterministic: curia has read "CURIA1|7|FIN|312|7" (no newline yet) before "8\n" arrives.
+        # A reader that parsed the unterminated tail would report a wrong income or an END count
+        # of 1; the test fails then (checked by making LineSplitter emit its tail).
+        run_example(tear_sync=True)
 
     def test_delayed_flush(self):
         run_example({"flush_delay": 0.03})

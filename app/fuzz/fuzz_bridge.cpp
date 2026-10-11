@@ -13,10 +13,17 @@
 //    opened and that has no frame event yet, so there is at most one Damaged per frame, and the
 //    assembler is Open exactly while a frame is pending;
 //  - every Complete frame obeys the ranges and counts of docs/wire-format.md sections 2 to 4 and
-//    holds clean, valid UTF-8 text.
+//    holds clean, valid UTF-8 text;
+//  - two small reference models, written from the spec and not from the code under test, agree
+//    with it: a plain split of the bytes into lines (section 1: '\n', one '\r', the 4,096-byte
+//    head), and a recount of every frame's records, snaps, byte total, END claim and shortened
+//    flag at the moment it is reported Complete. Chunk independence cannot see a consistently
+//    wrong rule; these can.
 //
 // The same function is linked into curia_fuzz_replay (fuzz_replay_main.cpp), which feeds it files
 // without libFuzzer so that every platform can replay the seed corpus.
+#include "fuzz_bridge.h"
+
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -40,6 +47,11 @@ namespace {
 using namespace curia::bridge;
 
 constexpr std::size_t kMaxInputBytes = 1 << 20;
+// The numbers of the spec, restated so that the reference models do not borrow them from the code
+// under test: section 1 (line head), section 3 (frame limits).
+constexpr std::size_t kSpecLineHead = 4096;
+constexpr std::int64_t kSpecMaxFrameRecords = 512;
+constexpr std::size_t kSpecMaxFrameBytes = 128 * 1024;
 
 void require(bool ok, const char* what) {
     if (!ok) {
@@ -122,6 +134,31 @@ template <typename Sink> void forChunks(std::string_view bytes, std::uint64_t se
     }
 }
 
+// Section 1 written the plain way: the physical lines of `bytes` that end in '\n' (a tail without
+// one is held back), the head of an overlong line, one '\r' removed from a normal line.
+std::vector<Line> referenceLines(std::string_view bytes) {
+    std::vector<Line> lines;
+    std::size_t pos = 0;
+    while (true) {
+        const std::size_t newline = bytes.find('\n', pos);
+        if (newline == std::string_view::npos) {
+            break;
+        }
+        std::string_view physical = bytes.substr(pos, newline - pos);
+        Line line;
+        if (physical.size() > kSpecLineHead) {
+            line.overlong = true;
+            physical = physical.substr(0, kSpecLineHead);
+        } else if (!physical.empty() && physical.back() == '\r') {
+            physical.remove_suffix(1);
+        }
+        line.text.assign(physical);
+        lines.push_back(std::move(line));
+        pos = newline + 1;
+    }
+    return lines;
+}
+
 std::string runPipeline(const std::vector<Step>& steps, bool chunked, std::uint64_t seed) {
     BridgePipeline pipeline;
     std::vector<Event> events;
@@ -144,7 +181,9 @@ std::string runPipeline(const std::vector<Step>& steps, bool chunked, std::uint6
 }
 
 bool cleanText(const std::string& text) {
-    if (text.size() > kMaxRecordBytes) {
+    // A record is cut to 1,024 bytes before hygiene, but hygiene step 1 turns each invalid byte
+    // into U+FFFD (3 bytes), so a cleaned text can legitimately reach three times that.
+    if (text.size() > 3 * kMaxRecordBytes) {
         return false;
     }
     for (std::size_t i = 0; i < text.size(); ++i) {
@@ -295,11 +334,24 @@ void checkFrame(const Frame& f) {
     require(!dumpJson(toJson(f)).empty(), "frame prints");
 }
 
+// What the reference model knows about the frame a valid BEGIN opened, counted from the parse
+// results alone.
+struct FrameModel {
+    std::int64_t count = 0;  // frame records so far, BEGIN and (once it came) END included
+    std::size_t bytes = 0;
+    std::int32_t snap = 0;
+    bool snapMismatch = false;
+    bool shortened = false;
+    std::int64_t endClaim = -1;
+};
+
 // The manual chain: the same stages as BridgePipeline, but with the frame bookkeeping visible.
 void checkInvariants(const std::vector<Step>& steps, std::uint64_t seed) {
     LineSplitter splitter;
     FrameAssembler assembler;
     bool pending = false;  // a valid BEGIN opened a frame that has had no frame event yet
+    FrameModel model;
+    std::vector<Line> lines;  // what the splitter produced for the current step
 
     const auto handle = [&](const std::vector<Event>& events) {
         for (const Event& event : events) {
@@ -307,6 +359,13 @@ void checkInvariants(const std::vector<Step>& steps, std::uint64_t seed) {
                 require(pending, "Complete only for a pending frame");
                 pending = false;
                 checkFrame(complete->frame);
+                const Frame& f = complete->frame;
+                require(f.recordCount == model.count, "record count equals the recount");
+                require(model.endClaim == model.count, "END claimed the recounted number");
+                require(!model.snapMismatch && f.snap == model.snap, "all records share the snap");
+                require(model.count <= kSpecMaxFrameRecords && model.bytes <= kSpecMaxFrameBytes,
+                        "a complete frame is within the size limits");
+                require(f.textShortened == model.shortened, "text shortened flag");
             } else if (const auto* damaged = std::get_if<FrameDamaged>(&event)) {
                 require(pending, "at most one Damaged per frame, and only for a pending frame");
                 pending = false;
@@ -317,14 +376,43 @@ void checkInvariants(const std::vector<Step>& steps, std::uint64_t seed) {
         }
     };
     const auto consumeLine = [&](Line&& line) {
+        lines.push_back(line);
         const ParseResult result = parseLine(line.text, line.overlong);
+        const bool isFrameRecord =
+            result.outcome == ParseOutcome::Record && result.record.snap >= 1;
+        const bool opens = isFrameRecord && result.record.type == RecordType::Begin;
+        if (isFrameRecord && !opens && pending) {
+            const Record& record = result.record;
+            ++model.count;
+            model.bytes += record.length;
+            model.snapMismatch = model.snapMismatch || record.snap != model.snap;
+            if (record.type == RecordType::End) {
+                const auto* end = std::get_if<EndFields>(&record.fields);
+                model.endClaim = end != nullptr ? end->count : -1;
+            } else if (record.textShortened) {
+                model.shortened = true;
+            }
+        }
         handle(assembler.consume(result));
-        if (result.outcome == ParseOutcome::Record && result.record.type == RecordType::Begin &&
-            result.record.snap >= 1) {
+        if (opens) {
             pending = true;
+            model = FrameModel{};
+            model.count = 1;
+            model.bytes = result.record.length;
+            model.snap = result.record.snap;
+            model.shortened = result.record.textShortened;
         }
         require((assembler.state() == FrameAssembler::State::Open) == pending,
                 "assembler is Open exactly while a frame is pending");
+    };
+    const auto checkLines = [&](std::string_view stepBytes) {
+        const std::vector<Line> expected = referenceLines(stepBytes);
+        require(expected.size() == lines.size(), "line count equals the reference split");
+        for (std::size_t i = 0; i < expected.size(); ++i) {
+            require(expected[i].text == lines[i].text && expected[i].overlong == lines[i].overlong,
+                    "line equals the reference split");
+        }
+        lines.clear();
     };
     for (const Step& step : steps) {
         if (step.truncate) {
@@ -336,10 +424,15 @@ void checkInvariants(const std::vector<Step>& steps, std::uint64_t seed) {
         }
         forChunks(step.bytes, seed,
                   [&](std::string_view chunk) { splitter.feed(chunk, consumeLine); });
+        checkLines(step.bytes);
     }
 }
 
 }  // namespace
+
+std::string fuzzEventsJson(std::string_view input) {
+    return runPipeline(toSteps(input), false, 0);
+}
 
 extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size) {
     if (size > kMaxInputBytes) {
