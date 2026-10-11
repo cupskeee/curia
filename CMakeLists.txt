@@ -25,6 +25,9 @@ option(CURIA_BUILD_TESTS "Build the unit tests" ON)
 option(CURIA_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
 option(CURIA_SANITIZE "Build with AddressSanitizer and UndefinedBehaviorSanitizer (Clang/GCC)" OFF)
 option(CURIA_BUILD_FUZZ "Build the libFuzzer targets curia_fuzz_bridge and curia_fuzz_sse (Clang with libFuzzer; use with CURIA_SANITIZE)" OFF)
+# Development configuration (decision D19): read CURIA_ANTHROPIC_API_KEY / CURIA_MODEL from the
+# environment and accept the --test-endpoint flag. ON in development and CI; turn it OFF for release builds.
+option(CURIA_ENABLE_DEV_ENV "Development configuration: env-var API key and --test-endpoint (OFF for release builds, D19)" ON)
 
 include(CTest)
 

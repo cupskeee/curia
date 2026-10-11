@@ -24,6 +24,8 @@ jobs:
           persist-credentials: false
       - name: Repository hygiene scan (no Paradox content, no keys)
         run: tools/ci/scan_patterns.sh
+      - name: Source rules (model IDs, curl debug options, secret access)
+        run: tools/ci/check_source_rules.sh
       - name: Version consistency (CMake, vcpkg.json, CHANGELOG)
         run: tools/ci/check_versions.sh
       - name: Mod structure lint (no game files involved)

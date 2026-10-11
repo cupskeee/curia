@@ -68,6 +68,7 @@ it from the requirements file and run the checks CI runs:
 python3 -m venv .venv-tools && .venv-tools/bin/pip install -r tools/requirements-dev.txt
 CLANG_FORMAT=.venv-tools/bin/clang-format tools/ci/check_format.sh --fix   # --fix rewrites files
 tools/ci/scan_patterns.sh      # no Paradox content, no keys, no home paths
+tools/ci/check_source_rules.sh # no model IDs, curl debug options or stray secret access in app/
 tools/ci/check_versions.sh     # CMake, vcpkg.json and CHANGELOG agree
 python3 tools/ci/lint_mod.py   # structure of the mod folders and the CURIA1 export format
 python3 -m unittest discover -s tools/ci -p "test_*.py"   # tests of the lint
@@ -142,6 +143,33 @@ Versions follow [SemVer 2.0.0](https://semver.org/spec/v2.0.0.html) with tags li
 `v0.1.0`; the version stays `0.y.z` until the wire protocol and config schema are
 declared stable. There is one version for the app and the mod. The wire-protocol
 version (`CURIA1`) is separate and lives inside the data.
+
+## Source rules
+
+`tools/ci/check_source_rules.sh` scans the C++ under `app/` (comments included) and fails the
+build on four things.
+
+- **Model IDs** (Claude, GPT, Gemini, Llama, DeepSeek and Mistral names, and any `-YYYYMMDD`
+  date suffix). Models are discovered from the provider's models endpoint, so a name in source
+  goes stale and hides a choice that belongs to the user; tests use neutral names such as
+  `mock-model-1`.
+- **libcurl options that print requests or weaken TLS**: `CURLOPT_VERBOSE`, the debug, stderr and
+  trace options, the peer and host verification switches, and `NO_REVOKE`. Verbose output would
+  put the `Authorization` header in a log, and switching verification off would send the key to
+  whoever answers.
+- **`reveal()` calls** on a `SecretString` outside `core/secret.*`, `core/redact.*`, `http/`,
+  `providers/anthropic_*` and `tests/`. Only the transport may read the key's bytes; everything
+  else asks `size()`, `empty()` or `contains()`, so a key cannot drift into a log line or an error
+  message.
+- **`CURIA_` environment variables** read or named in a string literal outside
+  `core/dev_config.cpp` (tests may). One place reads and validates them, and messages that must
+  name a variable come from `describeNotConfigured()`.
+
+`tools/ci/scan_patterns.sh` additionally checks every key-shaped token one by one (a token is
+exempt only if it contains `FAKE` or `fake` itself), real-looking Anthropic request ids
+(`msg_01...`), literal `x-api-key:` and `Authorization: Bearer` headers outside `docs/`, and
+that no tracked path has a `transcripts` or `curia_m4_results` segment: development transcripts
+of prompts and answers stay outside the repository.
 
 ## Docs first
 
