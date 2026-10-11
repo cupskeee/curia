@@ -46,21 +46,21 @@ Not yet tested, needed for the exporter: `THIS`-based gold (`[THIS.GetCharacter.
 
 ## Milestone 0b (same day; chosen by the owner)
 
-Run by the owner as one launch with the richer stub (`m0b-checklist.md`): King Harold II Godwineson of England, start 15 September 1066 (10 vassals; heir Prince Godwine, landless, with one claim of his own; one claim of the ruler, Devon; two active wars, Norway and Normandy; no faction against him). Helper runs `M0B` (13 October 1066, first pulse) and `M0B2` (31 January 1067, second pulse). Stub: `mod/curia-m0/` (two on_action files, script values, loc).
+Run by the owner as one launch with the richer stub (`m0b-checklist.md`): the ruler of the 1066 bookmark's starting realm, start 15 September 1066 (10 vassals; a landless heir with one claim of his own; one claim of the ruler; two active wars; no faction against him). Helper runs `M0B` (13 October 1066, first pulse) and `M0B2` (31 January 1067, second pulse). Stub: `mod/curia-m0/` (two on_action files, script values, loc).
 
 ### Value forms that resolve (all inside `debug_log` strings; same form works as a quoted string)
 
 | Probe | Form | Result |
 |---|---|---|
-| Ruler name | `[THIS.GetCharacter.GetNameNoTooltip]`, `[THIS.Char.GetNameNoTooltip]` | both resolve ("King Harold of England": title and "of <title>" are included) |
+| Ruler name | `[THIS.GetCharacter.GetNameNoTooltip]`, `[THIS.Char.GetNameNoTooltip]` | both resolve (a name string that includes the title prefix and "of <title>") |
 | Ruler gold | `[THIS.GetCharacter.GetGold|0]` | resolves (375, then 413 at the second pulse) |
 | Variable | `[THIS.Var('x').GetValue]`, `[THIS.GetCharacter.MakeScope.Var('x').GetValue]` | both resolve (42) |
 | Script value | `[THIS.ScriptValue('x')|0]`, `[SCOPE.ScriptValue('x')|0]` at the top scope | both resolve (gold 375) |
-| Primary title | `[THIS.GetCharacter.GetPrimaryTitle.GetNameNoTierNoTooltip]` | resolves ("England", "Northumbria", "Mercia") |
-| Heir | `player_heir = { … }`; name, liege, opinion | resolves ("Godwine": first name only because he holds no title) |
+| Primary title | `[THIS.GetCharacter.GetPrimaryTitle.GetNameNoTierNoTooltip]` | resolves (title names for three different characters, without tier or tooltip) |
+| Heir | `player_heir = { … }`; name, liege, opinion | resolves (the heir's first name only, because he holds no title) |
 | Vassals | `ordered_vassal = { max = 2 order_by = current_military_strength … }`; name, title, gold | resolves |
-| Wars | `every_character_war`; `[THIS.War.GetName]`; `primary_attacker = {…}` and `primary_defender = {…}` | resolve ("Norwegian Invasion of England", attacker/defender names) |
-| Claims | `random_claim`; `[THIS.Title.GetNameNoTierNoTooltip]` | resolves ("Devon" for the ruler, "Middle Seaxe" for the heir) |
+| Wars | `every_character_war`; `[THIS.War.GetName]`; `primary_attacker = {…}` and `primary_defender = {…}` | resolve (a named war of the realm, attacker/defender names) |
+| Claims | `random_claim`; `[THIS.Title.GetNameNoTierNoTooltip]` | resolves (a title name for the ruler's claim, another title name for the heir's claim) |
 | **Opinion of the ruler** (vassal and heir) | script value `value = "opinion(liege)"` read as `[THIS.ScriptValue('x')|0]` | **resolves** (-37 and -87 for the two vassals, 83 for the heir) |
 | Opinion via the court owner (heir) | script value `value = "opinion(liege_or_court_owner)"` | resolves (83, same as `liege`: the heir had a liege link) |
 | Opinion precomputed | `set_variable = { name = x value = <script value> }` inside the iterated scope, read as `[THIS.GetCharacter.MakeScope.Var('x').GetValue]` | **resolves** (same numbers) |
