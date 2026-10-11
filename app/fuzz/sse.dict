@@ -1,0 +1,61 @@
+# Tokens for the SSE fuzz target (fuzz_sse.cpp): the parser's grammar and the Anthropic stream.
+# Not seed data: libFuzzer splices these into inputs.
+
+# Terminators and the byte order mark
+lf="\x0A"
+cr="\x0D"
+crlf="\x0D\x0A"
+blank_lf="\x0A\x0A"
+blank_crlf="\x0D\x0A\x0D\x0A"
+blank_cr="\x0D\x0D"
+bom="\xEF\xBB\xBF"
+bom_half="\xEF\xBB"
+nul="\x00"
+
+# Fields
+field_data="data: "
+field_data_nospace="data:"
+field_data_bare="data"
+field_event="event: "
+field_id="id: "
+field_retry="retry: "
+field_comment=": "
+colon=":"
+retry_digits="1500"
+retry_big="99999999999999999999"
+retry_bad="-5"
+
+# Event types of the Anthropic stream
+t_message_start="message_start"
+t_content_block_start="content_block_start"
+t_content_block_delta="content_block_delta"
+t_content_block_stop="content_block_stop"
+t_message_delta="message_delta"
+t_message_stop="message_stop"
+t_ping="ping"
+t_error="error"
+t_message="message"
+
+# JSON pieces of the payloads
+j_type="{\"type\":\""
+j_delta="\"delta\":{\"type\":\""
+j_text_delta="text_delta"
+j_thinking_delta="thinking_delta"
+j_signature_delta="signature_delta"
+j_stop_reason="\"stop_reason\":\""
+j_end_turn="end_turn"
+j_max_tokens="max_tokens"
+j_refusal="refusal"
+j_usage="\"usage\":{\"input_tokens\":"
+j_cache_read="\"cache_read_input_tokens\":"
+j_cache_creation="\"cache_creation_input_tokens\":"
+j_output="\"output_tokens\":"
+j_error_type="\"error\":{\"type\":\"overloaded_error\",\"message\":\""
+
+# UTF-8 edges
+u_2byte="\xC3\xA9"
+u_3byte="\xE2\x82\xAC"
+u_4byte="\xF0\x9F\x98\x80"
+u_bad_lead="\xFF"
+u_overlong="\xC0\x80"
+u_surrogate="\xED\xA0\x80"

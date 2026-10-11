@@ -183,10 +183,10 @@ jobs:
           ASAN_OPTIONS: detect_leaks=1
           UBSAN_OPTIONS: print_stacktrace=1
         run: ctest --preset linux-x64-sanitize
-      - name: clang-tidy (core, net, Linux platform, tests)
+      - name: clang-tidy (core, net, providers, Linux platform, tests)
         run: |
           # The macOS-only probe tests (test_probe_*) are not part of this configuration.
-          find app/src/bridge app/src/core app/src/net app/src/platform/linux app/tests app/fuzz -name '*.cpp' -not -name 'test_probe_*' -print0 |
+          find app/src/bridge app/src/core app/src/net app/src/providers app/src/platform/linux app/tests app/fuzz -name '*.cpp' -not -name 'test_probe_*' -print0 |
             xargs -0 -n1 clang-tidy-18 -p build/linux-x64-sanitize --quiet
 
   fuzz-smoke:
@@ -204,8 +204,8 @@ jobs:
       - name: Configure (core only, libFuzzer with ASan and UBSan)
         id: configure
         run: cmake --preset linux-x64-fuzz -DCURIA_WARNINGS_AS_ERRORS=ON
-      - name: Build the fuzz target
-        run: cmake --build --preset linux-x64-fuzz --target curia_fuzz_bridge
+      - name: Build the fuzz targets
+        run: cmake --build --preset linux-x64-fuzz --target curia_fuzz_bridge curia_fuzz_sse
       # Configure runs vcpkg install, so a successful Configure means every port is in the cache. Saving after a failed
       # Configure would store a partial cache under the exact key, and an exact hit is never saved again.
       - name: Save the vcpkg binary cache (when every port was built, even if a later step failed)
@@ -214,7 +214,7 @@ jobs:
         with:
           path: .vcpkg-cache
           key: ${{ steps.vcpkg.outputs.cache-primary-key }}
-      - name: Fuzz for 60 seconds from the committed seed corpus
+      - name: Fuzz the bridge for 45 seconds from the committed seed corpus
         env:
           ASAN_OPTIONS: detect_leaks=1
           UBSAN_OPTIONS: print_stacktrace=1
@@ -223,8 +223,17 @@ jobs:
           # -max_len 256 KiB: a frame reaches its 128 KiB cap only with about 33 long records, which a shorter input cannot hold.
           mkdir -p "$RUNNER_TEMP/corpus" "$RUNNER_TEMP/crashes"
           cp -r app/fuzz/corpus/. "$RUNNER_TEMP/corpus/"
-          build/linux-x64-fuzz/app/curia_fuzz_bridge -max_total_time=60 -timeout=10 -rss_limit_mb=2048 -max_len=262144 \
+          build/linux-x64-fuzz/app/curia_fuzz_bridge -max_total_time=45 -timeout=10 -rss_limit_mb=2048 -max_len=262144 \
             -artifact_prefix="$RUNNER_TEMP/crashes/" "$RUNNER_TEMP/corpus" tests/fixtures/curia1
+      - name: Fuzz the SSE parser for 45 seconds from the committed seed corpus
+        env:
+          ASAN_OPTIONS: detect_leaks=1
+          UBSAN_OPTIONS: print_stacktrace=1
+        run: |
+          mkdir -p "$RUNNER_TEMP/corpus_sse" "$RUNNER_TEMP/crashes"
+          cp -r app/fuzz/corpus_sse/. "$RUNNER_TEMP/corpus_sse/"
+          build/linux-x64-fuzz/app/curia_fuzz_sse -max_total_time=45 -timeout=10 -rss_limit_mb=2048 -max_len=262144 \
+            -dict=app/fuzz/sse.dict -artifact_prefix="$RUNNER_TEMP/crashes/sse-" "$RUNNER_TEMP/corpus_sse"
       - name: Keep the crashing input
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
