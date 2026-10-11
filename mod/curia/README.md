@@ -92,7 +92,11 @@ literal, the `BEGIN` key and `.metadata/metadata.json` agree; every `debug_log` 
 `curia_probe_*` key is used; every `debug_log` directly follows the counter increment and no inline literal other than `LOAD`
 exists; every `curia_line_*` key fits the record table of the spec (field count and kinds, one text expression and only last, only
 the integer and text expressions that ran, no pipe or markup inside an expression, defined script values) and every form of the
-table has a key; every global that is set is read, and every counter is reset in `curia_export_begin`.
+table has a key; the counters and header totals read the script value the spec names (a swapped `n` or total is caught); every
+global that is set (also in a multi-line block) is read, and every counter is reset in `curia_export_begin`; per effect, in
+every script file, the writes of `curia_export_lines` pair one to one with the `debug_log` calls; `curia_export_run` calls the
+sections in the order of the spec; the counting and the writing pass of each ordered iterator have identical parameters; every
+counting global is changed somewhere. Localization keys are indented by exactly one space.
 
 ## Forms: ran in the game versus new in 0.2.0
 Ran in M0/M0b/M3 (`docs/spikes/`): `[THIS.GetCharacter.GetNameNoTooltip]`, `[THIS.GetCharacter.GetGold|0]`,
@@ -164,8 +168,8 @@ session 2 candidates that could have raised a script error (`save_temporary_scop
 `faction_is_type` and `faction_power_threshold` inside faction-scope script values; all `THIS.Faction...` forms) ran in
 session 2 with no `error.log` entry matching Curia; they are no longer open risks for the cases run. Still not covered
 by any run: a ruler with an implicit claim (the implicit-flag cases of `claim_detail`), a nonzero discontent, faction
-types other than independence, claimant and peasant, and the `special_character` form that could carry the claimant
-(it is not in the mod). `faction_*` output is not capped (about 16 lines per faction). A data function that does not exist would be reported when the localization loads
+types other than independence, claimant and peasant, and the `special_character` / `special_title` forms of the
+CLAIMANT and TITLE records (they are in the export, guarded for type 3, and have never run in the game). `faction_*` output is not capped (about 16 lines per faction). A data function that does not exist would be reported when the localization loads
 (`error.log`); ck3-tiger found none.
 
 ## Spike limits

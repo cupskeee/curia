@@ -14,9 +14,13 @@ Export format, for the mod folder named "curia" only (docs/wire-format.md; the c
   2. every debug_log names a localization key; every curia_line_* / curia_probe_* key is used
   3. every debug_log in a scripted effect directly follows the curia_export_lines increment (BEGIN: the set to 1), and
      no inline literal other than the LOAD literal exists
-  4. localization grammar: record prefix, field count and kinds from an executable table, one text field and only last
+  4. localization grammar: record prefix, field count and kinds from an executable table, one text field and only last,
+     and for the counters and header totals the script value each field must read
   5. every global variable the mod sets is read as global_var:<name> in a script value, and every counter is reset in
-     curia_export_begin
+     curia_export_begin (multi-line writes included)
+  6. wiring: per effect the number of curia_export_lines writes equals the number of debug_log calls; curia_export_run
+     calls the sections in the order of docs/wire-format.md section 4; the counting and writing pass of a section have
+     identical iterator parameters; every counting global is changed somewhere
 The real validation against the game is local only (ck3-tiger, docs/architecture.md section 7).
 """
 import json
@@ -76,6 +80,61 @@ FORMS = [
     ("END", "END", [INT]),
 ]
 
+# Which source a field must read, so that a swapped counter or header total cannot pass the grammar alone. Key: (form id,
+# field number after the type, counted from 1). A value that starts with "[" is the exact expression, any other value is
+# the name of the script value.
+_ID = "[THIS.GetCharacter.GetID]"
+_GOLD = "[THIS.GetCharacter.GetGold|0]"
+EXPECTED_SOURCE = {
+    ("BEGIN", 1): "curia_mode_value",
+    ("BEGIN", 3): "curia_date_year",
+    ("BEGIN", 4): "curia_date_month",
+    ("BEGIN", 5): "curia_date_day",
+    ("BEGIN", 6): _ID,
+    ("FIN", 1): _GOLD,
+    ("FIN", 2): "curia_income_tenths",
+    ("HEIR", 1): _ID,
+    ("VASSALS", 1): "curia_vassal_count",
+    ("VASSALS", 2): "curia_vassals_listed_value",
+    ("VASSAL", 1): "curia_rank_value",
+    ("VASSAL", 2): _ID,
+    ("VASSAL", 3): _GOLD,
+    ("VASSAL", 4): "curia_opinion_of_liege",
+    ("VASSAL", 5): "curia_military_strength",
+    ("WARS", 1): "curia_wars_total_value",
+    ("WAR NAME", 1): "curia_war_index_value",
+    ("WAR ATTACKER", 1): "curia_war_index_value",
+    ("WAR ATTACKER", 3): _ID,
+    ("WAR DEFENDER", 1): "curia_war_index_value",
+    ("WAR DEFENDER", 3): _ID,
+    ("CLAIMS", 1): "curia_claims_explicit_count",
+    ("CLAIMS", 2): "curia_claims_implicit_count",
+    ("CLAIMS", 3): "curia_claims_listed_value",
+    ("CLAIM strong", 1): "curia_claim_index_value",
+    ("CLAIM strong", 3): "curia_title_tier",
+    ("CLAIM weak", 1): "curia_claim_index_value",
+    ("CLAIM weak", 3): "curia_title_tier",
+    ("FACTIONS", 1): "curia_faction_against_count",
+    ("FACTIONS", 2): "curia_faction_member_flag",
+    ("FACTIONS", 3): "curia_factions_listed_value",
+    ("FACTION INFO against", 4): "curia_faction_type_code",
+    ("FACTION INFO against", 5): "curia_faction_power",
+    ("FACTION INFO against", 6): "curia_faction_power_threshold",
+    ("FACTION INFO against", 7): "curia_faction_member_count",
+    ("FACTION INFO member", 4): "curia_faction_type_code",
+    ("FACTION INFO member", 5): "curia_faction_power",
+    ("FACTION INFO member", 6): "curia_faction_power_threshold",
+    ("FACTION INFO member", 7): "curia_faction_member_count",
+    ("FACTION LEADER", 3): _ID,
+    ("FACTION CLAIMANT", 3): _ID,
+    ("FACTION TITLE", 3): "curia_title_tier",
+    ("FACTION TARGET", 3): _ID,
+    ("END", 1): "curia_line_count_value",
+}
+for _form in ("INFO against", "INFO member", "LEADER none", "LEADER", "CLAIMANT none", "CLAIMANT", "TITLE none", "TITLE",
+              "TARGET none", "TARGET"):
+    EXPECTED_SOURCE[("FACTION " + _form, 1)] = "curia_faction_index_value"
+
 SNAP_EXPR = "[EmptyScope.ScriptValue('curia_snap_id_value')|0]"
 
 # Integer expressions that printed plain digits in the game (M0/M0b/M3). Group 1, where present, is a script value name.
@@ -131,6 +190,36 @@ def significant(text):
         line = re.sub(r"\s+", " ", raw.split("#", 1)[0]).strip()
         if line:
             yield number, line
+
+
+def strip_comments(text):
+    """Remove # comments but keep the line structure, so that offsets still give the right line numbers."""
+    return "\n".join(line.split("#", 1)[0] for line in text.splitlines())
+
+
+def block_end(text, open_index):
+    """Return the index of the brace that closes the one at open_index (len(text) if unbalanced)."""
+    depth = 0
+    for index in range(open_index, len(text)):
+        if text[index] == "{":
+            depth += 1
+        elif text[index] == "}":
+            depth -= 1
+            if depth == 0:
+                return index
+    return len(text)
+
+
+def top_level_blocks(text):
+    """Return [(name, line number, body text)] of the top-level `name = { ... }` blocks of comment-stripped text."""
+    blocks, position = [], 0
+    for m in re.finditer(r"^[ \t]*([A-Za-z_]\w*)[ \t]*=[ \t]*\{", text, re.M):
+        if m.start() < position:
+            continue
+        end = block_end(text, m.end() - 1)
+        blocks.append((m.group(1), text.count("\n", 0, m.start()) + 1, text[m.end():end]))
+        position = end
+    return blocks
 
 
 def relname(mod, path):
@@ -219,6 +308,9 @@ def lint_structure(mod, root):
             body = data[len(BOM):] if data.startswith(BOM) else data
             if not body.startswith(b"l_english:"):
                 problems.append(f"{rel}: localization must start with 'l_english:'")
+            for number, raw in enumerate(body.decode("utf-8", errors="replace").splitlines(), 1):
+                if raw.strip() and not raw.lstrip().startswith("#") and raw[0] in " \t" and not re.match(r" \S", raw):
+                    problems.append(f"{rel}:{number}: a localization key must be indented by exactly one space (no tabs)")
     return problems
 
 
@@ -323,7 +415,7 @@ def check_debug_log_counter(mod):
             problems.append(f"{label}:{number}: debug_log with an inline literal; only the LOAD literal in common/on_action is allowed")
         elif literal is not None and not LOAD_RE.match(literal):
             problems.append(f"{label}:{number}: debug_log literal '{literal}' is not the LOAD literal 'CURIA1|0|LOAD|<version>'")
-    for path in mod_txt(mod, "scripted_effects"):
+    for path in all_script_files(mod):
         label_file = relname(mod, path)
         previous, effect, depth = None, None, 0
         for number, line in significant(read_text(path)):
@@ -342,6 +434,27 @@ def check_debug_log_counter(mod):
                     )
             previous = line
             depth += line.count("{") - line.count("}")
+    problems += check_increment_log_pairs(mod)
+    return problems
+
+
+LINES_WRITE_RE = re.compile(r"\b(?:set|change)_global_variable\s*=\s*\{[^{}]*?\bname\s*=\s*curia_export_lines\b")
+KEY_LOG_RE = re.compile(r"^[ \t]*debug_log[ \t]*=[ \t]*[A-Za-z_]\w*[ \t]*$", re.M)
+
+
+def check_increment_log_pairs(mod):
+    """Per top-level effect, the writes of curia_export_lines and the debug_log calls must pair one to one. The adjacency
+    check alone passes a doubled or an orphaned increment, and either one makes the END count wrong."""
+    problems = []
+    for path in all_script_files(mod):
+        for name, number, body in top_level_blocks(strip_comments(read_text(path))):
+            writes = len(LINES_WRITE_RE.findall(body))
+            logs = len(KEY_LOG_RE.findall(body))
+            if writes != logs:
+                problems.append(
+                    f"{relname(mod, path)}:{number}: {name}: {writes} write(s) of curia_export_lines but {logs} debug_log"
+                    f" call(s); each debug_log needs exactly one increment (the END count)"
+                )
     return problems
 
 
@@ -397,15 +510,22 @@ def field_problem(kind, piece):
 
 
 def match_record(rtype, fields):
-    """Return (form id, None) for the form of this record type that fits, else (None, reason)."""
+    """Return (form id, None) for the form of this record type that fits, else (None, reason). When nothing fits, the
+    reason names the closest form: among the forms whose literal words all occur in the record, the one that got
+    furthest (or, for a wrong field count, the one with the nearest count)."""
     candidates = [(fid, kinds) for fid, t, kinds in FORMS if t == rtype]
     if not candidates:
         return None, f"record type {rtype} is not in the table of docs/wire-format.md section 4"
-    best_reason, best_score = None, -1
-    for fid, kinds in candidates:
+
+    def words(kinds):
+        return [k[1] for k in kinds if k[0] == "lit"] + ["none" for k in kinds if k[0] == "none"]
+
+    compatible = [(fid, kinds) for fid, kinds in candidates if all(w in fields for w in words(kinds))]
+    best_reason, best_score = None, None
+    for fid, kinds in compatible or candidates:
         if len(kinds) != len(fields):
             reason = f"form '{fid}' has {len(kinds)} fields after the type, found {len(fields)}"
-            score = 0
+            score = -abs(len(kinds) - len(fields))
         else:
             reason, score = None, 1
             for index, (kind, piece) in enumerate(zip(kinds, fields), 1):
@@ -415,9 +535,24 @@ def match_record(rtype, fields):
                     break
             if reason is None:
                 return fid, None
-        if score > best_score:
+        if best_score is None or score > best_score:
             best_reason, best_score = reason, score
     return None, best_reason
+
+
+def source_problems(where, form, fields):
+    problems = []
+    for index, piece in enumerate(fields, 1):
+        required = EXPECTED_SOURCE.get((form, index))
+        if required is None:
+            continue
+        if required.startswith("["):
+            ok = piece == required
+        else:
+            ok = int_script_value(piece)[1] == required
+        if not ok:
+            problems.append(f"{where}: form '{form}', field {index} must read {required}, found '{piece}'")
+    return problems
 
 
 def check_localization_grammar(mod):
@@ -468,6 +603,7 @@ def check_localization_grammar(mod):
             problems.append(f"{where}: {reason}")
         else:
             covered.add(form)
+            problems += source_problems(where, form, fields)
     return problems, covered
 
 
@@ -481,16 +617,27 @@ def check_table_coverage(mod):
 # ---------------------------------------------------------------------------------------------------------------------
 # Check 5: global variables
 # ---------------------------------------------------------------------------------------------------------------------
-GLOBAL_WRITE_RE = re.compile(r"\b(set|change)_global_variable\s*=\s*\{\s*name\s*=\s*([A-Za-z0-9_]+)")
+GLOBAL_CALL_RE = re.compile(r"\b(set|change)_global_variable\s*=\s*\{")
+GLOBAL_NAME_RE = re.compile(r"\bname\s*=\s*([A-Za-z0-9_]+)")
+
+
+def global_writes_in(text):
+    """Return [(kind 'set'/'change', name, offset)] over comment-stripped text; the block may span several lines."""
+    writes = []
+    for m in GLOBAL_CALL_RE.finditer(text):
+        name = GLOBAL_NAME_RE.search(text[m.end():block_end(text, m.end() - 1)])
+        if name:
+            writes.append((m.group(1), name.group(1), m.start()))
+    return writes
 
 
 def global_writes(mod):
     """Return [(kind 'set'/'change', name, file label, line number)] over every script file of the mod."""
     writes = []
     for path in all_script_files(mod):
-        for number, line in significant(read_text(path)):
-            for m in GLOBAL_WRITE_RE.finditer(line):
-                writes.append((m.group(1), m.group(2), relname(mod, path), number))
+        text = strip_comments(read_text(path))
+        for kind, name, offset in global_writes_in(text):
+            writes.append((kind, name, relname(mod, path), text.count("\n", 0, offset) + 1))
     return writes
 
 
@@ -533,12 +680,92 @@ def check_counters_reset(mod):
             body = found
     if body is None:
         return [f"{mod.name}: the effect {BEGIN_EFFECT} is not defined in common/scripted_effects"]
-    reset = {m.group(1) for m in re.finditer(r"set_global_variable\s*=\s*\{\s*name\s*=\s*([A-Za-z0-9_]+)", body)}
+    reset = {name for kind, name, _offset in global_writes_in(strip_comments(body)) if kind == "set"}
     problems, reported = [], set()
     for kind, name, label, number in global_writes(mod):
         if kind == "change" and name not in reset and name not in reported:
             reported.add(name)
             problems.append(f"{label}:{number}: counter {name} is changed but not set in {BEGIN_EFFECT} (every counter is reset per frame)")
+    return problems
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Check 6: wiring of the sections (only for a complete mod; a mini mod in a test has no sections)
+# ---------------------------------------------------------------------------------------------------------------------
+RUN_EFFECT = "curia_export_run"
+SECTION_ORDER = ["begin", "fin", "heir", "vassals", "wars", "claims", "factions", "end"]
+# section effect -> the ordered_* iterator whose counting and writing pass must agree
+TWO_PASS = {
+    "curia_export_vassals": "ordered_vassal",
+    "curia_export_claims": "ordered_claim",
+    "curia_export_factions": "ordered_targeting_faction",
+}
+PARAM_KEYS = {"max", "check_range_bounds", "order_by", "limit", "explicit", "pressed"}
+COUNTED_GLOBALS = ["curia_vassals_listed", "curia_wars_total", "curia_claims_listed", "curia_factions_listed"]
+
+
+def statements(body):
+    """Split a block body into its top-level statements (a one-line statement or a braced one), whitespace normalised."""
+    result, current, depth = [], [], 0
+    for line in body.splitlines():
+        if not line.strip():
+            continue
+        current.append(line.strip())
+        depth += line.count("{") - line.count("}")
+        if depth <= 0:
+            result.append(re.sub(r"\s+", " ", " ".join(current)))
+            current, depth = [], 0
+    if current:
+        result.append(re.sub(r"\s+", " ", " ".join(current)))
+    return result
+
+
+def check_wiring(mod):
+    problems = []
+    effects = {}
+    for path in mod_txt(mod, "scripted_effects"):
+        for name, number, body in top_level_blocks(strip_comments(read_text(path))):
+            effects[name] = (relname(mod, path), number, body)
+
+    # the order of the sections
+    if RUN_EFFECT not in effects:
+        problems.append(f"{mod.name}: the effect {RUN_EFFECT} is not defined in common/scripted_effects")
+    else:
+        label, number, body = effects[RUN_EFFECT]
+        calls = re.findall(r"^[ \t]*(curia_export_\w+)[ \t]*=[ \t]*yes\b", body, re.M)
+        wanted = ["curia_export_" + w for w in SECTION_ORDER]
+        with_probes = wanted[:-1] + ["curia_export_probes", wanted[-1]]
+        if calls not in (wanted, with_probes):
+            problems.append(
+                f"{label}:{number}: {RUN_EFFECT} calls {calls}; the sections must run in the order of docs/wire-format.md"
+                f" section 4: {wanted} (with curia_export_probes between factions and end when probing)"
+            )
+        for call in calls:
+            if call not in effects:
+                problems.append(f"{label}:{number}: {RUN_EFFECT} calls {call}, which no scripted effect defines")
+
+    # identical iterator parameters in the counting and the writing pass
+    for effect, iterator in TWO_PASS.items():
+        if effect not in effects:
+            problems.append(f"{mod.name}: the effect {effect} is not defined in common/scripted_effects")
+            continue
+        label, number, body = effects[effect]
+        passes = []
+        for m in re.finditer(r"\b" + iterator + r"[ \t]*=[ \t]*\{", body):
+            inner = body[m.end():block_end(body, m.end() - 1)]
+            passes.append(sorted(s for s in statements(inner) if s.split(" ", 1)[0] in PARAM_KEYS))
+        if len(passes) != 2:
+            problems.append(f"{label}:{number}: {effect} must run {iterator} twice (counting and writing pass), found {len(passes)}")
+        elif passes[0] != passes[1]:
+            problems.append(f"{label}:{number}: {effect}: the counting and the writing pass of {iterator} have different parameters")
+        elif not any(s.startswith("max ") for s in passes[0]):
+            problems.append(f"{label}:{number}: {effect}: {iterator} has no max (the cap of the section)")
+
+    # every counting global is changed somewhere (begin only resets it)
+    changed = {name for kind, name, _l, _n in global_writes(mod) if kind == "change"}
+    for name in COUNTED_GLOBALS:
+        if name not in changed:
+            problems.append(f"{mod.name}: counting global {name} is never changed, so its header would always read 0")
     return problems
 
 
@@ -551,6 +778,7 @@ def lint_export(mod, coverage=True):
     problems += check_localization_grammar(mod)[0]
     if coverage:
         problems += check_table_coverage(mod)
+        problems += check_wiring(mod)
     problems += check_globals_read(mod)
     problems += check_counters_reset(mod)
     return problems

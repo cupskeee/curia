@@ -2,6 +2,7 @@
 """Unit tests of tools/ci/lint_mod.py. Synthetic mini mods in temporary folders (no game files): one good case, then one
 failing case per check; the last tests run the lint on the real mod/curia folder."""
 import pathlib
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -122,7 +123,9 @@ class GoodCase(LintCase):
         problems, count = lint_mod.lint_all(mod.parent)
         self.assertEqual(count, 1)
         # the mini mod covers only two record forms, so the coverage check is the one that speaks
-        self.assertTrue(all("no curia_line_ localization key" in p for p in problems), problems)
+        # (and the wiring check, which needs the sections of a complete mod)
+        self.assertTrue(all("no curia_line_ localization key" in p or "scripted effect" in p or "counting global" in p
+                            or "is not defined" in p for p in problems), problems)
 
 
 class VersionAgreement(LintCase):
@@ -320,6 +323,166 @@ class StructureCase(LintCase):
         mod = write_mod(tmp.name, files)
         (mod / "common/scripted_effects/other.txt").write_bytes(b"x = {}\n")
         self.assertProblem(lint_mod.lint_structure(mod, mod.parent), "other.txt: missing UTF-8 BOM", "must start with curia_")
+
+
+class DebugLogPairs(LintCase):
+    def pairs(self, mod):
+        return lint_mod.check_increment_log_pairs(mod)
+
+    def test_doubled_increment(self):
+        mod = self.mod_with({EFFECTS_FILE: (
+            "	change_global_variable = { name = curia_export_lines add = 1 }\n	debug_log = curia_line_fin",
+            "	change_global_variable = { name = curia_export_lines add = 1 }\n"
+            "	change_global_variable = { name = curia_export_lines add = 1 }\n	debug_log = curia_line_fin")})
+        self.assertProblem(self.pairs(mod), "curia_export_fin", "2 write(s)", "1 debug_log")
+
+    def test_orphan_increment(self):
+        mod = self.mod_with({EFFECTS_FILE: ("curia_export_fin = {", "curia_export_fin = {\n	change_global_variable = { name = curia_export_lines add = 1 }\n	change_global_variable = { name = curia_export_lines add = 1 }\n	debug_log = curia_line_fin\n}\ncuria_orphan = {\n	change_global_variable = { name = curia_export_lines add = 1 }")})
+        self.assertProblem(self.pairs(mod), "curia_orphan")
+
+    def test_debug_log_outside_scripted_effects(self):
+        gui = "curia_run = {\n	scope = character\n	effect = {\n		debug_log = curia_line_fin\n	}\n}\n"
+        mod = self.mod_with({"common/scripted_guis/curia_scripted_guis.txt": gui})
+        self.assertProblem(self.pairs(mod), "curia_scripted_guis.txt", "curia_run", "0 write(s)")
+        self.assertProblem(lint_mod.check_debug_log_counter(mod), "curia_scripted_guis.txt", "debug_log = curia_line_fin")
+
+    def test_multi_line_increment_counts(self):
+        mod = self.mod_with({EFFECTS_FILE: (
+            "change_global_variable = { name = curia_export_lines add = 1 }",
+            "change_global_variable = {\n		name = curia_export_lines\n		add = 1\n	}")})
+        self.assertEqual(self.pairs(mod), [])
+
+
+class MultiLineGlobals(LintCase):
+    def test_multi_line_write_is_seen(self):
+        write = "	set_global_variable = {\n		name = curia_zzz\n		value = 0\n	}\n"
+        mod = self.mod_with({EFFECTS_FILE: ("curia_export_fin = {\n", "curia_export_fin = {\n" + write)})
+        self.assertProblem(lint_mod.check_globals_read(mod), "curia_zzz", "curia_export.txt")
+
+    def test_multi_line_counter_not_reset(self):
+        change = "	change_global_variable = {\n		name = curia_rank\n		add = 1\n	}\n"
+        mod = self.mod_with({EFFECTS_FILE: ("curia_export_fin = {\n", "curia_export_fin = {\n" + change)})
+        self.assertProblem(lint_mod.check_counters_reset(mod), "curia_rank", "curia_export_begin")
+
+
+class Indentation(LintCase):
+    def test_tab_indent_in_localization(self):
+        mod = self.mod_with({LOC_FILE: ("\n curia_line_fin:", "\n\tcuria_line_fin:")})
+        self.assertProblem(lint_mod.lint_structure(mod, mod.parent), "exactly one space")
+
+    def test_two_space_indent_in_localization(self):
+        mod = self.mod_with({LOC_FILE: ("\n curia_line_fin:", "\n  curia_line_fin:")})
+        self.assertProblem(lint_mod.lint_structure(mod, mod.parent), "exactly one space")
+
+
+class ClosestForm(LintCase):
+    def test_heir_with_a_missing_field_names_the_heir_form(self):
+        fields = lint_mod.split_fields("CURIA1|%s|HEIR|%s|%s|%s|%s" % (SNAP, ID, i("curia_has_liege_value"), i("curia_is_landed_value"), NAME))[3:]
+        form, reason = lint_mod.match_record("HEIR", fields)
+        self.assertIsNone(form)
+        self.assertIn("form 'HEIR' has 5 fields", reason)
+
+    def test_war_attacker_with_a_missing_field_names_the_attacker_form(self):
+        form, reason = lint_mod.match_record("WAR", [i("curia_war_index_value"), "ATTACKER", NAME])
+        self.assertIsNone(form)
+        self.assertIn("form 'WAR ATTACKER'", reason)
+
+    def test_faction_target_with_a_missing_field_names_the_target_form(self):
+        form, reason = lint_mod.match_record("FACTION", [i("curia_faction_index_value"), "TARGET", NAME])
+        self.assertIsNone(form)
+        self.assertIn("form 'FACTION TARGET'", reason)
+
+
+class RealModMutants(unittest.TestCase):
+    """Copy the real mod, break one thing, and expect the lint to say so (the mutants the reviewers tried)."""
+
+    def mutate(self, rel, old, new, count=1):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        mod = pathlib.Path(tmp.name) / "mod" / "curia"
+        shutil.copytree(lint_mod.REPO_ROOT / "mod" / "curia", mod)
+        path = mod / rel
+        data = path.read_bytes().decode("utf-8")
+        self.assertIn(old, data, f"test setup: {old!r} not in {rel}")
+        path.write_bytes(data.replace(old, new, count).encode("utf-8"))
+        return mod
+
+    def problems(self, mod):
+        return lint_mod.lint_all(mod.parent)[0]
+
+    def assertCaught(self, mod, *needles):
+        text = "\n".join(self.problems(mod))
+        self.assertTrue(text, "the lint found nothing")
+        for needle in needles:
+            self.assertIn(needle, text)
+
+    def test_claim_n_from_the_wrong_counter(self):
+        mod = self.mutate(LOC_FILE, "CLAIM|[EmptyScope.ScriptValue('curia_claim_index_value')|0]|strong",
+                          "CLAIM|[EmptyScope.ScriptValue('curia_war_index_value')|0]|strong")
+        self.assertCaught(mod, "curia_line_claim_strong", "field 1 must read curia_claim_index_value")
+
+    def test_vassal_id_and_gold_swapped(self):
+        mod = self.mutate(LOC_FILE, "|[THIS.GetCharacter.GetID]|[THIS.GetCharacter.GetGold|0]|[THIS.ScriptValue('curia_opinion_of_liege')",
+                          "|[THIS.GetCharacter.GetGold|0]|[THIS.GetCharacter.GetID]|[THIS.ScriptValue('curia_opinion_of_liege')")
+        self.assertCaught(mod, "curia_line_vassal", "field 2 must read")
+
+    def test_wars_header_reads_the_wrong_value(self):
+        mod = self.mutate(LOC_FILE, "WARS|[EmptyScope.ScriptValue('curia_wars_total_value')|0]",
+                          "WARS|[EmptyScope.ScriptValue('curia_line_count_value')|0]")
+        self.assertCaught(mod, "curia_line_wars", "must read curia_wars_total_value")
+
+    def test_vassals_header_reads_the_computed_count(self):
+        mod = self.mutate(LOC_FILE, "|[EmptyScope.ScriptValue('curia_vassals_listed_value')|0]\"",
+                          "|[THIS.ScriptValue('curia_vassal_count')|0]\"")
+        self.assertCaught(mod, "curia_line_vassals", "must read curia_vassals_listed_value")
+
+    def test_counting_pass_increment_removed(self):
+        mod = self.mutate(EFFECTS_FILE, "			change_global_variable = { name = curia_vassals_listed add = 1 }\n", "")
+        self.assertCaught(mod, "curia_vassals_listed", "never changed")
+
+    def test_section_removed_from_the_run(self):
+        mod = self.mutate(EFFECTS_FILE, "	curia_export_claims = yes\n", "")
+        self.assertCaught(mod, "curia_export_run calls", "order of docs/wire-format.md")
+
+    def test_sections_swapped(self):
+        mod = self.mutate(EFFECTS_FILE, "	curia_export_wars = yes\n	curia_export_claims = yes\n",
+                          "	curia_export_claims = yes\n	curia_export_wars = yes\n")
+        self.assertCaught(mod, "curia_export_run calls", "order of docs/wire-format.md")
+
+    def test_probes_after_end_are_rejected(self):
+        mod = self.mutate(EFFECTS_FILE, "	curia_export_end = yes\n}", "	curia_export_end = yes\n	curia_export_probes = yes\n}")
+        self.assertCaught(mod, "curia_export_run calls")
+
+    def test_iterator_max_differs_between_passes(self):
+        mod = self.mutate(EFFECTS_FILE, "max = curia_max_vassals", "max = curia_max_factions")
+        self.assertCaught(mod, "curia_export_vassals", "different parameters")
+
+    def test_iterator_order_differs_between_passes(self):
+        mod = self.mutate(EFFECTS_FILE, "order_by = tier", "order_by = tier\n			pressed = yes")
+        self.assertCaught(mod, "curia_export_claims", "different parameters")
+
+    def test_second_pass_missing(self):
+        mod = self.mutate(EFFECTS_FILE, "ordered_targeting_faction = {", "every_targeting_faction = {", count=1)
+        self.assertCaught(mod, "curia_export_factions", "twice")
+
+    def test_double_increment_in_the_real_mod(self):
+        line = "change_global_variable = { name = curia_export_lines add = 1 }"
+        mod = self.mutate(EFFECTS_FILE, "	" + line + "\n	debug_log = curia_line_fin", "	" + line + "\n	" + line + "\n	debug_log = curia_line_fin")
+        self.assertCaught(mod, "curia_export_fin", "2 write(s)")
+
+    def test_debug_log_without_increment_in_the_scripted_gui(self):
+        mod = self.mutate("common/scripted_guis/curia_scripted_guis.txt", "curia_export_run = yes",
+                          "debug_log = curia_line_fin\n		curia_export_run = yes")
+        self.assertCaught(mod, "curia_scripted_guis.txt", "curia_line_fin")
+
+    def test_multi_line_orphan_global(self):
+        mod = self.mutate(EFFECTS_FILE, "curia_export_fin = {\n",
+                          "curia_export_fin = {\n	set_global_variable = {\n		name = curia_zzz\n		value = 0\n	}\n")
+        self.assertCaught(mod, "curia_zzz")
+
+    def test_tab_indent_in_the_real_localization(self):
+        mod = self.mutate(LOC_FILE, "\n curia_line_fin:", "\n\tcuria_line_fin:")
+        self.assertCaught(mod, "exactly one space")
 
 
 class RealMod(unittest.TestCase):

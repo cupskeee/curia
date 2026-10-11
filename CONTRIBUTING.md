@@ -69,7 +69,8 @@ python3 -m venv .venv-tools && .venv-tools/bin/pip install -r tools/requirements
 CLANG_FORMAT=.venv-tools/bin/clang-format tools/ci/check_format.sh --fix   # --fix rewrites files
 tools/ci/scan_patterns.sh      # no Paradox content, no keys, no home paths
 tools/ci/check_versions.sh     # CMake, vcpkg.json and CHANGELOG agree
-python3 tools/ci/lint_mod.py   # structure of the mod folders
+python3 tools/ci/lint_mod.py   # structure of the mod folders and the CURIA1 export format
+python3 -m unittest discover -s tools/ci -p "test_*.py"   # tests of the lint
 ```
 
 ## Build and test
