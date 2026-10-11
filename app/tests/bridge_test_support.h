@@ -6,6 +6,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <ostream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
