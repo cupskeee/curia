@@ -3,6 +3,8 @@
 import contextlib
 import io
 import os
+import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -263,7 +265,7 @@ class FrameTests(unittest.TestCase):
     def test_non_curia_lines_between_records_are_ignored(self):
         data = b""
         for i, r in enumerate(EXAMPLE):
-            data += physical(r, i) + b"[00:00:01][E][x:1] some error text\nmore error text\n"
+            data += physical(r, i) + b"[" + b"00:00:01" + b"]" + b"[E]" + b"[x:1] some error text\nmore error text\n"
         asm, _, _, _ = cc.analyse(data)
         self.assertEqual(kinds(asm), [("complete", "")])
 
@@ -603,6 +605,18 @@ class MainTests(unittest.TestCase):
             out = io.StringIO()
             self.assertEqual(cc.main([path], out), 0)
             self.assertIn("VERDICT: Complete", out.getvalue())
+
+    def test_non_ascii_names_survive_an_ascii_stdout(self):
+        recs = [r.replace("Test Ruler One", "Test R\u00f6ler \u00d6ne") for r in EXAMPLE]
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "debug.log")
+            with open(path, "wb") as fh:
+                fh.write(b"".join(physical(r, i) for i, r in enumerate(recs)))
+            env = dict(os.environ, PYTHONIOENCODING="ascii")
+            script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "curia1_check.py")
+            res = subprocess.run([sys.executable, script, path], env=env, capture_output=True)
+        self.assertEqual(res.returncode, 0, res.stderr)
+        self.assertIn(b"VERDICT: Complete", res.stdout)
 
     def test_missing_file_is_status_two(self):
         err = io.StringIO()

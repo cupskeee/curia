@@ -881,7 +881,11 @@ def main(argv=None, out=None) -> int:
     ap.add_argument("--last", type=int, default=None, metavar="N",
                     help="print the tables of the last N frames only (the summary always covers all of them)")
     args = ap.parse_args(argv)
-    out = out or sys.stdout
+    if out is None:
+        out = sys.stdout
+        # Game names are not ASCII; a cp1252 console or a redirect under a plain locale must not kill the report.
+        if hasattr(out, "reconfigure"):
+            out.reconfigure(encoding="utf-8", errors="replace")
     try:
         with open(args.log, "rb") as fh:
             data = fh.read()
