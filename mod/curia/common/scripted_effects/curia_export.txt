@@ -5,7 +5,7 @@
 #
 # Frame (every record starts with CURIA1|<snap>|; the exact texts are in the localization file, one key per record form):
 #   BEGIN|<mode 0/1>|<mod version>|<year>|<month>|<day>|<ruler id>|<ruler name>
-#   FIN|<gold>|<income in tenths of a gold piece>
+#   FIN|<gold>|<net monthly balance in tenths of a gold piece>
 #   HEIR|none   or   HEIR|<id>|<opinion of liege>|<has liege 0/1>|<landed 0/1>|<name>
 #   VASSALS|<total>|<listed>   then   VASSAL|<rank>|<id>|<gold>|<opinion>|<military strength>|<name>   (top 10 by strength)
 #   WARS|<total>   then per war   WAR|<n>|NAME|<war name>, WAR|<n>|ATTACKER|<id>|<name>, WAR|<n>|DEFENDER|<id>|<name>

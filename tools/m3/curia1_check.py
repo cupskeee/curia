@@ -667,7 +667,7 @@ def frame_lines(frame: Frame) -> List[str]:
     if fin:
         g, i = fin["head"].values["gold"], fin["head"].values["income"]
         out.append("  Gold         %d" % g)
-        out.append("  Income       %d tenths = %s gold per month" % (i, tenths(i)))
+        out.append("  Income       %d tenths = %s gold per month (net: income minus expenses)" % (i, tenths(i)))
     else:
         out.append("  Gold/income  not exported")
     heir = sections.get("HEIR")
@@ -754,8 +754,9 @@ def compare_lines(frame: Frame) -> List[str]:
     if fin:
         g, i = fin["head"].values["gold"], fin["head"].values["income"]
         out.append("  [E] Gold: the top bar must show %d gold (whole gold)." % g)
-        out.append("  [E] Income: the top bar must show %s%s a month (%d tenths in the log). Write the HUD figure "
-                   "next to it." % ("+" if i > 0 else "", tenths(i), i))
+        out.append("  [E] Income: the log figure is the NET monthly balance. The top bar must show %s%s a month and the "
+                   "tooltip's total line must show the same (%d tenths in the log); the tooltip's income line alone "
+                   "is the income before expenses. Write the total next to it." % ("+" if i > 0 else "", tenths(i), i))
     vas = sections.get("VASSALS")
     if vas:
         v = vas["head"].values
@@ -844,7 +845,7 @@ def report(asm: Assembler, lines_total: int, overlong: int, tail: bytes, last: O
         for (field, printed), times in sorted(asm.negatives.items()):
             out.write("    %s  %s  sign byte 0x%02x (ASCII hyphen-minus)  x%d\n" % (field, printed, printed.encode()[0], times))
     else:
-        out.write("  negative integers seen: none (case E needs at least one)\n")
+        out.write("  negative integers seen: none in this log\n")
     if asm.unsupported:
         out.write("  unsupported-format reports:\n")
         for _ln, text in asm.unsupported:

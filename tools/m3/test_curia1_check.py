@@ -559,7 +559,7 @@ class OutputTests(unittest.TestCase):
         recs = list(EXAMPLE)
         recs[5] = "CURIA1|7|VASSAL|2|1004|40|5|310|Test Vassal Four"
         _code, text = self.render(recs)
-        self.assertIn("negative integers seen: none (case E needs at least one)", text)
+        self.assertIn("negative integers seen: none in this log", text)
         recs[1] = "CURIA1|7|FIN|-30|-5"
         _code, text = self.render(recs)
         self.assertIn("FIN.gold  -30", text)

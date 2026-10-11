@@ -32,11 +32,12 @@ at `0.y.z` and anything may change between minor versions.
 
 ### Changed
 
-- The Curia mod (`mod/curia/`, now 0.2.0) writes the approved `CURIA1` export
+- The Curia mod (`mod/curia/`, now 0.2.1) writes the approved `CURIA1` export
   format of `docs/wire-format.md` instead of the spike layout: records with
   ids, section headers with totals, numeric date and mod version in `BEGIN`,
-  income in tenths of a gold piece, explicit claims marked `strong` or `weak`,
-  and faction groups. The format is not frozen until the pre-freeze in-game
+  the net monthly balance (income minus expenses, as the top bar shows it) in
+  tenths of a gold piece, explicit claims marked `strong` or `weak`, and
+  faction groups. The format is not frozen until the pre-freeze in-game
   check has passed, and the earlier spike output is not readable by the new
   format. `tools/ci/lint_mod.py` now checks the format's invariants.
 
