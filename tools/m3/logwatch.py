@@ -1425,7 +1425,7 @@ def run_selftest(echo: Callable[[str], None] = print, tolerance_s: float = 0.25)
     steps: List[Tuple[float, str, str]] = [
         (0.05, "CURIA1|s1|BEGIN|1066.9.15|1", "s1b"),
         (0.12, "CURIA1|s1|FIN|375|12", "s1f"),
-        (0.30, "CURIA1|s1|NAME|Zo\u00eb of Aq\u00fcitaine", "s1n"),
+        (0.30, "CURIA1|s1|NAME|Test R\u00f6ler \u00d6ne", "s1n"),
         (0.08, "CURIA1|s1|END|4", "s1e"),
         (0.10, "CURIA1|s2|LONG|" + "x" * 8000, "s2l"),
     ]
