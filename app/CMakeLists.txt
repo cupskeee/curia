@@ -45,6 +45,8 @@ add_library(curia_core STATIC
     src/core/cli.cpp
     src/core/watch_log.cpp
     src/net/ca_bundle.cpp
+    src/providers/cancel_token.cpp
+    src/providers/sse_parser.cpp
     ${CURIA_PLATFORM_SOURCES})
 target_include_directories(curia_core PUBLIC src ${CMAKE_CURRENT_BINARY_DIR}/generated)
 find_package(Threads REQUIRED)
@@ -64,6 +66,12 @@ if(CURIA_BUILD_FUZZ)
     target_link_options(curia_fuzz_bridge PRIVATE -fsanitize=fuzzer,address,undefined)
     target_link_libraries(curia_fuzz_bridge PRIVATE curia_core)
     curia_configure_target(curia_fuzz_bridge)
+
+    add_executable(curia_fuzz_sse fuzz/fuzz_sse.cpp)
+    target_compile_options(curia_fuzz_sse PRIVATE -fsanitize=fuzzer-no-link)
+    target_link_options(curia_fuzz_sse PRIVATE -fsanitize=fuzzer,address,undefined)
+    target_link_libraries(curia_fuzz_sse PRIVATE curia_core)
+    curia_configure_target(curia_fuzz_sse)
 endif()
 
 # --- milestone M2 overlay probe, portable part (macOS only; throwaway spike code) -----------
@@ -165,6 +173,8 @@ if(CURIA_BUILD_TESTS)
         tests/test_log_tailer.cpp
         tests/test_log_watcher.cpp
         tests/test_platform.cpp
+        tests/test_provider_types.cpp
+        tests/test_sse_parser.cpp
         tests/test_watch_log.cpp)
     if(APPLE)
         target_sources(curia_tests PRIVATE
@@ -190,6 +200,14 @@ if(CURIA_BUILD_TESTS)
              COMMAND curia_fuzz_replay ${PROJECT_SOURCE_DIR}/tests/fixtures/curia1
                      ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/corpus)
     set_tests_properties(fuzz_replay PROPERTIES LABELS fuzz TIMEOUT 300)
+
+    # The same for the SSE parser (fuzz/fuzz_sse.cpp, corpus in fuzz/corpus_sse).
+    add_executable(curia_fuzz_sse_replay fuzz/fuzz_sse.cpp fuzz/fuzz_sse_replay_main.cpp)
+    target_link_libraries(curia_fuzz_sse_replay PRIVATE curia_core)
+    curia_configure_target(curia_fuzz_sse_replay)
+    add_test(NAME fuzz_replay_sse
+             COMMAND curia_fuzz_sse_replay ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/corpus_sse)
+    set_tests_properties(fuzz_replay_sse PROPERTIES LABELS fuzz TIMEOUT 300)
 endif()
 
 # --- end-to-end test: fake CK3 -> curia --watch-log -> golden events (needs the app binary) -------

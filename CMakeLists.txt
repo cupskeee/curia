@@ -24,7 +24,7 @@ option(CURIA_BUILD_APP "Build the desktop app (needs SDL3, Dear ImGui, libcurl)"
 option(CURIA_BUILD_TESTS "Build the unit tests" ON)
 option(CURIA_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
 option(CURIA_SANITIZE "Build with AddressSanitizer and UndefinedBehaviorSanitizer (Clang/GCC)" OFF)
-option(CURIA_BUILD_FUZZ "Build the libFuzzer target curia_fuzz_bridge (Clang with libFuzzer; use with CURIA_SANITIZE)" OFF)
+option(CURIA_BUILD_FUZZ "Build the libFuzzer targets curia_fuzz_bridge and curia_fuzz_sse (Clang with libFuzzer; use with CURIA_SANITIZE)" OFF)
 
 include(CTest)
 

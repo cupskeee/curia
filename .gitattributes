@@ -7,3 +7,5 @@
 *.otf binary
 *.ico binary
 *.icns binary
+# The SSE fuzz seeds carry CR bytes and arbitrary bytes; never normalise line endings.
+app/fuzz/corpus_sse/* binary
