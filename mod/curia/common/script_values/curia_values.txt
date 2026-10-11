@@ -63,10 +63,16 @@ curia_date_day = {
 }
 
 # ---- money ----
-# Monthly income in tenths of a gold piece (7.8 prints as 78), owner decision W7. Ruler scope.
+# The ruler's net monthly balance (income minus expenses, the figure the top bar shows) in tenths of a gold piece
+# (+7.8 prints as 78), rounded once at the end. Owner decisions W7 and the pre-freeze result of 2026-10-11: the first
+# form, monthly_character_income alone, is the income before expenses (9.2 against a top bar of +7.8). The format's
+# FIN field keeps the name income. The subtraction is the game's own monthly_character_income_minus_expenses
+# (common/script_values/01_dynamic_values.txt). Ruler scope.
 curia_income_tenths = {
 	value = monthly_character_income
+	subtract = monthly_character_expenses
 	multiply = 10
+	round = yes
 }
 
 # ---- sizes and counts ----
@@ -203,6 +209,26 @@ curia_probe_income_monthly = {
 }
 curia_probe_income_yearly = {
 	value = yearly_character_income
+}
+# Pre-freeze income re-check (2026-10-11): the three parts of the export's net figure, each in tenths and rounded, so
+# that a mismatch with the top bar can be read from one probe click. The balance form (the game's own
+# monthly_character_balance trigger, listed in its trigger documentation) appears once in the game's files, as
+# "add = liege.monthly_character_balance" inside a scale block of a diarchy file, and never as the value of a named script
+# value: a candidate that may need removing if it raises an error.
+curia_probe_income_gross_tenths = {
+	value = monthly_character_income
+	multiply = 10
+	round = yes
+}
+curia_probe_expenses_tenths = {
+	value = monthly_character_expenses
+	multiply = 10
+	round = yes
+}
+curia_probe_balance_tenths = {
+	value = monthly_character_balance
+	multiply = 10
+	round = yes
 }
 curia_probe_realm_size = {
 	value = realm_size

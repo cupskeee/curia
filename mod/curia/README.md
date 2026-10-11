@@ -1,15 +1,15 @@
-# Curia mod (mod id `curia`), version 0.2.0
+# Curia mod (mod id `curia`), version 0.2.1
 
 The CK3 side of Curia: two HUD buttons that write a read-only snapshot of the player's realm to CK3's `debug.log`
-as `CURIA1|...` records, for the Curia app to read. **Not released and not published.** Version 0.2.0 writes the format
+as `CURIA1|...` records, for the Curia app to read. **Not released and not published.** Version 0.2.1 writes the format
 approved at the wire-format checkpoint of 2026-10-11 (`docs/wire-format.md`, the single source of truth for the records);
 the format is **not frozen** until the maintainer's pre-freeze in-game check (`docs/wire-format.md` section 9) has passed, and
 the forms marked new in section 8 of that file have never run in the game. The 0.1.0 spike layout is gone and is not
 readable by the new format; the mod and the app change together.
 
 It overrides no vanilla file (every file name carries the `curia_` prefix, no `replace_path`) and needs no console and no
-`-debug_mode`. It is written to leave `error.log` untouched in normal use (the checks that ran in M3 are about 0.1.0; 0.2.0 has
-only had the structural lint, its own format lint and ck3-tiger, no game run). Curia keeps these counters as global variables
+`-debug_mode`. It is written to leave `error.log` untouched in normal use (the checks that ran in M3 are about 0.1.0; 0.2.0 ran in the pre-freeze
+check of 2026-10-11 with no `error.log` entry; 0.2.1 only changes the income figure and adds probes, and has had the structural lint, its own format lint and ck3-tiger, no game run). Curia keeps these counters as global variables
 in the save: `curia_snap_id`, `curia_export_lines`, `curia_rank`, `curia_war_index`, `curia_claim_index`,
 `curia_faction_index`, `curia_vassals_listed`, `curia_wars_total`, `curia_claims_listed`, `curia_factions_listed` and
 `curia_probe_mode`; in probe mode it also sets four claim-flag variables (`curia_claim_f_es`, `curia_claim_f_ew`,
@@ -24,7 +24,7 @@ the position the M2 stub proved clear of the HUD; the second is to its right. Bo
 
 ## Files
 ```
-descriptor.mod                                     name, version 0.2.0, tags Utilities, supported_version 1.20.* (no BOM)
+descriptor.mod                                     name, version 0.2.1, tags Utilities, supported_version 1.20.* (no BOM)
 .metadata/metadata.json                            launcher metadata, same name/version/supported version, id "curia"
 gui/curia_widget.gui                               the widget with the two buttons
 gui/scripted_widgets/curia_widgets.txt             registers the widget (no vanilla GUI file overridden)
@@ -32,7 +32,7 @@ common/scripted_guis/curia_scripted_guis.txt       curia_run_advisor, curia_run_
 common/scripted_effects/curia_export.txt           the export, one effect per section, counting passes before the headers
 common/scripted_effects/curia_probes.txt           the probe section: one effect per group, plus the helper curia_probe_faction_fields
 common/script_values/curia_values.txt              caps, frame counters, the values the export prints, probe-only values
-common/on_action/curia_on_actions.txt              the game-start record CURIA1|0|LOAD|0.2.0
+common/on_action/curia_on_actions.txt              the game-start record CURIA1|0|LOAD|0.2.1
 localization/english/curia_l_english.yml           button texts and every record form (UTF-8 BOM, l_english:)
 ```
 Script and localization files carry a UTF-8 BOM and tabs, like the game's own; `python3 tools/ci/lint_mod.py` checks that and the format invariants below.
@@ -57,7 +57,7 @@ this table is only the shape the mod writes (`<n>` numbers items inside a sectio
 | Record | Fields after `<snap>\|` |
 |---|---|
 | `BEGIN` | `BEGIN\|<mode 0/1>\|<mod_version>\|<year>\|<month>\|<day>\|<ruler id>\|<ruler name>` |
-| `FIN` | `FIN\|<gold>\|<income in tenths of a gold piece>` (7.8 prints as 78) |
+| `FIN` | `FIN\|<gold>\|<net monthly balance in tenths of a gold piece>` (+7.8 prints as 78) |
 | `HEIR` | `HEIR\|none`, or `HEIR\|<id>\|<opinion of the heir's liege>\|<has liege 0/1>\|<landed 0/1>\|<name>` |
 | `VASSALS`, `VASSAL` | `VASSALS\|<total>\|<listed>`, then `VASSAL\|<rank>\|<id>\|<gold>\|<opinion of liege>\|<military strength>\|<name>` (top N by strength, N = `curia_max_vassals`, default 10) |
 | `WARS`, `WAR` | `WARS\|<total>` (wars are not capped), then three records per war with the same `<n>`: `WAR\|<n>\|NAME\|<war name>`, `WAR\|<n>\|ATTACKER\|<id>\|<name>`, `WAR\|<n>\|DEFENDER\|<id>\|<name>` |
@@ -99,6 +99,8 @@ sections in the order of the spec; the counting and the writing pass of each ord
 counting global is changed somewhere. Localization keys are indented by exactly one space.
 
 ## Forms: ran in the game versus new in 0.2.0
+The pre-freeze check of 2026-10-11 ran 0.2.0 (final `errcount` 0); everything below ran there except the income, which was the wrong quantity (see the next list); 0.2.1 changes only that value and adds probes.
+
 Ran in M0/M0b/M3 (`docs/spikes/`): `[THIS.GetCharacter.GetNameNoTooltip]`, `[THIS.GetCharacter.GetGold|0]`,
 `[THIS.GetCharacter.GetID]`, `[THIS.War.GetName]`, `[THIS.Title.GetNameNoTierNoTooltip]`, `[THIS.ScriptValue('x')|0]`,
 `[EmptyScope.ScriptValue('x')|0]` (also over `global_var:`), the script value `"opinion(liege)"`, the iterators `player_heir`,
@@ -108,11 +110,11 @@ the `explicit` / `pressed` filters, `every_targeting_faction`, `joined_faction`,
 `faction_power`, `faction_power_threshold`, `every_faction_member`, and `save_temporary_scope_as` with `scope:` and `prev` inside a claim
 iterator (the claim probe).
 
-New in 0.2.0, **never run in the game** (the list of `docs/wire-format.md` section 8 is the authority):
+New in 0.2.0 (the list of `docs/wire-format.md` section 8 is the authority; the net income form of 0.2.1 has not run):
 - the date as the script values `current_year`, `current_month` and `current_day` (`current_year` is used as a value in the game's own
   files; month and day appear there only as comparisons, but ck3-tiger accepts them in a script value; the data functions
   `[GetCurrentDate.GetYear]`, `GetMonthOfYear` and `GetDayOfMonth` exist as the fallback);
-- income in tenths: the script value `monthly_character_income` multiplied by 10;
+- income in tenths: since 0.2.1 the net monthly balance, the script value `monthly_character_income` minus `monthly_character_expenses`, multiplied by 10 and rounded once (0.2.0 used the income before expenses, which the pre-freeze check showed to be 9.2 against a top bar of +7.8);
 - `ordered_claim` with `explicit = yes` and a `limit` on `has_strong_claim_on` / `has_weak_claim_on` through a saved temporary scope;
 - `ordered_targeting_faction` with `max`, `check_range_bounds = no` and `order_by = faction_power`;
 - `special_character` and `special_title` with `has_special_character` / `has_special_title` and `exists`, inside a guard on
@@ -139,6 +141,8 @@ ruler's claim, a nonzero discontent, and faction types other than independence, 
 | `ruler_id`, `heir_id`, `vassal_id` | `[THIS.GetCharacter.GetID]` |
 | `ruler_first_name`, `heir_first_name`, `vassal_first_name` | `[THIS.GetCharacter.GetFirstNameNoTooltip]` (names without titles) |
 | `ruler_income_monthly`, `ruler_income_yearly` | script values over `monthly_character_income`, `yearly_character_income` |
+| `ruler_income_gross_tenths`, `ruler_expenses_tenths`, `ruler_net_tenths` | income before expenses, expenses and the exported net figure, each in tenths and rounded (0.2.1, for the income re-check) |
+| `ruler_balance_tenths` | the game's own `monthly_character_balance` over 10, rounded: **a candidate**: the game's files use the name once, inside a scale block (`liege.monthly_character_balance`), never as the value of a named script value; remove the probe if it raises an `error.log` entry |
 | `ruler_strength`, `vassal_strength` | script value over `current_military_strength` |
 | `ruler_realm_size` | script value over `realm_size` |
 | `ruler_landless_ruler`, `heir_landless_ruler` | script value over the `is_landless_ruler` trigger |

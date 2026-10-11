@@ -1,6 +1,8 @@
 <!-- SPDX-License-Identifier: MIT -->
 # M3 pre-freeze check: the CURIA1 format against the game (owner, macOS, about 30 minutes)
 
+**Result (2026-10-11):** every case passed except the income figure (the mod exported the income before expenses); mod 0.2.1 fixes it and `m3-income-recheck.md` is the 5-minute re-check. The sheet below is kept as it was run, for mod 0.2.0.
+
 Why: `docs/wire-format.md` section 9 lists the in-game checks that must pass before the data format is declared frozen. The mod (version 0.2.0) now writes that format, and `tools/m3/curia1_check.py` reads the game's log and tells you, frame by frame, whether the records are valid and what to compare with the game's screen. This sheet is the **must-test** part only: cases A, B, D and I, plus the income part of E and the date part of H. The other cases are **accepted gaps**: they are not tested and are recorded as gaps (last section).
 
 Rules as in `m3-session2-checklist.md`: throwaway games only, **plain Play button, no console, no debug mode** in everything below (the console switches achievements off for that game); words and numbers only in your notes, never game text (the files you send back do hold game text and stay private); anything that differs from this page is the result, write it down. One Terminal window, reached with Cmd+Tab (on a single screen it cannot stay in view next to CK3). **Pause the game (Space) before reading the screen and before every click**, so the numbers on screen and in the log are the same moment.

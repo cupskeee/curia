@@ -58,7 +58,7 @@ struct BeginFields {
 
 struct FinFields {
     std::int32_t gold = 0;
-    std::int32_t income = 0;  // tenths of a gold piece
+    std::int32_t income = 0;  // net monthly balance, tenths of a gold piece
 };
 
 // The text of a full HEIR is the heir's name; the `none` form has no other field.

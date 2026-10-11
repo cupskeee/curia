@@ -10,6 +10,6 @@ on_game_start_after_lobby = {
 
 curia_on_game_start = {
 	effect = {
-		debug_log = "CURIA1|0|LOAD|0.2.0"
+		debug_log = "CURIA1|0|LOAD|0.2.1"
 	}
 }

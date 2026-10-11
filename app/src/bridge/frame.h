@@ -22,7 +22,8 @@ struct Date {
 
 struct Finances {
     std::int32_t gold = 0;
-    // Monthly income in tenths of a gold piece (78 means 7.8); may be negative.
+    // Net monthly balance (income minus expenses, the top bar figure) in tenths of a gold piece
+    // (78 means +7.8); may be negative.
     std::int32_t incomeTenths = 0;
 };
 

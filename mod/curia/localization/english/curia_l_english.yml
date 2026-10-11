@@ -8,7 +8,7 @@
 
  # Frame records (CURIA1 wire format, docs/wire-format.md sections 2 to 4). Every text expression is the LAST field of its record and a
  # record has at most one; one key per record form, because a debug_log call prints one key. tools/ci/lint_mod.py checks the grammar.
- curia_line_begin: "CURIA1|[EmptyScope.ScriptValue('curia_snap_id_value')|0]|BEGIN|[EmptyScope.ScriptValue('curia_mode_value')|0]|0.2.0|[EmptyScope.ScriptValue('curia_date_year')|0]|[EmptyScope.ScriptValue('curia_date_month')|0]|[EmptyScope.ScriptValue('curia_date_day')|0]|[THIS.GetCharacter.GetID]|[THIS.GetCharacter.GetNameNoTooltip]"
+ curia_line_begin: "CURIA1|[EmptyScope.ScriptValue('curia_snap_id_value')|0]|BEGIN|[EmptyScope.ScriptValue('curia_mode_value')|0]|0.2.1|[EmptyScope.ScriptValue('curia_date_year')|0]|[EmptyScope.ScriptValue('curia_date_month')|0]|[EmptyScope.ScriptValue('curia_date_day')|0]|[THIS.GetCharacter.GetID]|[THIS.GetCharacter.GetNameNoTooltip]"
  curia_line_fin: "CURIA1|[EmptyScope.ScriptValue('curia_snap_id_value')|0]|FIN|[THIS.GetCharacter.GetGold|0]|[THIS.ScriptValue('curia_income_tenths')|0]"
  curia_line_heir: "CURIA1|[EmptyScope.ScriptValue('curia_snap_id_value')|0]|HEIR|[THIS.GetCharacter.GetID]|[THIS.ScriptValue('curia_opinion_of_liege_guarded')|0]|[THIS.ScriptValue('curia_has_liege_value')|0]|[THIS.ScriptValue('curia_is_landed_value')|0]|[THIS.GetCharacter.GetNameNoTooltip]"
  curia_line_heir_none: "CURIA1|[EmptyScope.ScriptValue('curia_snap_id_value')|0]|HEIR|none"
@@ -40,6 +40,10 @@
  curia_probe_ruler_first_name: "CURIA1|[EmptyScope.ScriptValue('curia_snap_id_value')|0]|PROBE|ruler_first_name|[THIS.GetCharacter.GetFirstNameNoTooltip]"
  curia_probe_ruler_income_monthly: "CURIA1|[EmptyScope.ScriptValue('curia_snap_id_value')|0]|PROBE|ruler_income_monthly|[THIS.ScriptValue('curia_probe_income_monthly')|0]"
  curia_probe_ruler_income_yearly: "CURIA1|[EmptyScope.ScriptValue('curia_snap_id_value')|0]|PROBE|ruler_income_yearly|[THIS.ScriptValue('curia_probe_income_yearly')|0]"
+ curia_probe_ruler_income_gross_tenths: "CURIA1|[EmptyScope.ScriptValue('curia_snap_id_value')|0]|PROBE|ruler_income_gross_tenths|[THIS.ScriptValue('curia_probe_income_gross_tenths')|0]"
+ curia_probe_ruler_expenses_tenths: "CURIA1|[EmptyScope.ScriptValue('curia_snap_id_value')|0]|PROBE|ruler_expenses_tenths|[THIS.ScriptValue('curia_probe_expenses_tenths')|0]"
+ curia_probe_ruler_balance_tenths: "CURIA1|[EmptyScope.ScriptValue('curia_snap_id_value')|0]|PROBE|ruler_balance_tenths|[THIS.ScriptValue('curia_probe_balance_tenths')|0]"
+ curia_probe_ruler_net_tenths: "CURIA1|[EmptyScope.ScriptValue('curia_snap_id_value')|0]|PROBE|ruler_net_tenths|[THIS.ScriptValue('curia_income_tenths')|0]"
  curia_probe_ruler_strength: "CURIA1|[EmptyScope.ScriptValue('curia_snap_id_value')|0]|PROBE|ruler_strength|[THIS.ScriptValue('curia_military_strength')|0]"
  curia_probe_ruler_realm_size: "CURIA1|[EmptyScope.ScriptValue('curia_snap_id_value')|0]|PROBE|ruler_realm_size|[THIS.ScriptValue('curia_probe_realm_size')|0]"
  curia_probe_ruler_landless_ruler: "CURIA1|[EmptyScope.ScriptValue('curia_snap_id_value')|0]|PROBE|ruler_landless_ruler|[THIS.ScriptValue('curia_probe_is_landless_ruler')|0]"

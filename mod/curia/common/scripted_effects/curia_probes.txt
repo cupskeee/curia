@@ -56,6 +56,14 @@ curia_probe_ruler = {
 	change_global_variable = { name = curia_export_lines add = 1 }
 	debug_log = curia_probe_ruler_income_yearly
 	change_global_variable = { name = curia_export_lines add = 1 }
+	debug_log = curia_probe_ruler_income_gross_tenths
+	change_global_variable = { name = curia_export_lines add = 1 }
+	debug_log = curia_probe_ruler_expenses_tenths
+	change_global_variable = { name = curia_export_lines add = 1 }
+	debug_log = curia_probe_ruler_balance_tenths
+	change_global_variable = { name = curia_export_lines add = 1 }
+	debug_log = curia_probe_ruler_net_tenths
+	change_global_variable = { name = curia_export_lines add = 1 }
 	debug_log = curia_probe_ruler_strength
 	change_global_variable = { name = curia_export_lines add = 1 }
 	debug_log = curia_probe_ruler_realm_size
