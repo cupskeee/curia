@@ -1,0 +1,33 @@
+[
+  {
+    "detail": "END count 4, counted 3",
+    "event": "frame_damaged",
+    "reason": "count_mismatch",
+    "snap": 40
+  },
+  {
+    "detail": "END count 2, counted 3",
+    "event": "frame_damaged",
+    "reason": "count_mismatch",
+    "snap": 41
+  },
+  {
+    "event": "frame_complete",
+    "frame": {
+      "date": {
+        "day": 15,
+        "month": 9,
+        "year": 1066
+      },
+      "mod_version": "0.1.0",
+      "mode": 0,
+      "record_count": 2,
+      "ruler": {
+        "id": 1001,
+        "name": "Test Ruler One"
+      },
+      "snap": 42,
+      "text_shortened": false
+    }
+  }
+]

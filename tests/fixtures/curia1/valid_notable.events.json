@@ -1,0 +1,33 @@
+[
+  {
+    "event": "frame_complete",
+    "frame": {
+      "date": {
+        "day": 15,
+        "month": 9,
+        "year": 1066
+      },
+      "fin": {
+        "gold": 0,
+        "income_tenths": 0
+      },
+      "heir": {
+        "has_liege": true,
+        "id": 1002,
+        "landed": false,
+        "name": "",
+        "none": false,
+        "opinion": 84
+      },
+      "mod_version": "0.1.0",
+      "mode": 0,
+      "record_count": 5,
+      "ruler": {
+        "id": 1001,
+        "name": "Test Ruler One"
+      },
+      "snap": 8,
+      "text_shortened": false
+    }
+  }
+]

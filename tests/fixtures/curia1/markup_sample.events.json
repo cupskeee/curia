@@ -1,0 +1,90 @@
+[
+  {
+    "event": "frame_complete",
+    "frame": {
+      "claims": {
+        "explicit": 1,
+        "implicit": 0,
+        "listed": [
+          {
+            "kind": "strong",
+            "tier": 4,
+            "title": "Test Realm"
+          }
+        ]
+      },
+      "date": {
+        "day": 15,
+        "month": 9,
+        "year": 1066
+      },
+      "factions": {
+        "against": 1,
+        "listed": [
+          {
+            "claimant": {
+              "id": 1102,
+              "name": "Test Claimant"
+            },
+            "leader": {
+              "id": 1101,
+              "name": "Test Leader"
+            },
+            "members": 2,
+            "power": 10,
+            "role": "against",
+            "target": {
+              "id": 1001,
+              "name": "Test Target"
+            },
+            "threshold": 100,
+            "title": {
+              "tier": 4,
+              "title": "Test Title"
+            },
+            "type": 3
+          }
+        ],
+        "member": false
+      },
+      "mod_version": "0.1.0",
+      "mode": 0,
+      "record_count": 16,
+      "ruler": {
+        "id": 1001,
+        "name": "Test Ruler One"
+      },
+      "snap": 120,
+      "text_shortened": false,
+      "vassals": {
+        "listed": [
+          {
+            "gold": 1,
+            "id": 1003,
+            "name": "Install Test Ruler on the Test Realm Throne",
+            "opinion": 1,
+            "rank": 1,
+            "strength": 1
+          }
+        ],
+        "total": 1
+      },
+      "wars": {
+        "total": 1,
+        "wars": [
+          {
+            "attacker": {
+              "id": 1,
+              "name": "ax"
+            },
+            "defender": {
+              "id": 2,
+              "name": "d"
+            },
+            "name": "Test Name"
+          }
+        ]
+      }
+    }
+  }
+]

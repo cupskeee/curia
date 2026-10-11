@@ -48,3 +48,46 @@ TEST_CASE("unknown arguments and conflicting modes are rejected") {
     CHECK_FALSE(error.empty());
     CHECK_FALSE(parse({"--smoke", "--idle-test", "3"}, options, error));
 }
+
+TEST_CASE("--watch-log and its companions") {
+    curia::CliOptions options;
+    std::string error;
+    CHECK(parse({"--watch-log", "some.log"}, options, error));
+    CHECK(options.watchLogPath == "some.log");
+    CHECK_FALSE(options.fromStart);
+    CHECK(options.maxFrames == 0);
+    CHECK(options.timeoutSeconds == 0);
+
+    CHECK(parse(
+        {"--watch-log", "a.log", "--from-start", "--max-frames", "3", "--timeout-seconds", "20"},
+        options, error));
+    CHECK(options.fromStart);
+    CHECK(options.maxFrames == 3);
+    CHECK(options.timeoutSeconds == 20);
+    // Order does not matter.
+    CHECK(parse({"--max-frames", "1", "--watch-log", "a.log"}, options, error));
+    CHECK(options.maxFrames == 1);
+}
+
+TEST_CASE("--watch-log needs a path and sensible numbers") {
+    curia::CliOptions options;
+    std::string error;
+    CHECK_FALSE(parse({"--watch-log"}, options, error));
+    CHECK_FALSE(parse({"--watch-log", ""}, options, error));
+    CHECK_FALSE(parse({"--watch-log", "a.log", "--max-frames"}, options, error));
+    CHECK_FALSE(parse({"--watch-log", "a.log", "--max-frames", "0"}, options, error));
+    CHECK_FALSE(parse({"--watch-log", "a.log", "--max-frames", "x"}, options, error));
+    CHECK_FALSE(parse({"--watch-log", "a.log", "--timeout-seconds", "0"}, options, error));
+    CHECK_FALSE(parse({"--watch-log", "a.log", "--timeout-seconds", "5s"}, options, error));
+    CHECK_FALSE(parse({"--watch-log", "a.log", "--timeout-seconds", "86401"}, options, error));
+}
+
+TEST_CASE("--watch-log conflicts with the window modes, and its options need it") {
+    curia::CliOptions options;
+    std::string error;
+    CHECK_FALSE(parse({"--watch-log", "a.log", "--smoke"}, options, error));
+    CHECK_FALSE(parse({"--idle-test", "3", "--watch-log", "a.log"}, options, error));
+    CHECK_FALSE(parse({"--from-start"}, options, error));
+    CHECK_FALSE(parse({"--max-frames", "2"}, options, error));
+    CHECK_FALSE(parse({"--timeout-seconds", "2"}, options, error));
+}

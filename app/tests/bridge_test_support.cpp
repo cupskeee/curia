@@ -1,0 +1,319 @@
+// SPDX-License-Identifier: MIT
+#include "bridge_test_support.h"
+
+#include <algorithm>
+#include <array>
+#include <atomic>
+#include <chrono>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
+#include <sstream>
+
+#include "bridge/frame_json.h"
+
+#ifndef CURIA_FIXTURE_DIR
+#error "CURIA_FIXTURE_DIR must point at tests/fixtures"
+#endif
+
+namespace curia::bridge::test {
+
+std::string enginePrefix(std::size_t variant) {
+    const std::array<std::string, 5> parts = {
+        "synthetic-time", "synthetic-level", "synthetic-source:1",
+        "synthetic/script/path/file.txt:1", "synthetic_effect_name:"};
+    std::string out;
+    for (const std::string& part : parts) {
+        out += part;
+        out += ' ';
+    }
+    const std::size_t target = 120 + variant % 12;
+    while (out.size() + 1 < target) {
+        out += '.';
+    }
+    out += ' ';
+    return out;
+}
+
+std::string prefixed(std::string_view bareRecord, std::size_t variant) {
+    std::string out = enginePrefix(variant);
+    out.append(bareRecord);
+    return out;
+}
+
+std::string prefixedLine(std::string_view bareRecord, std::size_t variant) {
+    std::string out = prefixed(bareRecord, variant);
+    out += '\n';
+    return out;
+}
+
+ParseResult parseBare(std::string_view bareRecord, bool overlong) {
+    return parseLine(prefixed(bareRecord), overlong);
+}
+
+std::string stream(const std::vector<std::string>& bareRecords) {
+    std::string out;
+    std::size_t i = 0;
+    for (const std::string& record : bareRecords) {
+        out += prefixedLine(record, i++);
+    }
+    return out;
+}
+
+std::vector<std::string> exampleFrame(std::int32_t snap) {
+    const std::string s = std::to_string(snap);
+    const std::string p = "CURIA1|" + s + "|";
+    return {
+        p + "BEGIN|0|0.1.0|1066|9|15|1001|Test Ruler One",
+        p + "FIN|312|78",
+        p + "HEIR|1002|84|1|0|Test Heir Two",
+        p + "VASSALS|2|2",
+        p + "VASSAL|1|1003|120|55|1523|Test Vassal Three",
+        p + "VASSAL|2|1004|40|-12|310|Test Vassal Four",
+        p + "WARS|0",
+        p + "CLAIMS|1|0|1",
+        p + "CLAIM|1|weak|4|Test Realm",
+        p + "FACTIONS|1|0|1",
+        p + "FACTION|1|INFO|against|3|33|100|2",
+        p + "FACTION|1|LEADER|1004|Test Vassal Four",
+        p + "FACTION|1|CLAIMANT|1005|Test Claimant Five",
+        p + "FACTION|1|TITLE|4|Test Realm",
+        p + "FACTION|1|TARGET|1001|Test Ruler One",
+        p + "END|16",
+    };
+}
+
+std::string fixtureDir() {
+    return std::string(CURIA_FIXTURE_DIR) + "/curia1";
+}
+
+std::vector<std::string> fixtureNames() {
+    std::vector<std::string> names;
+    std::error_code ec;
+    for (std::filesystem::directory_iterator it(fixtureDir(), ec), end; !ec && it != end;
+         it.increment(ec)) {
+        if (it->path().extension() == ".log") {
+            names.push_back(it->path().stem().string());
+        }
+    }
+    std::sort(names.begin(), names.end());
+    return names;
+}
+
+std::string readFile(const std::string& path, bool& ok) {
+    const std::ifstream in(path, std::ios::binary);
+    ok = static_cast<bool>(in);
+    std::ostringstream buffer;
+    buffer << in.rdbuf();
+    return buffer.str();
+}
+
+bool writeFile(const std::string& path, const std::string& contents) {
+    std::ofstream out(path, std::ios::binary | std::ios::trunc);
+    out << contents;
+    return static_cast<bool>(out);
+}
+
+Fixture loadFixture(const std::string& name) {
+    Fixture fixture;
+    fixture.name = name;
+    bool ok = false;
+    const std::string text = readFile(fixtureDir() + "/" + name + ".log", ok);
+    if (!ok) {
+        fixture.errors.emplace_back("cannot read the fixture file");
+        return fixture;
+    }
+    std::string pending;
+    const auto flush = [&]() {
+        if (!pending.empty()) {
+            Action action;
+            action.bytes = std::move(pending);
+            fixture.actions.push_back(std::move(action));
+            pending.clear();
+        }
+    };
+    std::size_t lineNumber = 0;
+    std::istringstream lines(text);
+    std::string line;
+    while (std::getline(lines, line)) {
+        if (!line.empty() && line.back() == '\r') {
+            line.pop_back();  // a checkout with CRLF conversion
+        }
+        if (line.empty() || line[0] == '#') {
+            continue;
+        }
+        if (line == "!truncate") {
+            flush();
+            Action action;
+            action.kind = Action::Kind::Truncate;
+            fixture.actions.push_back(std::move(action));
+        } else if (line == "!noise" || line == "!raw") {
+            pending += '\n';  // an empty line (the form that survives trailing-space trimming)
+        } else if (line.starts_with("!noise ")) {
+            pending += line.substr(7);
+            pending += '\n';
+        } else if (line.starts_with("!raw ")) {
+            pending += line.substr(5);
+            pending += '\n';
+        } else if (line.starts_with("CURIA1|")) {
+            pending += prefixedLine(line, lineNumber);
+        } else {
+            fixture.errors.push_back("unknown line: " + line);
+        }
+        ++lineNumber;
+    }
+    flush();
+    return fixture;
+}
+
+void FakeFile::append(std::string_view bytes) {
+    const std::lock_guard<std::mutex> lock(mutex_);
+    content_.append(bytes);
+}
+
+void FakeFile::truncate() {
+    const std::lock_guard<std::mutex> lock(mutex_);
+    content_.clear();
+}
+
+void FakeFile::remove() {
+    const std::lock_guard<std::mutex> lock(mutex_);
+    exists_ = false;
+    content_.clear();
+}
+
+void FakeFile::create() {
+    const std::lock_guard<std::mutex> lock(mutex_);
+    exists_ = true;
+}
+
+void FakeFile::setReadError(bool on) {
+    const std::lock_guard<std::mutex> lock(mutex_);
+    readError_ = on;
+}
+
+void FakeFile::setStatError(bool on) {
+    const std::lock_guard<std::mutex> lock(mutex_);
+    statError_ = on;
+}
+
+std::uint64_t FakeFile::size() const {
+    const std::lock_guard<std::mutex> lock(mutex_);
+    return content_.size();
+}
+
+std::size_t FakeFile::largestRead() const {
+    const std::lock_guard<std::mutex> lock(mutex_);
+    return largestRead_;
+}
+
+std::size_t FakeFile::readCalls() const {
+    const std::lock_guard<std::mutex> lock(mutex_);
+    return readCalls_;
+}
+
+std::size_t FakeFile::statCalls() const {
+    const std::lock_guard<std::mutex> lock(mutex_);
+    return statCalls_;
+}
+
+IFileSource::Stat FakeFile::stat() {
+    const std::lock_guard<std::mutex> lock(mutex_);
+    ++statCalls_;
+    if (!exists_) {
+        return {IFileSource::State::Missing, 0};
+    }
+    if (statError_) {
+        return {IFileSource::State::Error, 0};
+    }
+    return {IFileSource::State::Ok, content_.size()};
+}
+
+bool FakeFile::read(std::uint64_t offset, std::size_t maxBytes, std::string& out) {
+    const std::lock_guard<std::mutex> lock(mutex_);
+    ++readCalls_;
+    largestRead_ = std::max(largestRead_, maxBytes);
+    if (!exists_ || readError_) {
+        return false;
+    }
+    if (offset < content_.size()) {
+        out.append(content_, static_cast<std::size_t>(offset), maxBytes);
+    }
+    return true;
+}
+
+TempDir::TempDir() {
+    static std::atomic<unsigned> counter{0};
+    const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
+    const std::filesystem::path dir =
+        std::filesystem::temp_directory_path() /
+        ("curia_test_" + std::to_string(stamp) + "_" + std::to_string(counter.fetch_add(1)));
+    std::filesystem::create_directories(dir);
+    dir_ = dir.string();
+}
+
+TempDir::~TempDir() {
+    std::error_code ec;
+    std::filesystem::remove_all(std::filesystem::path(dir_), ec);
+}
+
+std::string TempDir::path(const std::string& name) const {
+    return (std::filesystem::path(dir_) / name).string();
+}
+
+namespace {
+
+// A tiny deterministic generator (xorshift32): chunk sizes must not depend on the platform's
+// <random> implementation.
+std::uint32_t nextRandom(std::uint32_t& state) {
+    state ^= state << 13;
+    state ^= state >> 17;
+    state ^= state << 5;
+    return state;
+}
+
+}  // namespace
+
+std::vector<Event> runActions(const std::vector<Action>& actions, std::size_t chunkSize,
+                              std::uint32_t randomSeed) {
+    BridgePipeline pipeline;
+    std::vector<Event> events;
+    std::uint32_t rng = randomSeed == 0 ? 1U : randomSeed;
+    const auto append = [&events](std::vector<Event>&& more) {
+        events.insert(events.end(), std::make_move_iterator(more.begin()),
+                      std::make_move_iterator(more.end()));
+    };
+    for (const Action& action : actions) {
+        if (action.kind == Action::Kind::Truncate) {
+            append(pipeline.truncateLog());
+            continue;
+        }
+        const std::string_view bytes = action.bytes;
+        if (chunkSize == 0 && randomSeed == 0) {
+            append(pipeline.feed(bytes));
+            continue;
+        }
+        std::size_t pos = 0;
+        while (pos < bytes.size()) {
+            std::size_t take = chunkSize;
+            if (randomSeed != 0) {
+                take = 1 + nextRandom(rng) % 97;
+            }
+            take = std::min(take, bytes.size() - pos);
+            append(pipeline.feed(bytes.substr(pos, take)));
+            pos += take;
+        }
+    }
+    return events;
+}
+
+std::vector<Event> runBytes(std::string_view bytes) {
+    BridgePipeline pipeline;
+    return pipeline.feed(bytes);
+}
+
+std::string eventsText(const std::vector<Event>& events) {
+    return dumpJson(toJson(events));
+}
+
+}  // namespace curia::bridge::test

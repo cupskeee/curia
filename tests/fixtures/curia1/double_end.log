@@ -1,0 +1,7 @@
+# A second END after a complete frame is ignored (Idle); so is an END before any BEGIN.
+CURIA1|180|END|2
+CURIA1|180|BEGIN|0|0.1.0|1066|9|15|1001|Test Ruler One
+CURIA1|180|FIN|1|2
+CURIA1|180|END|3
+CURIA1|180|END|3
+CURIA1|180|END|3

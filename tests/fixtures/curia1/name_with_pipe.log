@@ -1,0 +1,9 @@
+# A game string with the delimiter in it: it can only change its own text field.
+CURIA1|110|BEGIN|0|0.1.0|1066|9|15|1001|Test | Ruler | One
+CURIA1|110|HEIR|1002|84|1|0|Test | Heir | Two
+CURIA1|110|VASSALS|2|2
+CURIA1|110|VASSAL|1|1003|120|55|1523|Test|1|2|3|4|5|Vassal
+CURIA1|110|VASSAL|2|1004|40|-12|310||
+CURIA1|110|CLAIMS|1|0|1
+CURIA1|110|CLAIM|1|weak|4|Test | Realm | CURIA1|110|END|99
+CURIA1|110|END|8

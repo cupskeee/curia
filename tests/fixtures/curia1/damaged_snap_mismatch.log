@@ -1,0 +1,23 @@
+# A record with another snap inside a frame (a higher one and a lower one), an unknown-type record
+# with a lower snap, and an END with another snap (higher and lower).
+CURIA1|30|BEGIN|0|0.1.0|1066|9|15|1001|Test Ruler One
+CURIA1|30|FIN|312|78
+CURIA1|31|WARS|0
+CURIA1|30|END|4
+CURIA1|32|BEGIN|0|0.1.0|1066|9|15|1001|Test Ruler One
+CURIA1|32|END|2
+CURIA1|33|BEGIN|0|0.1.0|1066|9|15|1001|Test Ruler One
+CURIA1|34|END|2
+CURIA1|35|BEGIN|0|0.1.0|1066|9|15|1001|Test Ruler One
+CURIA1|35|END|2
+# Lower snaps: a known type, an unknown type, and an END.
+CURIA1|36|BEGIN|0|0.1.0|1066|9|15|1001|Test Ruler One
+CURIA1|35|FIN|312|78
+CURIA1|36|END|3
+CURIA1|37|BEGIN|0|0.1.0|1066|9|15|1001|Test Ruler One
+CURIA1|36|FOO|1
+CURIA1|37|END|3
+CURIA1|38|BEGIN|0|0.1.0|1066|9|15|1001|Test Ruler One
+CURIA1|37|END|2
+CURIA1|39|BEGIN|0|0.1.0|1066|9|15|1001|Test Ruler One
+CURIA1|39|END|2

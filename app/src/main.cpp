@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: MIT
 #include <cstdio>
+#include <iostream>
 #include <string>
 
 #include "app.h"
 #include "core/build_info.h"
 #include "core/cli.h"
+#include "core/watch_log.h"
 
 int main(int argc, char** argv) {
     curia::CliOptions options;
@@ -21,6 +23,10 @@ int main(int argc, char** argv) {
     if (options.showVersion) {
         std::printf("%s\n", curia::buildInfoJson().c_str());
         return 0;
+    }
+    // Headless: must run before runApp, which initialises SDL and opens a window.
+    if (!options.watchLogPath.empty()) {
+        return curia::runWatchLog(options, std::cout, std::cerr);
     }
     return curia::runApp(options);
 }

@@ -1,0 +1,98 @@
+[
+  {
+    "event": "frame_complete",
+    "frame": {
+      "claims": {
+        "explicit": 1,
+        "implicit": 0,
+        "listed": [
+          {
+            "kind": "weak",
+            "tier": 4,
+            "title": "Test Realm"
+          }
+        ]
+      },
+      "date": {
+        "day": 15,
+        "month": 9,
+        "year": 1066
+      },
+      "factions": {
+        "against": 1,
+        "listed": [
+          {
+            "claimant": {
+              "id": 1005,
+              "name": "Test Claimant Five"
+            },
+            "leader": {
+              "id": 1004,
+              "name": "Test Vassal Four"
+            },
+            "members": 2,
+            "power": 33,
+            "role": "against",
+            "target": {
+              "id": 1001,
+              "name": "Test Ruler One"
+            },
+            "threshold": 100,
+            "title": {
+              "tier": 4,
+              "title": "Test Realm"
+            },
+            "type": 3
+          }
+        ],
+        "member": false
+      },
+      "fin": {
+        "gold": 312,
+        "income_tenths": 78
+      },
+      "heir": {
+        "has_liege": true,
+        "id": 1002,
+        "landed": false,
+        "name": "Test Heir Two",
+        "none": false,
+        "opinion": 84
+      },
+      "mod_version": "0.1.0",
+      "mode": 0,
+      "record_count": 16,
+      "ruler": {
+        "id": 1001,
+        "name": "Test Ruler One"
+      },
+      "snap": 7,
+      "text_shortened": false,
+      "vassals": {
+        "listed": [
+          {
+            "gold": 120,
+            "id": 1003,
+            "name": "Test Vassal Three",
+            "opinion": 55,
+            "rank": 1,
+            "strength": 1523
+          },
+          {
+            "gold": 40,
+            "id": 1004,
+            "name": "Test Vassal Four",
+            "opinion": -12,
+            "rank": 2,
+            "strength": 310
+          }
+        ],
+        "total": 2
+      },
+      "wars": {
+        "total": 0,
+        "wars": []
+      }
+    }
+  }
+]

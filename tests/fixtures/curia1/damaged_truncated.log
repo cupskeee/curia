@@ -1,0 +1,13 @@
+# The log is truncated inside a frame (the game was restarted): Damaged (truncated log). The rest of
+# the old frame is ignored, a frame after the truncation is read. A truncation between frames
+# is silent.
+CURIA1|80|BEGIN|0|0.1.0|1066|9|15|1001|Test Ruler One
+CURIA1|80|FIN|1|2
+!truncate
+CURIA1|80|WARS|0
+CURIA1|80|END|4
+CURIA1|1|BEGIN|0|0.1.0|1066|9|15|1001|Test Ruler One
+CURIA1|1|END|2
+!truncate
+CURIA1|1|BEGIN|0|0.1.0|1066|9|15|1001|Test Ruler One
+CURIA1|1|END|2

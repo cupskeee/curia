@@ -1,0 +1,10 @@
+# END count wrong; a record with another snap inside the frame; an END with another snap.
+CURIA1|16|BEGIN|0|0.1.0|1066|9|15|1001|Test Ruler One
+CURIA1|16|FIN|1|2
+CURIA1|16|END|9
+CURIA1|17|BEGIN|0|0.1.0|1066|9|15|1001|Test Ruler One
+CURIA1|18|FIN|1|2
+CURIA1|17|END|3
+CURIA1|19|BEGIN|0|0.1.0|1066|9|15|1001|Test Ruler One
+CURIA1|19|FIN|1|2
+CURIA1|20|END|3

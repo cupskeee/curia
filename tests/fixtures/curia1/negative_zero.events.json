@@ -1,0 +1,46 @@
+[
+  {
+    "event": "frame_complete",
+    "frame": {
+      "date": {
+        "day": 15,
+        "month": 9,
+        "year": 1066
+      },
+      "fin": {
+        "gold": 0,
+        "income_tenths": 0
+      },
+      "heir": {
+        "has_liege": false,
+        "id": 1002,
+        "landed": false,
+        "name": "Test Heir Two",
+        "none": false,
+        "opinion": 0
+      },
+      "mod_version": "0.1.0",
+      "mode": 0,
+      "record_count": 6,
+      "ruler": {
+        "id": 1001,
+        "name": "Test Ruler One"
+      },
+      "snap": 3,
+      "text_shortened": false,
+      "vassals": {
+        "listed": [
+          {
+            "gold": 0,
+            "id": 1003,
+            "name": "Test Vassal Three",
+            "opinion": 0,
+            "rank": 1,
+            "strength": 0
+          }
+        ],
+        "total": 1
+      }
+    }
+  }
+]

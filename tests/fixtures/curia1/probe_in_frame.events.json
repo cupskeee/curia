@@ -1,0 +1,25 @@
+[
+  {
+    "event": "frame_complete",
+    "frame": {
+      "date": {
+        "day": 15,
+        "month": 9,
+        "year": 1066
+      },
+      "fin": {
+        "gold": 1,
+        "income_tenths": 2
+      },
+      "mod_version": "0.1.0",
+      "mode": 1,
+      "record_count": 5,
+      "ruler": {
+        "id": 1001,
+        "name": "Test Ruler One"
+      },
+      "snap": 140,
+      "text_shortened": false
+    }
+  }
+]

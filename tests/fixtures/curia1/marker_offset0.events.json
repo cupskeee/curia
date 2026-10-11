@@ -1,0 +1,8 @@
+[
+  {
+    "detail": "END count 3, counted 2",
+    "event": "frame_damaged",
+    "reason": "count_mismatch",
+    "snap": 191
+  }
+]

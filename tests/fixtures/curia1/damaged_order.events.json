@@ -1,0 +1,51 @@
+[
+  {
+    "detail": "section repeated or out of order",
+    "event": "frame_damaged",
+    "reason": "order",
+    "snap": 60
+  },
+  {
+    "detail": "section repeated or out of order",
+    "event": "frame_damaged",
+    "reason": "order",
+    "snap": 61
+  },
+  {
+    "detail": "WAR records not NAME, ATTACKER, DEFENDER in order",
+    "event": "frame_damaged",
+    "reason": "order",
+    "snap": 62
+  },
+  {
+    "detail": "FACTION records not INFO, LEADER, CLAIMANT, TITLE, TARGET",
+    "event": "frame_damaged",
+    "reason": "order",
+    "snap": 63
+  },
+  {
+    "detail": "VASSAL rank does not run 1..listed",
+    "event": "frame_damaged",
+    "reason": "order",
+    "snap": 64
+  },
+  {
+    "event": "frame_complete",
+    "frame": {
+      "date": {
+        "day": 15,
+        "month": 9,
+        "year": 1066
+      },
+      "mod_version": "0.1.0",
+      "mode": 0,
+      "record_count": 2,
+      "ruler": {
+        "id": 1001,
+        "name": "Test Ruler One"
+      },
+      "snap": 65,
+      "text_shortened": false
+    }
+  }
+]

@@ -33,13 +33,38 @@ endif()
 configure_file(src/core/version.h.in ${CMAKE_CURRENT_BINARY_DIR}/generated/curia/version.h @ONLY)
 
 add_library(curia_core STATIC
+    src/bridge/bridge_pipeline.cpp
+    src/bridge/frame_assembler.cpp
+    src/bridge/frame_json.cpp
+    src/bridge/line_splitter.cpp
+    src/bridge/log_tailer.cpp
+    src/bridge/log_watcher.cpp
+    src/bridge/record.cpp
+    src/bridge/text_hygiene.cpp
     src/core/build_info.cpp
     src/core/cli.cpp
+    src/core/watch_log.cpp
     src/net/ca_bundle.cpp
     ${CURIA_PLATFORM_SOURCES})
 target_include_directories(curia_core PUBLIC src ${CMAKE_CURRENT_BINARY_DIR}/generated)
-target_link_libraries(curia_core PUBLIC nlohmann_json::nlohmann_json)
+find_package(Threads REQUIRED)
+target_link_libraries(curia_core PUBLIC nlohmann_json::nlohmann_json Threads::Threads)
 curia_configure_target(curia_core)
+
+# --- fuzz target: libFuzzer, Clang only (Apple's Clang ships no libFuzzer runtime) ---------------
+if(CURIA_BUILD_FUZZ)
+    if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+        message(FATAL_ERROR "CURIA_BUILD_FUZZ needs Clang with libFuzzer (found ${CMAKE_CXX_COMPILER_ID}; "
+                            "Apple Clang has no libFuzzer)")
+    endif()
+    # Coverage instrumentation for the code under test; the fuzzer runtime is linked into the target only.
+    target_compile_options(curia_core PRIVATE -fsanitize=fuzzer-no-link)
+    add_executable(curia_fuzz_bridge fuzz/fuzz_bridge.cpp)
+    target_compile_options(curia_fuzz_bridge PRIVATE -fsanitize=fuzzer-no-link)
+    target_link_options(curia_fuzz_bridge PRIVATE -fsanitize=fuzzer,address,undefined)
+    target_link_libraries(curia_fuzz_bridge PRIVATE curia_core)
+    curia_configure_target(curia_fuzz_bridge)
+endif()
 
 # --- milestone M2 overlay probe, portable part (macOS only; throwaway spike code) -----------
 if(APPLE)
@@ -126,10 +151,21 @@ if(CURIA_BUILD_TESTS)
     find_package(doctest CONFIG REQUIRED)
     add_executable(curia_tests
         tests/test_main.cpp
+        tests/bridge_test_support.cpp
+        tests/test_bridge_assembler.cpp
+        tests/test_bridge_fixtures.cpp
+        tests/test_bridge_hygiene.cpp
+        tests/test_bridge_json.cpp
+        tests/test_bridge_parser.cpp
+        tests/test_bridge_robustness.cpp
+        tests/test_bridge_splitter.cpp
         tests/test_build_info.cpp
         tests/test_cli.cpp
         tests/test_ca_bundle.cpp
-        tests/test_platform.cpp)
+        tests/test_log_tailer.cpp
+        tests/test_log_watcher.cpp
+        tests/test_platform.cpp
+        tests/test_watch_log.cpp)
     if(APPLE)
         target_sources(curia_tests PRIVATE
             tests/test_probe_combos.cpp
@@ -138,7 +174,35 @@ if(CURIA_BUILD_TESTS)
         target_link_libraries(curia_tests PRIVATE curia_probe_core)
     endif()
     target_link_libraries(curia_tests PRIVATE curia_core doctest::doctest)
+    # The committed CURIA1 fixtures and their golden outputs (tests/fixtures/curia1/README.md).
+    target_compile_definitions(curia_tests PRIVATE
+        CURIA_FIXTURE_DIR="${PROJECT_SOURCE_DIR}/tests/fixtures")
     curia_configure_target(curia_tests)
     include(doctest)
     doctest_discover_tests(curia_tests PROPERTIES LABELS unit)
+
+    # The fuzz entry point (fuzz/fuzz_bridge.cpp) behind a plain main(): replays the fixtures and the
+    # seed corpus without libFuzzer, on every platform and compiler.
+    add_executable(curia_fuzz_replay fuzz/fuzz_bridge.cpp fuzz/fuzz_replay_main.cpp)
+    target_link_libraries(curia_fuzz_replay PRIVATE curia_core)
+    curia_configure_target(curia_fuzz_replay)
+    add_test(NAME fuzz_replay
+             COMMAND curia_fuzz_replay ${PROJECT_SOURCE_DIR}/tests/fixtures/curia1
+                     ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/corpus)
+    set_tests_properties(fuzz_replay PROPERTIES LABELS fuzz TIMEOUT 300)
+endif()
+
+# --- end-to-end test: fake CK3 -> curia --watch-log -> golden events (needs the app binary) -------
+# The mock-LLM leg of the chain (tools/mock_llm) arrives with M4/M5.
+if(CURIA_BUILD_APP AND CURIA_BUILD_TESTS)
+    find_package(Python3 COMPONENTS Interpreter)
+    if(Python3_Interpreter_FOUND)
+        add_test(NAME e2e_fake_ck3
+                 COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/fake_ck3/e2e_test.py
+                         --curia $<TARGET_FILE:curia>
+                         --fixtures ${PROJECT_SOURCE_DIR}/tests/fixtures/curia1)
+        set_tests_properties(e2e_fake_ck3 PROPERTIES LABELS e2e TIMEOUT 300)
+    else()
+        message(STATUS "Python 3 not found: the end-to-end test e2e_fake_ck3 is not registered")
+    endif()
 endif()

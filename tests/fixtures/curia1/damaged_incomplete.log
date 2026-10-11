@@ -1,0 +1,11 @@
+# A frame that never ends: the next BEGIN abandons it (incomplete), and so does an unsupported BEGIN.
+CURIA1|70|BEGIN|0|0.1.0|1066|9|15|1001|Test Ruler One
+CURIA1|70|FIN|1|2
+CURIA1|71|BEGIN|0|0.1.0|1066|9|15|1001|Test Ruler One
+CURIA1|71|FIN|3|4
+CURIA1|71|END|3
+CURIA1|72|BEGIN|0|0.1.0|1066|9|15|1001|Test Ruler One
+CURIA1|72|FIN|1|2
+CURIA1|73|BEGIN|1066.9.15|0.1.0|Test Ruler One
+CURIA1|74|BEGIN|0|0.1.0|1066|9|15|1001|Test Ruler One
+CURIA1|74|END|2

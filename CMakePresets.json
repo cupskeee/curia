@@ -80,6 +80,24 @@
       }
     },
     {
+      "name": "linux-x64-fuzz",
+      "displayName": "Linux x86_64, core + libFuzzer target with ASan/UBSan",
+      "inherits": "base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      },
+      "cacheVariables": {
+        "VCPKG_TARGET_TRIPLET": "curia-x64-linux",
+        "VCPKG_MANIFEST_NO_DEFAULT_FEATURES": "ON",
+        "CURIA_BUILD_APP": "OFF",
+        "CURIA_SANITIZE": "ON",
+        "CURIA_BUILD_FUZZ": "ON",
+        "CMAKE_CXX_COMPILER": "clang++"
+      }
+    },
+    {
       "name": "windows-x64",
       "displayName": "Windows x64",
       "inherits": "base",
@@ -115,6 +133,10 @@
     {
       "name": "linux-x64-sanitize",
       "configurePreset": "linux-x64-sanitize"
+    },
+    {
+      "name": "linux-x64-fuzz",
+      "configurePreset": "linux-x64-fuzz"
     },
     {
       "name": "windows-x64",
@@ -153,6 +175,11 @@
     {
       "name": "linux-x64-sanitize",
       "configurePreset": "linux-x64-sanitize",
+      "inherits": "base-test"
+    },
+    {
+      "name": "linux-x64-fuzz",
+      "configurePreset": "linux-x64-fuzz",
       "inherits": "base-test"
     },
     {

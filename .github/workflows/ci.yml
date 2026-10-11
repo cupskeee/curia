@@ -32,6 +32,8 @@ jobs:
           python3 -m unittest discover -s tools/ci -p "test_*.py"
       - name: M3 log watcher unit tests (synthetic data only)
         run: python3 -m unittest discover -s tools/m3
+      - name: Fake CK3 unit tests (synthetic data only)
+        run: python3 -m unittest discover -s tools/fake_ck3
       - name: Developer tools (pinned versions)
         run: |
           python3 -m venv .venv-tools
@@ -184,8 +186,53 @@ jobs:
       - name: clang-tidy (core, net, Linux platform, tests)
         run: |
           # The macOS-only probe tests (test_probe_*) are not part of this configuration.
-          find app/src/core app/src/net app/src/platform/linux app/tests -name '*.cpp' -not -name 'test_probe_*' -print0 |
+          find app/src/bridge app/src/core app/src/net app/src/platform/linux app/tests app/fuzz -name '*.cpp' -not -name 'test_probe_*' -print0 |
             xargs -0 -n1 clang-tidy-18 -p build/linux-x64-sanitize --quiet
+
+  fuzz-smoke:
+    name: fuzz smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-vcpkg
+        id: vcpkg
+        with:
+          cache-key-suffix: curia-x64-linux-core
+      - name: Configure (core only, libFuzzer with ASan and UBSan)
+        id: configure
+        run: cmake --preset linux-x64-fuzz -DCURIA_WARNINGS_AS_ERRORS=ON
+      - name: Build the fuzz target
+        run: cmake --build --preset linux-x64-fuzz --target curia_fuzz_bridge
+      # Configure runs vcpkg install, so a successful Configure means every port is in the cache. Saving after a failed
+      # Configure would store a partial cache under the exact key, and an exact hit is never saved again.
+      - name: Save the vcpkg binary cache (when every port was built, even if a later step failed)
+        if: always() && steps.configure.outcome == 'success' && steps.vcpkg.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .vcpkg-cache
+          key: ${{ steps.vcpkg.outputs.cache-primary-key }}
+      - name: Fuzz for 60 seconds from the committed seed corpus
+        env:
+          ASAN_OPTIONS: detect_leaks=1
+          UBSAN_OPTIONS: print_stacktrace=1
+        run: |
+          # libFuzzer writes new inputs into the first corpus folder: a scratch copy, so the checkout stays clean.
+          # -max_len 256 KiB: a frame reaches its 128 KiB cap only with about 33 long records, which a shorter input cannot hold.
+          mkdir -p "$RUNNER_TEMP/corpus" "$RUNNER_TEMP/crashes"
+          cp -r app/fuzz/corpus/. "$RUNNER_TEMP/corpus/"
+          build/linux-x64-fuzz/app/curia_fuzz_bridge -max_total_time=60 -timeout=10 -rss_limit_mb=2048 -max_len=262144 \
+            -artifact_prefix="$RUNNER_TEMP/crashes/" "$RUNNER_TEMP/corpus" tests/fixtures/curia1
+      - name: Keep the crashing input
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fuzz-crashes
+          path: ${{ runner.temp }}/crashes
+          retention-days: 7
+          if-no-files-found: ignore
 
   dependency-review:
     name: dependency review (informational)
@@ -204,7 +251,7 @@ jobs:
   ci-result:
     name: CI result
     if: always()
-    needs: [lint, build, universal, sanitizers]
+    needs: [lint, build, universal, sanitizers, fuzz-smoke]
     runs-on: ubuntu-24.04
     steps:
       - name: Require every needed job to have succeeded

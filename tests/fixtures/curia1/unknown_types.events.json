@@ -1,0 +1,42 @@
+[
+  {
+    "event": "frame_complete",
+    "frame": {
+      "date": {
+        "day": 15,
+        "month": 9,
+        "year": 1066
+      },
+      "factions": {
+        "against": 1,
+        "listed": [
+          {
+            "claimant": null,
+            "leader": null,
+            "members": 1,
+            "power": 1,
+            "role": "against",
+            "target": null,
+            "threshold": 1,
+            "title": null,
+            "type": 1
+          }
+        ],
+        "member": false
+      },
+      "fin": {
+        "gold": 1,
+        "income_tenths": 2
+      },
+      "mod_version": "0.1.0",
+      "mode": 0,
+      "record_count": 13,
+      "ruler": {
+        "id": 1001,
+        "name": "Test Ruler One"
+      },
+      "snap": 130,
+      "text_shortened": false
+    }
+  }
+]

@@ -1,0 +1,59 @@
+[
+  {
+    "event": "frame_complete",
+    "frame": {
+      "date": {
+        "day": 15,
+        "month": 9,
+        "year": 1066
+      },
+      "mod_version": "0.1.0",
+      "mode": 0,
+      "record_count": 12,
+      "ruler": {
+        "id": 1001,
+        "name": "Test Ruler One"
+      },
+      "snap": 6,
+      "text_shortened": false,
+      "wars": {
+        "total": 3,
+        "wars": [
+          {
+            "attacker": {
+              "id": 1001,
+              "name": "Test Ruler One"
+            },
+            "defender": {
+              "id": 2001,
+              "name": "Test Enemy Seven"
+            },
+            "name": "Test War One"
+          },
+          {
+            "attacker": {
+              "id": 2001,
+              "name": "Test Enemy Seven"
+            },
+            "defender": {
+              "id": 1001,
+              "name": "Test Ruler One"
+            },
+            "name": "Test War Two"
+          },
+          {
+            "attacker": {
+              "id": 2002,
+              "name": "Test Aggressor Eight"
+            },
+            "defender": {
+              "id": 2003,
+              "name": "Test Defender Nine"
+            },
+            "name": "Test War Three"
+          }
+        ]
+      }
+    }
+  }
+]

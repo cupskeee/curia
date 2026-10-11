@@ -1,0 +1,27 @@
+[
+  {
+    "detail": "the frame exceeds 512 records or 128 KiB",
+    "event": "frame_damaged",
+    "reason": "too_large",
+    "snap": 210
+  },
+  {
+    "event": "frame_complete",
+    "frame": {
+      "date": {
+        "day": 15,
+        "month": 9,
+        "year": 1066
+      },
+      "mod_version": "0.1.0",
+      "mode": 0,
+      "record_count": 2,
+      "ruler": {
+        "id": 1001,
+        "name": "Test Ruler One"
+      },
+      "snap": 211,
+      "text_shortened": false
+    }
+  }
+]

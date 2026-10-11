@@ -1,0 +1,9 @@
+# Strong (pressed) and weak (unpressed) claims across tiers; implicit claims are only a count.
+CURIA1|8|BEGIN|0|0.1.0|1066|9|15|1001|Test Ruler One
+CURIA1|8|CLAIMS|5|4|5
+CURIA1|8|CLAIM|1|strong|5|Test Empire
+CURIA1|8|CLAIM|2|strong|4|Test Kingdom
+CURIA1|8|CLAIM|3|weak|3|Test Duchy
+CURIA1|8|CLAIM|4|weak|2|Test County
+CURIA1|8|CLAIM|5|weak|1|Test Barony
+CURIA1|8|END|8

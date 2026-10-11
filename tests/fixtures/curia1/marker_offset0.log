@@ -1,0 +1,8 @@
+# A marker at offset 0 (no engine prefix) is not a record. The raw lines below are not counted, so the
+# END count of the frame is wrong; the first raw line also carries a second marker.
+!raw CURIA1|190|BEGIN|0|0.1.0|1066|9|15|1001|Test Ruler One
+!raw CURIA1|190|FIN|1|2 CURIA1|190|FIN|1|2
+!raw CURIA1|190|END|3
+CURIA1|191|BEGIN|0|0.1.0|1066|9|15|1001|Test Ruler One
+!raw CURIA1|191|FIN|1|2
+CURIA1|191|END|3

@@ -1,0 +1,6 @@
+# A marker at offset 0 is not a record: the frame of snap 14 never opens, the one of snap 15 has a wrong END count.
+!raw CURIA1|14|BEGIN|0|0.1.0|1066|9|15|1001|Test Ruler One
+!raw CURIA1|14|END|2
+CURIA1|15|BEGIN|0|0.1.0|1066|9|15|1001|Test Ruler One
+!raw CURIA1|15|FIN|1|2
+CURIA1|15|END|3
