@@ -1,5 +1,6 @@
 ﻿# SPDX-License-Identifier: MIT
-# Curia (M3 spike): one marker line when a NEW game starts, so the app (and the owner) can tell the mod is loaded.
+# Curia: one marker record (LOAD, snapshot 0, docs/wire-format.md section 4) when a NEW game starts, so the app can tell the mod is loaded.
+# The version token must equal descriptor.mod and the BEGIN localization line (tools/ci/lint_mod.py checks that).
 # Pattern proven in the M0/M2 stubs: on_game_start_after_lobby with a custom on_action and a literal string.
 # No on-load hook was found in the game's on_action files, so loading an existing save is not expected to print it (not tested).
 
@@ -9,6 +10,6 @@ on_game_start_after_lobby = {
 
 curia_on_game_start = {
 	effect = {
-		debug_log = "CURIA1|0|LOAD|mod=curia|version=0.1.0"
+		debug_log = "CURIA1|0|LOAD|0.2.0"
 	}
 }

@@ -30,6 +30,16 @@ at `0.y.z` and anything may change between minor versions.
   `CODE_OF_CONDUCT.md` (Contributor Covenant 3.0), `SECURITY.md`, `SUPPORT.md`
   and this changelog.
 
+### Changed
+
+- The Curia mod (`mod/curia/`, now 0.2.0) writes the approved `CURIA1` export
+  format of `docs/wire-format.md` instead of the spike layout: records with
+  ids, section headers with totals, numeric date and mod version in `BEGIN`,
+  income in tenths of a gold piece, explicit claims marked `strong` or `weak`,
+  and faction groups. The format is not frozen until the pre-freeze in-game
+  check has passed, and the earlier spike output is not readable by the new
+  format. `tools/ci/lint_mod.py` now checks the format's invariants.
+
 <!--
 Compare links are added when the first tag exists, for example:
 

@@ -1,7 +1,9 @@
 ﻿# SPDX-License-Identifier: MIT
-# Curia (M3 spike): the probe section, run only by the "Curia probes" button (curia_probe_mode = 1), inside the frame
-# between the last export section and END. Most lines are CURIA1|<snap>|PROBE|<name>|<value>; claim_detail has more
-# fields (CURIA1|<snap>|PROBE|claim_detail|<index>|<title>|<4 flags>|<tier>).
+# Curia (spike tool): the probe section, run only by the "Curia probes" button (curia_probe_mode = 1), inside the frame
+# between FACTIONS and END. Most lines are CURIA1|<snap>|PROBE|<name>|<value>; claim_detail has more
+# fields (CURIA1|<snap>|PROBE|claim_detail|<index>|<title>|<4 flags>|<tier>). PROBE is an unknown record type to the
+# CURIA1 format (docs/wire-format.md section 4): the app ignores it but counts it, so every debug_log here is preceded by
+# the curia_export_lines increment like the export's own (tools/ci/lint_mod.py checks that).
 # Each line tests ONE candidate form that was NOT proven in M0/M0b, so a failure is isolated to its own line: a wrong
 # guess should print an empty value or 0, and the other lines still print.
 #

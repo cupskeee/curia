@@ -27,7 +27,9 @@ jobs:
       - name: Version consistency (CMake, vcpkg.json, CHANGELOG)
         run: tools/ci/check_versions.sh
       - name: Mod structure lint (no game files involved)
-        run: python3 tools/ci/lint_mod.py
+        run: |
+          python3 tools/ci/lint_mod.py
+          python3 -m unittest discover -s tools/ci -p "test_*.py"
       - name: M3 log watcher unit tests (synthetic data only)
         run: python3 -m unittest discover -s tools/m3
       - name: Developer tools (pinned versions)

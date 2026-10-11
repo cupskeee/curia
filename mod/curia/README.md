@@ -1,38 +1,41 @@
-# Curia mod (mod id `curia`), M3 spike build 0.1.0
+# Curia mod (mod id `curia`), version 0.2.0
 
 The CK3 side of Curia: two HUD buttons that write a read-only snapshot of the player's realm to CK3's `debug.log`
-as `CURIA1|...` lines, for the Curia app to read. **This is the Milestone 3 spike build. It is not released and not
-published**; its job is to let the maintainer measure the log (flush latency, line format, bytes per export) with the
-real export shape. Frame, field order and the set of exported sections can still change; nothing is frozen until
-`docs/wire-format.md` exists.
+as `CURIA1|...` records, for the Curia app to read. **Not released and not published.** Version 0.2.0 writes the format
+approved at the wire-format checkpoint of 2026-10-11 (`docs/wire-format.md`, the single source of truth for the records);
+the format is **not frozen** until the maintainer's pre-freeze in-game check (`docs/wire-format.md` section 9) has passed, and
+the forms marked new in section 8 of that file have never run in the game. The 0.1.0 spike layout is gone and is not
+readable by the new format; the mod and the app change together.
 
 It overrides no vanilla file (every file name carries the `curia_` prefix, no `replace_path`) and needs no console and no
-`-debug_mode`. It is written to leave `error.log` untouched in normal use. Checks so far: the structural lint and ck3-tiger (0 findings), and the owner's in-game runs in M3: session 1 wrote one Curia range error per export (fixed in PR #11), and after the fix neither the 2026-10-10 re-check nor session 2 (2026-10-11) left a Curia entry in `error.log`. Curia keeps six counters as global variables in the save (`curia_snap_id`,
-`curia_export_lines`, `curia_rank`, `curia_war_index`, `curia_claim_index`, `curia_probe_mode`); in probe mode it also
-sets four claim-flag variables (`curia_claim_f_es`, `curia_claim_f_ew`, `curia_claim_f_is`, `curia_claim_f_iw`) so script
-values can read the flags. Nothing else in the game state is touched.
+`-debug_mode`. It is written to leave `error.log` untouched in normal use (the checks that ran in M3 are about 0.1.0; 0.2.0 has
+only had the structural lint, its own format lint and ck3-tiger, no game run). Curia keeps these counters as global variables
+in the save: `curia_snap_id`, `curia_export_lines`, `curia_rank`, `curia_war_index`, `curia_claim_index`,
+`curia_faction_index`, `curia_vassals_listed`, `curia_wars_total`, `curia_claims_listed`, `curia_factions_listed` and
+`curia_probe_mode`; in probe mode it also sets four claim-flag variables (`curia_claim_f_es`, `curia_claim_f_ew`,
+`curia_claim_f_is`, `curia_claim_f_iw`). Nothing else in the game state is touched.
 
 ## Buttons (bottom left of the HUD, visible in the default game view)
-- **Advisor** runs the export: BEGIN, FIN, HEIR, VASSAL, WAR, CLAIM, END.
-- **Curia probes** (spike only) runs the same export plus the PROBE section before END.
+- **Advisor** runs the export: BEGIN, FIN, HEIR, VASSALS, WARS, CLAIMS, FACTIONS, END.
+- **Curia probes** (spike tool) runs the same export plus the PROBE section between FACTIONS and END; its BEGIN has `mode` 1.
 
 Both run a scripted GUI (`curia_run_advisor`, `curia_run_probes`) with the player as root scope. The first button sits at
 the position the M2 stub proved clear of the HUD; the second is to its right. Both were seen on screen, clickable and clear of the HUD in M3 (Fullscreen); session 2 also clicked both in an Ironman game.
 
 ## Files
 ```
-descriptor.mod                                     name, version 0.1.0, tags Utilities, supported_version 1.20.* (no BOM)
+descriptor.mod                                     name, version 0.2.0, tags Utilities, supported_version 1.20.* (no BOM)
 .metadata/metadata.json                            launcher metadata, same name/version/supported version, id "curia"
 gui/curia_widget.gui                               the widget with the two buttons
 gui/scripted_widgets/curia_widgets.txt             registers the widget (no vanilla GUI file overridden)
 common/scripted_guis/curia_scripted_guis.txt       curia_run_advisor, curia_run_probes (scope character)
-common/scripted_effects/curia_export.txt           the export, one effect per section
+common/scripted_effects/curia_export.txt           the export, one effect per section, counting passes before the headers
 common/scripted_effects/curia_probes.txt           the probe section: one effect per group, plus the helper curia_probe_faction_fields
-common/script_values/curia_values.txt              caps, frame counters, opinion and flag values, probe-only values
-common/on_action/curia_on_actions.txt              the game-start line CURIA1|0|LOAD|mod=curia|version=0.1.0
-localization/english/curia_l_english.yml           button texts and every logged line (UTF-8 BOM, l_english:)
+common/script_values/curia_values.txt              caps, frame counters, the values the export prints, probe-only values
+common/on_action/curia_on_actions.txt              the game-start record CURIA1|0|LOAD|0.2.0
+localization/english/curia_l_english.yml           button texts and every record form (UTF-8 BOM, l_english:)
 ```
-Script and localization files carry a UTF-8 BOM and tabs, like the game's own; `python3 tools/ci/lint_mod.py` checks that.
+Script and localization files carry a UTF-8 BOM and tabs, like the game's own; `python3 tools/ci/lint_mod.py` checks that and the format invariants below.
 
 ## Install and remove (maintainer, macOS; quit CK3 completely first)
 ```sh
@@ -45,49 +48,75 @@ Options `--mod-dir <dir>`, `--dry-run` and `--force` exist; `--help` lists them.
 never modifies this repository copy. Normal launch only (never debug mode), new game: the `LOAD` line is written at the
 start of a new game; loading an existing save does not print it (M3), and one Ironman run in session 2 printed it twice, 40 s apart (cause not established), so never rely on exactly one `LOAD` line.
 
-## Line frame
-Every line starts with `CURIA1|<snap>|`; `<snap>` is a counter that goes up by one per export. Fields are separated by `|`.
-Names come from the `NoTooltip` forms, so they include titles ("King Harold of England"); the faction name is the exception found in M3 session 2: it still carries link markup (control byte 0x15 around the claimant and the title, with `;`, `,` and `:` inside). Numbers are plain integers.
-`none` lines mark a section that ran and found nothing.
+## Records
+Every record starts with `CURIA1|<snap>|`; `<snap>` is a counter that goes up by one per export, `LOAD` has snap 0. Fields are
+separated by `|`, there is no escaping, and **every record has at most one text field, always the last**, so a game string with a
+pipe in it cannot move another field. The fields, their ranges and the frame rules are in `docs/wire-format.md` sections 2 to 4;
+this table is only the shape the mod writes (`<n>` numbers items inside a section from 1).
 
-| Line | Fields after `<snap>\|` |
+| Record | Fields after `<snap>\|` |
 |---|---|
-| `BEGIN` | `BEGIN\|<date>\|<ruler name>\|<ruler primary title>\|<probe mode 0/1>` |
-| `FIN` | `FIN\|<gold>` |
-| `HEIR` | `HEIR\|<name>\|<opinion of the ruler>\|<has liege 0/1>\|<landed 0/1>`, or `HEIR\|none` |
-| `VASSAL` | `VASSAL\|<rank>\|<name>\|<primary title>\|<gold>\|<opinion of the ruler>` (top N by military strength, N = `curia_max_vassals`, default 10), or `VASSAL\|0\|none` |
-| `WAR` | three lines per war: `WAR\|<n>\|NAME\|<war name>`, `WAR\|<n>\|ATTACKER\|<name>`, `WAR\|<n>\|DEFENDER\|<name>`; or `WAR\|0\|none` |
-| `CLAIM` | `CLAIM\|<n>\|<title>` (highest tier first, at most `curia_max_claims`, default 10), or `CLAIM\|0\|none` |
-| `PROBE` | `PROBE\|<name>\|<value>`, probe button only, one candidate per line; `claim_detail` carries more fields (see the probe table) |
-| `END` | `END\|<line count>`: the number of lines in the frame, BEGIN and END included |
+| `BEGIN` | `BEGIN\|<mode 0/1>\|<mod_version>\|<year>\|<month>\|<day>\|<ruler id>\|<ruler name>` |
+| `FIN` | `FIN\|<gold>\|<income in tenths of a gold piece>` (7.8 prints as 78) |
+| `HEIR` | `HEIR\|none`, or `HEIR\|<id>\|<opinion of the heir's liege>\|<has liege 0/1>\|<landed 0/1>\|<name>` |
+| `VASSALS`, `VASSAL` | `VASSALS\|<total>\|<listed>`, then `VASSAL\|<rank>\|<id>\|<gold>\|<opinion of liege>\|<military strength>\|<name>` (top N by strength, N = `curia_max_vassals`, default 10) |
+| `WARS`, `WAR` | `WARS\|<total>` (wars are not capped), then three records per war with the same `<n>`: `WAR\|<n>\|NAME\|<war name>`, `WAR\|<n>\|ATTACKER\|<id>\|<name>`, `WAR\|<n>\|DEFENDER\|<id>\|<name>` |
+| `CLAIMS`, `CLAIM` | `CLAIMS\|<explicit>\|<implicit>\|<listed>`, then `CLAIM\|<n>\|strong or weak\|<tier>\|<title>` (explicit claims only, highest tier first, at most `curia_max_claims`, default 10; `strong` = pressed, `weak` = unpressed) |
+| `FACTIONS`, `FACTION` | `FACTIONS\|<against total>\|<member 0/1>\|<listed>`, then per faction (at most `curia_max_factions` = 5 against the ruler, strongest by power first, plus the faction the ruler has joined) five records with the same `<n>`: `INFO\|against or member\|<type 1..7>\|<power>\|<threshold>\|<members>`, `LEADER`, `CLAIMANT`, `TITLE`, `TARGET`, each either `none` or `<id>\|<name>` (`TITLE`: `<tier>\|<title>`). `CLAIMANT` and `TITLE` are written only for a claimant faction (type 3), `none` otherwise. Faction names are not exported |
+| `PROBE` | `PROBE\|<name>\|<value>...`, probe button only; an unknown record type to the format (ignored, counted) |
+| `END` | `END\|<count>`: the number of records in the frame, BEGIN and END included |
 
-A war is three lines because the war name is only reachable from the war scope and the side names only from their own
-scopes (the proven forms cannot be combined in one line). `ATTACKER` and `DEFENDER` are the war's primary sides and the ruler may only be a participant (for example in an ally's war), so the app compares the names
-with the BEGIN name instead of assuming a side; whether the war scope offers a link to the ruler's own side is a game test. A frame is complete when `END` arrives and its count equals the lines seen for that `<snap>`.
-The engine puts about 110 bytes in front of every line (script path, effect name), so the parser finds `CURIA1|` anywhere in
-the line.
+A war is three records because the war name is only reachable from the war scope and the side from its own scope (the proven
+forms cannot be combined in one line). `ATTACKER` and `DEFENDER` are the war's primary sides and carry ids; the ruler may only be
+an ally, so the app compares them with the `BEGIN` ruler id. The engine puts about 110 bytes in front of every line (script path, effect name), so the parser finds `CURIA1|`
+anywhere in the line.
 
-## Forms: proven in M0/M0b versus used here without a proof at that time
-Proven (`docs/spikes/m0-results.md`, T7 in `docs/spikes/m2-results.md`): `[THIS.GetCharacter.GetNameNoTooltip]`,
-`[THIS.GetCharacter.GetGold|0]`, `[THIS.GetCharacter.GetPrimaryTitle.GetNameNoTierNoTooltip]`, `[THIS.War.GetName]`,
-`[THIS.Title.GetNameNoTierNoTooltip]`, `[GetCurrentDate.GetString]`, `[THIS.ScriptValue('x')|0]`, `[EmptyScope.ScriptValue('x')|0]`
-(with a constant), the script value `"opinion(liege)"`, the iterators `player_heir`, `ordered_vassal` (`max`, `order_by =
-current_military_strength`), `every_character_war` with `primary_attacker` / `primary_defender`, `random_claim`.
+Names come from the `NoTooltip` forms and include titles (a ruler prints like "King Test Ruler One of Test Realm"); numbers are plain
+integers through `[...|0]`. A debug_log call prints one localization key, so every form (strong and weak claims, against and
+member factions, each `none` form) has its own key in `localization/english/curia_l_english.yml`.
 
-Used in the export without a proof at the end of M0b (written from the game's own files). Session 1 of the M3 spike ran
-all of them in the Advisor export and every field printed a sensible value (`docs/spikes/m3-results.md`); the one Curia
-error was the `ordered_claim` range error, fixed with `check_range_bounds = no` (PR #11). Which claims `ordered_claim`
-returns is still open (see the probe section):
-- `[EmptyScope.ScriptValue('x')|0]` where the script value reads a global variable (`global_var:`): the snapshot id, the line
-  count and the rank/war/claim numbers all depend on it. The probe `snap_id_this` reads the same value through `THIS`.
-- `set_global_variable` / `change_global_variable` used as counters.
-- `max = curia_max_vassals` (a named script value; M0b used a literal number).
-- `ordered_claim` with `max` and `order_by = tier` (vanilla uses it that way; M0b ran `random_claim`, which has the same title scope).
-- The heir's opinion through a guarded script value (`if exists = liege` around `add = "opinion(liege)"`) and the `landed` flag
-  (script value around the `is_landed` trigger).
+### How the invariants are kept
+- **`listed` and `total` are counted, not computed.** Before a header is written, the same iterator (same `max`, `limit`, order) runs
+  once without output and counts into a global variable (`curia_vassals_listed`, `curia_wars_total`, `curia_claims_listed`,
+  `curia_factions_listed`); a script value reads it for the header, then the writing pass runs. The two passes of a section keep
+  identical parameters.
+- **`END` count.** `BEGIN` sets `curia_export_lines` to 1; every other `debug_log` is preceded by `change_global_variable = {
+  name = curia_export_lines add = 1 }`, and the lint checks every call, probes included.
+- **Every global variable that is set is read by a script value** in `curia_values.txt` (otherwise the engine reports it when the
+  mod loads), and every counter is reset in `curia_export_begin`.
+- **Visibility rule (owner decision D15):** only data the player could see in the game's UI is exported.
+
+### The lint (`tools/ci/lint_mod.py`, tests `tools/ci/test_lint_mod.py`)
+Besides the structure checks (BOM, LF, `curia_` names) the lint checks for this mod: the version in `descriptor.mod`, the `LOAD`
+literal, the `BEGIN` key and `.metadata/metadata.json` agree; every `debug_log` names a defined key and every `curia_line_*` /
+`curia_probe_*` key is used; every `debug_log` directly follows the counter increment and no inline literal other than `LOAD`
+exists; every `curia_line_*` key fits the record table of the spec (field count and kinds, one text expression and only last, only
+the integer and text expressions that ran, no pipe or markup inside an expression, defined script values) and every form of the
+table has a key; every global that is set is read, and every counter is reset in `curia_export_begin`.
+
+## Forms: ran in the game versus new in 0.2.0
+Ran in M0/M0b/M3 (`docs/spikes/`): `[THIS.GetCharacter.GetNameNoTooltip]`, `[THIS.GetCharacter.GetGold|0]`,
+`[THIS.GetCharacter.GetID]`, `[THIS.War.GetName]`, `[THIS.Title.GetNameNoTierNoTooltip]`, `[THIS.ScriptValue('x')|0]`,
+`[EmptyScope.ScriptValue('x')|0]` (also over `global_var:`), the script value `"opinion(liege)"`, the iterators `player_heir`,
+`ordered_vassal` (`max`, `check_range_bounds = no`, `order_by = current_military_strength`), `every_character_war` with
+`primary_attacker` / `primary_defender`, `ordered_claim` (unfiltered, and with `explicit = all` / `pressed = all`), `every_claim` with
+the `explicit` / `pressed` filters, `every_targeting_faction`, `joined_faction`, `faction_leader`, `faction_target`, `faction_is_type`,
+`faction_power`, `faction_power_threshold`, `every_faction_member`, and `save_temporary_scope_as` with `scope:` and `prev` inside a claim
+iterator (the claim probe).
+
+New in 0.2.0, **never run in the game** (the list of `docs/wire-format.md` section 8 is the authority):
+- the date as the script values `current_year`, `current_month` and `current_day` (`current_year` is used as a value in the game's own
+  files; month and day appear there only as comparisons, but ck3-tiger accepts them in a script value; the data functions
+  `[GetCurrentDate.GetYear]`, `GetMonthOfYear` and `GetDayOfMonth` exist as the fallback);
+- income in tenths: the script value `monthly_character_income` multiplied by 10;
+- `ordered_claim` with `explicit = yes` and a `limit` on `has_strong_claim_on` / `has_weak_claim_on` through a saved temporary scope;
+- `ordered_targeting_faction` with `max`, `check_range_bounds = no` and `order_by = faction_power`;
+- `special_character` and `special_title` with `has_special_character` / `has_special_title` and `exists`, inside a guard on
+  `faction_is_type = claimant_faction`;
+- the counting passes and the header values that read their globals; the `none` forms; the literal `mod_version` token in the `BEGIN` key.
 
 ## Probe section
-Each line tests one form, so a failure shows up as an empty or 0 value on that line only. Groups, in emission order: ruler,
+The probe section sits between FACTIONS and END and only exists in the probe button's frame. Each line tests one form, so a failure shows up as an empty or 0 value on that line only. Groups, in emission order: ruler,
 heir, strongest vassal, highest-tier claim, claim filters, claim detail, one war, factions that target the ruler, the
 faction the ruler joined or leads. Status: the ruler, heir, vassal, claim and war rows ran in session 1 with sensible values
 and no error. The rows marked **session 2** (claim filters, claim detail, all faction rows) ran on 2026-10-11 with no
