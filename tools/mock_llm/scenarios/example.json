@@ -1,0 +1,43 @@
+[
+  {
+    "name": "example_answer",
+    "status": 200,
+    "framing": "chunked",
+    "headers": {
+      "request-id": "req_example0001"
+    },
+    "steps": [
+      {
+        "gen": "answer",
+        "text_parts": [
+          "Test ruler one",
+          " says hello."
+        ],
+        "usage": {
+          "input_tokens": 10,
+          "output_tokens": 4
+        },
+        "usage_in": "both",
+        "delay_ms": 5
+      }
+    ]
+  },
+  {
+    "name": "example_cut",
+    "steps": [
+      {
+        "b64": "ZXZlbnQ6IHBpbmcKZGF0YTogeyJ0eXBlIjoicGluZyJ9Cgo="
+      },
+      {
+        "raw": "event: content_block_delta\r\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"Test cut\"}}\r\n\r\n",
+        "chunks": [
+          10,
+          20
+        ]
+      },
+      {
+        "close": "truncate"
+      }
+    ]
+  }
+]
