@@ -1,0 +1,1 @@
+{"max_tokens":2048,"messages":[{"content":"Test question one?","role":"user"},{"content":"Test answer one.","role":"assistant"},{"content":"Test question two?","role":"user"}],"model":"mock-model-1","stream":true,"system":[{"text":"Test persona text.","type":"text"},{"text":"Test snapshot text.","type":"text"}]}

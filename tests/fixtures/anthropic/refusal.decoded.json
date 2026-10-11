@@ -1,0 +1,21 @@
+{
+  "error": {
+    "code": "Policy",
+    "httpStatus": 0,
+    "message": "the model declined to answer",
+    "partialText": "Test refusal.",
+    "requestId": "msg_mock0001",
+    "retryable": false
+  },
+  "statuses": [
+    "TextStarted"
+  ],
+  "terminal": "error",
+  "text": "Test refusal.",
+  "tokens": [
+    {
+      "kind": "Text",
+      "text": "Test refusal."
+    }
+  ]
+}

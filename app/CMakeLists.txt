@@ -52,6 +52,10 @@ add_library(curia_core STATIC
     src/net/endpoint_policy.cpp
     src/providers/cancel_token.cpp
     src/providers/sse_parser.cpp
+    src/providers/anthropic_request.cpp
+    src/providers/anthropic_stream.cpp
+    src/providers/chat_error.cpp
+    src/providers/provider_util.cpp
     ${CURIA_PLATFORM_SOURCES})
 target_include_directories(curia_core PUBLIC src ${CMAKE_CURRENT_BINARY_DIR}/generated)
 find_package(Threads REQUIRED)
@@ -189,7 +193,11 @@ if(CURIA_BUILD_TESTS)
         tests/test_platform.cpp
         tests/test_provider_types.cpp
         tests/test_sse_parser.cpp
-        tests/test_watch_log.cpp)
+        tests/test_watch_log.cpp
+        tests/test_anthropic_request.cpp
+        tests/test_anthropic_stream.cpp
+        tests/test_chat_error.cpp
+        tests/test_provider_util.cpp)
     if(APPLE)
         target_sources(curia_tests PRIVATE
             tests/test_probe_combos.cpp
@@ -200,7 +208,8 @@ if(CURIA_BUILD_TESTS)
     target_link_libraries(curia_tests PRIVATE curia_core doctest::doctest)
     # The committed CURIA1 fixtures and their golden outputs (tests/fixtures/curia1/README.md).
     target_compile_definitions(curia_tests PRIVATE
-        CURIA_FIXTURE_DIR="${PROJECT_SOURCE_DIR}/tests/fixtures")
+        CURIA_FIXTURE_DIR="${PROJECT_SOURCE_DIR}/tests/fixtures"
+        CURIA_ANTHROPIC_FIXTURE_DIR="${PROJECT_SOURCE_DIR}/tests/fixtures/anthropic")
     curia_configure_target(curia_tests)
     include(doctest)
     doctest_discover_tests(curia_tests PROPERTIES LABELS unit)

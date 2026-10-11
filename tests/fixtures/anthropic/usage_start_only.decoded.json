@@ -1,0 +1,28 @@
+{
+  "statuses": [
+    "TextStarted"
+  ],
+  "terminal": "done",
+  "text": "Test answer from the mock server.",
+  "tokens": [
+    {
+      "kind": "Text",
+      "text": "Test answer"
+    },
+    {
+      "kind": "Text",
+      "text": " from the"
+    },
+    {
+      "kind": "Text",
+      "text": " mock server."
+    }
+  ],
+  "usage": {
+    "cacheRead": 120,
+    "cacheWrite": 340,
+    "input": 21,
+    "output": 15,
+    "stopReason": "end_turn"
+  }
+}

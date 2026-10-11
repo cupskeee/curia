@@ -1,0 +1,29 @@
+{
+  "error": {
+    "code": "Overloaded",
+    "httpStatus": 0,
+    "message": "Mock overloaded",
+    "partialText": "Test token 1.Test token 2.Test token 3.",
+    "requestId": "msg_mock0001",
+    "retryable": true
+  },
+  "statuses": [
+    "TextStarted"
+  ],
+  "terminal": "error",
+  "text": "Test token 1.Test token 2.Test token 3.",
+  "tokens": [
+    {
+      "kind": "Text",
+      "text": "Test token 1."
+    },
+    {
+      "kind": "Text",
+      "text": "Test token 2."
+    },
+    {
+      "kind": "Text",
+      "text": "Test token 3."
+    }
+  ]
+}

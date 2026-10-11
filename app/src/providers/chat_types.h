@@ -51,6 +51,8 @@ struct Usage {
     int cacheRead = 0;
     int cacheWrite = 0;
     // The provider's stop reason word as received ("end_turn", "max_tokens", ...); empty if none.
+    // An answer cut off by the token limit is a normal onDone whose stopReason is "max_tokens";
+    // the caller decides how to show that.
     std::string stopReason;
 };
 
@@ -96,12 +98,17 @@ constexpr const char* toString(ChatError::Code code) noexcept {
     return "Unknown";
 }
 
-// All three run on the provider's reader thread and must not throw. Exactly one of onDone and
-// onError ends a request; nothing follows it.
+// A progress marker between the request and the first visible token, for the status line.
+enum class StreamStatus { ThinkingStarted, TextStarted };
+
+// All of them run on the provider's reader thread and must not throw. Exactly one of onDone and
+// onError ends a request; nothing follows it. onStatus is optional (may be empty); a provider
+// checks it before calling.
 struct StreamHandlers {
     std::function<void(TokenKind, std::string_view)> onToken;
     std::function<void(const Usage&)> onDone;
     std::function<void(const ChatError&)> onError;
+    std::function<void(StreamStatus)> onStatus;
 };
 
 }  // namespace curia::providers

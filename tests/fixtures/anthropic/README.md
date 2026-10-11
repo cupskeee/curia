@@ -55,3 +55,15 @@ Every stream is the standard sequence `message_start`, `content_block_start`, `c
 The usage fields are `input_tokens`, `cache_creation_input_tokens`, `cache_read_input_tokens`,
 `output_tokens`. The scenarios that need a live connection (HTTP errors, stall, reset, key echo,
 cache emulation) have no fixture: they exist only in the running mock.
+
+## Goldens
+
+`<name>.decoded.json` is what `AnthropicStreamDecoder` must produce for `<name>.sse` (tokens, status
+markers, the terminal call with usage or error, the accumulated text), with `showThinking` off. The
+unit test decodes every `.sse` at chunk sizes 1, 2, 3, 7, 64 and whole and requires the same result
+each time, then compares it with the golden (as parsed JSON, so the layout does not matter). To
+rewrite them after a deliberate change: `CURIA_UPDATE_GOLDEN=1 ctest -R golden` (or run the
+`curia_tests` binary directly with the variable set), then review the diff by hand against the table above. The same
+variable rewrites the `request_*.json` files, which are the exact bytes `buildAnthropicRequestJson`
+must give for a synthetic request (`request_basic.json`: persona and snapshot both cached;
+`request_no_cache.json`; `request_ttl_1h.json`; `request_no_system.json`).

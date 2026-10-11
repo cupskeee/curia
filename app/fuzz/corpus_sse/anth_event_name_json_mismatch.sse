@@ -1,0 +1,6 @@
+0k1event: content_block_delta
+data: {"type":"error","delta":{"type":"text_delta","text":"by name"}}
+
+event: message_stop
+data: {"type":"error"}
+
