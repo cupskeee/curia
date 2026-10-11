@@ -3,8 +3,8 @@
 The CK3 side of Curia: two HUD buttons that write a read-only snapshot of the player's realm to CK3's `debug.log`
 as `CURIA1|...` records, for the Curia app to read. **Not released and not published.** Version 0.2.1 writes the format
 approved at the wire-format checkpoint of 2026-10-11 (`docs/wire-format.md`, the single source of truth for the records);
-the format is **not frozen** until the maintainer's pre-freeze in-game check (`docs/wire-format.md` section 9) has passed, and
-the forms marked new in section 8 of that file have never run in the game. The 0.1.0 spike layout is gone and is not
+the format was **frozen** on 2026-10-11 after the maintainer's pre-freeze in-game check (`docs/wire-format.md` section 9, results in
+`docs/spikes/m3-prefreeze-results.md`); section 8 of that file says which forms ran and which did not. The 0.1.0 spike layout is gone and is not
 readable by the new format; the mod and the app change together.
 
 It overrides no vanilla file (every file name carries the `curia_` prefix, no `replace_path`) and needs no console and no

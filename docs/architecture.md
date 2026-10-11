@@ -54,17 +54,19 @@ M3 T3 showed no long flush latency on the Mac; if a platform does, the mitigatio
 - `localization/english/curia_l_english.yml`.
 - Syntax is written against the game's own files and the owner's `script_docs` / `dump_data_types` output, not memory (section 9).
 
-**Wire format (proposal, finalised after M0 T6 and M3 T4):** line-oriented, one `debug_log` call per line, pipe-separated, versioned prefix:
+**Wire format (frozen 2026-10-11 as `CURIA1`; the specification is `docs/wire-format.md`):** line-oriented, one `debug_log` call per line, pipe-separated, versioned prefix. A shortened sample (the full line types, ranges and rules are in the spec):
 
 ```
-CURIA1|<snap_id>|BEGIN|<game_date>|<char_id>
-CURIA1|<snap_id>|FIN|<gold>|<income>|…
-CURIA1|<snap_id>|HEIR|…
-CURIA1|<snap_id>|VASSAL|<rank>|<id>|<name>|<opinion>|…
-CURIA1|<snap_id>|END|<line_count>
+CURIA1|<snap>|BEGIN|<mode>|<mod_version>|<year>|<month>|<day>|<ruler_id>|<ruler_name>
+CURIA1|<snap>|FIN|<gold>|<net monthly balance in tenths of a gold piece>
+CURIA1|<snap>|HEIR|<id>|<opinion>|<has_liege>|<landed>|<name>
+CURIA1|<snap>|VASSALS|<total>|<listed>
+CURIA1|<snap>|VASSAL|<rank>|<id>|<gold>|<opinion>|<strength>|<name>
+…                       (WARS and WAR, CLAIMS and CLAIM, FACTIONS and FACTION groups)
+CURIA1|<snap>|END|<record_count>
 ```
 
-Rules: ASCII-safe field escaping defined once in `docs/wire-format.md` (to be written in M3); IDs not names where possible; numbers rounded; sections capped (top N vassals). The parser accepts a frame only if BEGIN…END match on `snap_id` and `line_count`. The engine's own line prefix (timestamps etc.) is stripped by locating the marker, not by assuming a layout (T4).
+Rules (all in `docs/wire-format.md`): no escaping, at most one free-text field per record and it is always last, so a pipe or markup in a game string cannot move another field; IDs next to names so characters can be matched; numbers are integers rounded by the mod and treated as approximate (power ±1, income ±0.1 gold); sections capped (top 10 vassals, 10 explicit claims, 5 factions against the ruler); new data only as a new line type or sub-kind. The parser accepts a frame only if BEGIN…END match on the snapshot number and the record count (the count includes BEGIN, END and unknown types) and the section and group counts hold. The engine's own line prefix (timestamps etc.) is stripped by locating the marker, not by assuming a layout (T4).
 
 **M0 findings that shape the format (2026-10-04, `research-notes.md` §2.14):** every `debug_log` call is prefixed by the engine with time, level, source and `file: <script> line: <n> (<on_action/effect name>): `, about 110 bytes in M0 and 119 to 124 bytes with the real mod's longer script path and effect names (M3 T4), so (1) the parser locates `CURIA1|` anywhere in the line and takes the text after it, (2) the exporter packs many fields per call, and the number of calls per export stays small (a single 8,000-character line survived intact in M0b), (3) values are written with inline bracket expressions in quoted strings (no loc files needed), using only forms proven in M0/M0b: from any scope `[THIS.GetCharacter.GetNameNoTooltip]` (or `THIS.Char`), `[THIS.GetCharacter.GetGold|0]`, `[THIS.Var('x').GetValue]`, `[THIS.ScriptValue('x')|0]`, `[THIS.GetCharacter.GetPrimaryTitle.GetNameNoTierNoTooltip]`, `[THIS.War.GetName]`, `[THIS.Title.GetNameNoTierNoTooltip]`; iterators `player_heir`, `ordered_vassal` (`max`, `order_by`), `every_character_war` (`primary_attacker`/`primary_defender`), `random_claim`; relational values (a vassal's or heir's opinion of the ruler) through a script value `"opinion(liege)"` (or `liege_or_court_owner`) read with `THIS.ScriptValue`, or precomputed into a variable inside the iterated scope; **avoid** `ROOT.*`, saved scopes (`sC`, `scope:`) and `scope:`-based script values (they come back empty and log script errors); use `NoTooltip` variants (plain `GetName` emits link markup); faction-scope forms (`THIS.Faction...`) did not run until M3 session 2 and then printed values with no error, but the faction name carries link markup even in the `NoTooltip` form (see the session 2 paragraph below); (4) the in-game date comes from a separate `debug_log_date` line or an exported value; (5) pipes survive.
 

@@ -209,8 +209,8 @@ curia_export_claims = {
 }
 
 # Factions that target the ruler (strongest by power, at most curia_max_factions) and the faction the ruler has joined
-# (docs/wire-format.md section 7). ordered_targeting_faction has never run in the game; if the pre-freeze check shows it
-# failing, the cap is dropped from the format.
+# (docs/wire-format.md section 7). ordered_targeting_faction ran in the pre-freeze check (2026-10-11) with one faction and
+# raised no error; the cap with more than one faction has not been exercised.
 curia_export_factions = {
 	if = {
 		limit = { any_targeting_faction = { } }
