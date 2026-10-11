@@ -3,7 +3,7 @@
 
 Numbers and words only; the owner's notes and the log files hold game text and stay private (`~/curia_m3_results/` on the owner's Mac). Screen observations (tooltips, windows, achievements, install counts) are the owner's notes; log values were read from the owner's logs. The sheets that were followed are `m3-prefreeze-checklist.md` (mod 0.2.0, about 30 minutes) and `m3-income-recheck.md` (mod 0.2.1, two readings). The format under test is `docs/wire-format.md`.
 
-**Verdict.** Every must-test case passed except one field, the `FIN` income, which failed the first run (it was the income before expenses); case D covered one named war only. Mod 0.2.1 exports the net monthly balance, and the re-check showed the quantity is right. The exported net figure was 0.1 gold a month below the tooltip total in the first reading and 0.2 below in the second; the owner decided to freeze with the field documented as approximate to ±0.1 (see "Income" below, which also notes that the second reading is larger than that). The format was frozen on this basis.
+**Verdict.** Every must-test case passed except one field, the `FIN` income, which failed the first run (it was the income before expenses); case D covered one named war only. Mod 0.2.1 exports the net monthly balance, and the re-check showed the quantity is right. The exported net figure was 0.1 gold a month below the tooltip total in the first reading and 0.2 below in the second; the owner decided to freeze with the field documented as approximate to ±0.1 and, because the second reading was 0.2 below, widened the documented tolerance to ±0.2 the same day (see "Income" below). The format was frozen on this basis.
 
 ## Setup
 
@@ -57,7 +57,7 @@ Reading it:
 - Rounding: the 19 May state in the re-check is the same as in the first run (gold 650 and all ten vassals' gold, opinion and strength identical in the first frame of both logs). With the same state the old form printed 90 for the gross income and the new form, with explicit rounding, printed 91, one data point showing that `|0` on a script value does not round to the nearest tenth (consistent with truncation). The offset to the tooltip is not explained by truncation or flooring in the mod: the expenses are *higher* in the log than in the tooltip, and the new form rounds to the nearest. This assumes the tooltip rounds to the nearest tenth, which was not verified. The cause is not established.
 - **Hypothesis for M4, not tested:** the script-side income and expenses may be values the game updates at its monthly tick (the log stayed at 91/14/77 over ten days of the same month while the tooltip's total moved), whereas the tooltip is computed live. A test: unpause across a month boundary and see whether the log value changes only then.
 
-**Decision (owner, 2026-10-11).** Freeze now. `FIN` income is the net monthly balance in tenths of a gold piece, approximate to ±0.1 (like power ±1). A tenth of a gold a month changes no advice, and the field's meaning does not change if the rounding is improved later. No further PR for the rounding.
+**Decision (owner, 2026-10-11).** Freeze now. `FIN` income is the net monthly balance in tenths of a gold piece, approximate to ±0.1 at first and ±0.2 after the owner's later correction (the second reading was 0.2 below the tooltip total), like power ±1. A tenth of a gold a month changes no advice, and the field's meaning does not change if the rounding is improved later. No further PR for the rounding.
 
 ## The app's parser on the real logs
 

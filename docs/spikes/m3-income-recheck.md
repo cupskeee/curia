@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: MIT -->
 # M3 income re-check: the FIN income figure against the top bar (owner, macOS, about 8 minutes once the game is loaded, about 12 with the install and the game start)
 
-**Result (2026-10-11):** done by the owner; the quantity is right (the exported net figure equals the game's own balance value), the net figure was 0.1 below the tooltip total in the first reading and 0.2 below in the second, and the owner froze the format with the income documented as approximate to ±0.1. See `m3-prefreeze-results.md`. The sheet below is kept as it was run.
+**Result (2026-10-11):** done by the owner; the quantity is right (the exported net figure equals the game's own balance value), the net figure was 0.1 below the tooltip total in the first reading and 0.2 below in the second, and the owner froze the format with the income documented as approximate (first ±0.1, widened to ±0.2 the same day). See `m3-prefreeze-results.md`. The sheet below is kept as it was run.
 
 Why: the pre-freeze check of 2026-10-11 passed on every case except one, the `FIN` income. Mod 0.2.0 exported the income **before expenses**: for the king the tooltip showed income +9.2, expenses -1.3 and a total of +7.8, the top bar showed +7.8, and the log held 90 tenths that day (92 on later dates, the tooltip's income line being 9.2). For the duke of the second game the top bar showed +4.9 and the log held 60 tenths (no tooltip lines were written down). The tenths themselves printed correctly; the quantity was the wrong one. Mod 0.2.1 exports the **net monthly balance** (income minus expenses), rounded once at the end, which is what the top bar shows (the tooltip's 9.2 and -1.3 are themselves rounded, so they need not add up to the displayed total exactly).
 
