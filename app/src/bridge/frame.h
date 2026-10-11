@@ -89,8 +89,9 @@ struct TitleRef {
 };
 
 // A faction group. The optional members are std::nullopt for the `none` form. The claimant and the
-// title are meant for type 3 (claimant faction) only: the mod writes `none` for other types, and a
-// value in a group of another type is valid but must be ignored by the reader.
+// title exist for type 3 (claimant faction) only: the mod writes `none` for other types, and the
+// assembler drops a value in a group of another type (valid in the record, ignored here, so that a
+// consumer cannot mistake a special character of another faction type for a claimant).
 struct Faction {
     FactionRole role = FactionRole::Against;
     std::int32_t type = 0;

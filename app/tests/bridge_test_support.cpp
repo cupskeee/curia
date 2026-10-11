@@ -145,6 +145,8 @@ Fixture loadFixture(const std::string& name) {
             Action action;
             action.kind = Action::Kind::Truncate;
             fixture.actions.push_back(std::move(action));
+        } else if (line == "!noise" || line == "!raw") {
+            pending += '\n';  // an empty line (the form that survives trailing-space trimming)
         } else if (line.starts_with("!noise ")) {
             pending += line.substr(7);
             pending += '\n';

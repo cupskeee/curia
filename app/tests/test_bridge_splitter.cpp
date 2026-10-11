@@ -11,7 +11,9 @@ using curia::bridge::LineSplitter;
 
 namespace {
 
-constexpr std::size_t kLimit = LineSplitter::kMaxLineBytes;
+// The number of the spec (section 1), written out so that changing the constant fails a test.
+constexpr std::size_t kLimit = 4096;
+static_assert(LineSplitter::kMaxLineBytes == 4096);
 
 std::vector<Line> splitAll(std::string_view bytes) {
     LineSplitter splitter;
@@ -202,4 +204,30 @@ TEST_CASE("splitter: every two-part split of a stream gives the same lines") {
         }
         REQUIRE(sameLines(whole, lines));
     }
+}
+
+TEST_CASE("splitter: the callback form hands out the same lines as the vector form") {
+    std::string bytes = "a\r\n\nCURIA1|7|END|2\n";
+    bytes += std::string(kLimit + 5, 'q') + "\n";
+    bytes += "tail";
+    const auto expected = splitAll(bytes);
+    LineSplitter splitter;
+    std::vector<Line> got;
+    splitter.feed(bytes, [&got](Line&& line) { got.push_back(std::move(line)); });
+    CHECK(sameLines(expected, got));
+    CHECK(splitter.pendingBytes() == 4);
+}
+
+TEST_CASE("splitter: the callback form keeps no per-line storage for a large block of newlines") {
+    // 2 MiB of empty lines: nothing is accumulated, every line reaches the callback.
+    LineSplitter splitter;
+    const std::string block(2U * 1024U * 1024U, '\n');
+    std::size_t lines = 0;
+    splitter.feed(block, [&lines](Line&& line) {
+        if (line.text.empty() && !line.overlong) {
+            ++lines;
+        }
+    });
+    CHECK(lines == block.size());
+    CHECK(splitter.pendingBytes() == 0);
 }

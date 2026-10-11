@@ -1,0 +1,27 @@
+[
+  {
+    "detail": "income: not a valid integer",
+    "event": "frame_damaged",
+    "reason": "invalid_record",
+    "snap": 220
+  },
+  {
+    "event": "frame_complete",
+    "frame": {
+      "date": {
+        "day": 15,
+        "month": 9,
+        "year": 1066
+      },
+      "mod_version": "0.1.0",
+      "mode": 0,
+      "record_count": 2,
+      "ruler": {
+        "id": 1001,
+        "name": "Test Ruler One"
+      },
+      "snap": 221,
+      "text_shortened": false
+    }
+  }
+]

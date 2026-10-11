@@ -203,7 +203,7 @@ struct ParseResult {
 };
 
 // Parses one physical line (as produced by LineSplitter). `overlong` says the line was cut to its
-// head. Never throws, never reads out of bounds.
+// head. Throws nothing except std::bad_alloc, never reads out of bounds.
 ParseResult parseLine(std::string_view line, bool overlong);
 
 // Drops up to 3 trailing bytes that start a UTF-8 sequence whose continuation bytes are not all

@@ -117,3 +117,59 @@ TEST_CASE("hygiene step 5: runs of spaces collapse and the ends are trimmed") {
 TEST_CASE("hygiene: the markup of a pipe-bearing name is just text") {
     CHECK(cleanText("Test | Name") == "Test | Name");
 }
+
+// ---- pins for the edges of each step (review findings) -----------------------------------------
+
+TEST_CASE("hygiene step 3: the tag word eats exactly one following U+0020") {
+    // With two spaces after the tag the collapse of step 5 hides the difference, so a single space
+    // between the neighbours is what shows that the tag took its space.
+    CHECK(cleanText("A" + kU + "L B") == "AB");
+    CHECK(cleanText("A" + kU + "L; B") == "AB");
+    CHECK(cleanText("A" + kU + "ONCLICK:X,1 B") == "AB");
+    CHECK(cleanText("A " + kU + "L B") == "A B");
+}
+
+TEST_CASE("hygiene step 3: only U+0020 ends a tag word, a tab does not") {
+    // The tab is part of the "word" L<TAB>x, which is not a known tag; the 0x15 and the tab go in
+    // step 4.
+    CHECK(cleanText(kU + "L\tx") == "Lx");
+}
+
+TEST_CASE("hygiene step 4: U+001F goes, and the neighbours of the deleted ranges stay") {
+    CHECK(cleanText(std::string("a\x1F") + "b") == "ab");
+    CHECK(cleanText(std::string("a\x1E") + "b") == "ab");
+    CHECK(cleanText("a\x20"
+                    "b") == "a b");  // U+0020 is the separator, not a control character
+    // Zero-width and format characters outside the listed ranges are kept.
+    CHECK(cleanText("a\xE2\x80\x8B"
+                    "z") == "a\xE2\x80\x8B"
+                            "z");  // U+200B
+    CHECK(cleanText("a\xE2\x80\x8E"
+                    "z") == "a\xE2\x80\x8E"
+                            "z");  // U+200E
+    CHECK(cleanText("a\xE2\x80\xA7"
+                    "z") == "a\xE2\x80\xA7"
+                            "z");  // U+2027
+    CHECK(cleanText("a\xE2\x81\xA0"
+                    "z") == "a\xE2\x81\xA0"
+                            "z");  // U+2060
+    CHECK(cleanText("a\xC2\xAD"
+                    "z") == "a\xC2\xAD"
+                            "z");  // U+00AD
+}
+
+TEST_CASE("hygiene step 1: overlong forms and out-of-range lead bytes give one U+FFFD per byte") {
+    CHECK(repairUtf8("\xE0\x80\x80") == kReplacement + kReplacement + kReplacement);
+    CHECK(repairUtf8("\xF0\x80\x80\x80") ==
+          kReplacement + kReplacement + kReplacement + kReplacement);
+    CHECK(repairUtf8("\xF5\x80\x80\x80") ==
+          kReplacement + kReplacement + kReplacement + kReplacement);
+    CHECK(repairUtf8("\xF7\xBF\xBF\xBF") ==
+          kReplacement + kReplacement + kReplacement + kReplacement);
+    CHECK(repairUtf8("\xC1\xBF") == kReplacement + kReplacement);
+    // The lowest and highest valid forms of each length stay.
+    CHECK(repairUtf8("\xC2\x80") == "\xC2\x80");
+    CHECK(repairUtf8("\xE0\xA0\x80") == "\xE0\xA0\x80");
+    CHECK(repairUtf8("\xF0\x90\x80\x80") == "\xF0\x90\x80\x80");
+    CHECK(repairUtf8("\xF4\x8F\xBF\xBF") == "\xF4\x8F\xBF\xBF");
+}

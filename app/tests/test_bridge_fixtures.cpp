@@ -50,7 +50,9 @@ const std::map<std::string, std::vector<std::string>>& expectations() {
         {"war_roles", {"C6"}},
         {"claims_kinds", {"C8"}},
         {"damaged_invalid_record", {"D20:invalid_record", "C21"}},
-        {"damaged_snap_mismatch", {"D30:snap_mismatch", "C32", "D33:snap_mismatch", "C35"}},
+        {"damaged_snap_mismatch",
+         {"D30:snap_mismatch", "C32", "D33:snap_mismatch", "C35", "D36:snap_mismatch",
+          "D37:snap_mismatch", "D38:snap_mismatch", "C39"}},
         {"damaged_count_mismatch", {"D40:count_mismatch", "D41:count_mismatch", "C42"}},
         {"damaged_group_count",
          {"D50:count_mismatch", "D51:count_mismatch", "D52:count_mismatch", "D53:count_mismatch",
@@ -58,6 +60,10 @@ const std::map<std::string, std::vector<std::string>>& expectations() {
         {"damaged_order", {"D60:order", "D61:order", "D62:order", "D63:order", "D64:order", "C65"}},
         {"damaged_incomplete", {"D70:incomplete", "C71", "D72:incomplete", "U73", "C74"}},
         {"damaged_truncated", {"D80:truncated_log", "C1", "C1"}},
+        {"damaged_too_large", {"D210:too_large", "C211"}},
+        {"faction_other_type", {"C8"}},
+        {"overlong_line", {"C200", "C201", "D202:invalid_record", "C203"}},
+        {"oversize_no_text", {"D220:invalid_record", "C221"}},
         {"frame_512_records", {"C90"}},
         {"noise_interleaved", {"C100"}},
         {"name_with_pipe", {"C110"}},
@@ -161,6 +167,13 @@ TEST_CASE("fixtures: the markup sample is cleaned") {
     const auto* complete = std::get_if<FrameComplete>(events.data());
     REQUIRE(complete != nullptr);
     const Frame& frame = complete->frame;
+    REQUIRE(frame.factions.has_value());
+    REQUIRE(must(frame.factions).listed.size() == 1);
+    const Faction& faction = must(frame.factions).listed[0];
+    CHECK(must(faction.leader).name == "Test Leader");
+    CHECK(must(faction.claimant).name == "Test Claimant");
+    CHECK(must(faction.title).title == "Test Title");
+    CHECK(must(faction.target).name == "Test Target");
     REQUIRE(frame.vassals.has_value());
     CHECK(must(frame.vassals).listed.at(0).name == "Install Test Ruler on the Test Realm Throne");
     REQUIRE(frame.claims.has_value());
@@ -211,4 +224,44 @@ TEST_CASE("fixtures: the oversize names are shortened, the frame is kept and fla
     CHECK(name2.rfind("ab", 0) == 0);
     CHECK((name2.size() - 2) % 3 == 0);
     CHECK(must(frame.vassals).listed[1].strength == 7);
+}
+
+TEST_CASE("fixtures: a claimant and a title outside a claimant faction are not kept") {
+    const Fixture fixture = loadFixture("faction_other_type");
+    const auto events = runActions(fixture.actions, 0);
+    REQUIRE(events.size() == 1);
+    const auto* complete = std::get_if<FrameComplete>(events.data());
+    REQUIRE(complete != nullptr);
+    REQUIRE(complete->frame.factions.has_value());
+    const auto& groups = must(complete->frame.factions).listed;
+    REQUIRE(groups.size() == 2);
+    CHECK(groups[0].type == 1);
+    CHECK_FALSE(groups[0].claimant.has_value());
+    CHECK_FALSE(groups[0].title.has_value());
+    CHECK(must(groups[0].leader).name == "Test Leader 1");
+    CHECK(groups[1].type == 3);
+    CHECK(must(groups[1].claimant).name == "Test Claimant Two");
+    CHECK(must(groups[1].title).tier == 3);
+}
+
+TEST_CASE("fixtures: overlong physical lines are shortened or invalid, never lost silently") {
+    const Fixture fixture = loadFixture("overlong_line");
+    const auto events = runActions(fixture.actions, 0);
+    REQUIRE(events.size() == 4);
+    const auto* first = std::get_if<FrameComplete>(&events[0]);
+    REQUIRE(first != nullptr);
+    CHECK(first->frame.textShortened);
+    const auto* second = std::get_if<FrameComplete>(&events[1]);
+    REQUIRE(second != nullptr);
+    // The record is short (about 100 bytes in the head) but comes from an overlong line.
+    CHECK(second->frame.textShortened);
+    REQUIRE(second->frame.heir.has_value());
+    CHECK(must(second->frame.heir).id == 1);
+    CHECK(must(second->frame.heir).name.rfind("Test Heir Two zzz", 0) == 0);
+    const auto* third = std::get_if<FrameDamaged>(&events[2]);
+    REQUIRE(third != nullptr);
+    CHECK((third->reason == DamageReason::InvalidRecord));
+    const auto* fourth = std::get_if<FrameComplete>(&events[3]);
+    REQUIRE(fourth != nullptr);
+    CHECK_FALSE(fourth->frame.textShortened);
 }

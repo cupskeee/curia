@@ -1,0 +1,16 @@
+# CLAIMANT and TITLE values in factions that are not claimant factions (type 3) are valid records, but
+# the frame does not keep them (docs/wire-format.md W6c: valid and ignored). Group 2 is type 3 and
+# keeps both.
+CURIA1|8|BEGIN|0|0.1.0|1066|9|15|1001|Test Ruler One
+CURIA1|8|FACTIONS|2|0|2
+CURIA1|8|FACTION|1|INFO|against|1|10|100|2
+CURIA1|8|FACTION|1|LEADER|1101|Test Leader 1
+CURIA1|8|FACTION|1|CLAIMANT|1201|Test Special One
+CURIA1|8|FACTION|1|TITLE|4|Test Special Title
+CURIA1|8|FACTION|1|TARGET|1001|Test Ruler One
+CURIA1|8|FACTION|2|INFO|against|3|20|100|3
+CURIA1|8|FACTION|2|LEADER|1102|Test Leader 2
+CURIA1|8|FACTION|2|CLAIMANT|1202|Test Claimant Two
+CURIA1|8|FACTION|2|TITLE|3|Test Claimed Title
+CURIA1|8|FACTION|2|TARGET|1001|Test Ruler One
+CURIA1|8|END|13

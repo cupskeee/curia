@@ -1,0 +1,67 @@
+[
+  {
+    "event": "frame_complete",
+    "frame": {
+      "date": {
+        "day": 15,
+        "month": 9,
+        "year": 1066
+      },
+      "factions": {
+        "against": 2,
+        "listed": [
+          {
+            "claimant": null,
+            "leader": {
+              "id": 1101,
+              "name": "Test Leader 1"
+            },
+            "members": 2,
+            "power": 10,
+            "role": "against",
+            "target": {
+              "id": 1001,
+              "name": "Test Ruler One"
+            },
+            "threshold": 100,
+            "title": null,
+            "type": 1
+          },
+          {
+            "claimant": {
+              "id": 1202,
+              "name": "Test Claimant Two"
+            },
+            "leader": {
+              "id": 1102,
+              "name": "Test Leader 2"
+            },
+            "members": 3,
+            "power": 20,
+            "role": "against",
+            "target": {
+              "id": 1001,
+              "name": "Test Ruler One"
+            },
+            "threshold": 100,
+            "title": {
+              "tier": 3,
+              "title": "Test Claimed Title"
+            },
+            "type": 3
+          }
+        ],
+        "member": false
+      },
+      "mod_version": "0.1.0",
+      "mode": 0,
+      "record_count": 13,
+      "ruler": {
+        "id": 1001,
+        "name": "Test Ruler One"
+      },
+      "snap": 8,
+      "text_shortened": false
+    }
+  }
+]

@@ -7,5 +7,7 @@ CURIA1|100|FIN|312|78
 !noise CURIA2|100|FIN|1|2 is another marker version
 CURIA1|100|HEIR|none
 !noise -
+!noise
+!raw
 CURIA1|100|END|4
 !noise after the frame

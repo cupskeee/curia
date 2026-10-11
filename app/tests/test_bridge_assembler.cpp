@@ -565,7 +565,10 @@ TEST_CASE("state row: known records count toward the 512 limit too") {
 }
 
 TEST_CASE("state row: frame-record bytes above 128 KiB make the frame too large") {
-    constexpr std::size_t kCap = FrameAssembler::kMaxFrameBytes;
+    // The numbers of the spec (section 3), written out so that changing the constant fails a test.
+    constexpr std::size_t kCap = 128 * 1024;
+    static_assert(FrameAssembler::kMaxFrameBytes == 128 * 1024);
+    static_assert(FrameAssembler::kMaxFrameRecords == 512);
     const std::string b = begin(5);
     const auto buildFrame = [&](std::size_t extraByte) {
         // BEGIN, 43 unknown records of 3000 bytes, one unknown record sized to land the sum
@@ -1013,14 +1016,28 @@ TEST_CASE("pipeline: an unterminated last line is held back until its newline ar
 
 TEST_CASE("pipeline: truncating the log drops the unterminated tail") {
     BridgePipeline pipeline;
-    const auto frame = exampleFrame(7);
-    std::string bytes = streamOf(frame);
-    bytes.pop_back();
-    CHECK(pipeline.feed(bytes).empty());
-    // The open frame is abandoned and the half line is gone, so the late newline completes nothing.
-    CHECK(damagedWith(pipeline.truncateLog(), DamageReason::TruncatedLog));
-    CHECK(pipeline.feed("\n").empty());
+    // An unterminated BEGIN: if it survived the truncation, it would be glued to the first line of
+    // the new log and open a frame of its own.
+    const std::string tail = curia::bridge::test::prefixed(begin(7));
+    CHECK(pipeline.feed(tail).empty());
+    CHECK(pipeline.splitter().pendingBytes() == tail.size());
+    CHECK(pipeline.truncateLog().empty());  // Idle: no frame was open
     CHECK(pipeline.splitter().pendingBytes() == 0);
+    const auto events = pipeline.feed(streamOf(frameOf(9, {})));
+    const Frame* frame = completeOnly(events);
+    REQUIRE(frame != nullptr);
+    CHECK(frame->snap == 9);
+}
+
+TEST_CASE("pipeline: truncating the log also forgets that a line was overlong") {
+    BridgePipeline pipeline;
+    CHECK(pipeline.feed(std::string(6000, 'x')).empty());  // an overlong line, no newline yet
+    CHECK(pipeline.truncateLog().empty());
+    // The first line of the new log is an ordinary short line, not "the rest of an overlong one".
+    const auto events = pipeline.feed(streamOf(frameOf(9, {r(9, "HEIR|1|2|1|0|Test Heir")})));
+    const Frame* frame = completeOnly(events);
+    REQUIRE(frame != nullptr);
+    CHECK_FALSE(frame->textShortened);
 }
 
 TEST_CASE(
@@ -1072,4 +1089,255 @@ TEST_CASE("pipeline: a NUL byte inside a text field is just removed by the hygie
     const Frame* frame = completeOnly(events);
     REQUIRE(frame != nullptr);
     CHECK(must(frame->heir).name == "Test");
+}
+
+// ---- wiring of the overlong flag from the splitter to the parser -------------------------------
+
+namespace {
+
+// One physical line without an engine prefix: `lead` (no marker), the record, and `rest`. The lead
+// is sized so that the record ends `recordBytesInHead` bytes after the first 4,096 bytes begin to
+// matter: with rest non-empty the line is overlong.
+std::string overlongLine(const std::string& record, std::size_t headBytesOfRecord,
+                         const std::string& rest) {
+    return std::string(4096 - headBytesOfRecord, '.') + record + rest;
+}
+
+}  // namespace
+
+TEST_CASE("pipeline: a text record from an overlong line is shortened even if its head is short") {
+    const std::string heir = r(5, "HEIR|1|2|1|0|Test Heir Two ");
+    std::string bytes = prefixedLine(begin(5));
+    // ~100 bytes of the record are in the head, the rest of the line is dropped.
+    bytes += overlongLine(heir, 100, std::string(1000, 'z')) + "\n";
+    bytes += prefixedLine(end(5, 3));
+    BridgePipeline pipeline;
+    const auto events = pipeline.feed(bytes);
+    const Frame* frame = completeOnly(events);
+    REQUIRE(frame != nullptr);
+    CHECK(frame->textShortened);
+    REQUIRE(frame->heir.has_value());
+    CHECK(must(frame->heir).name.rfind("Test Heir Two zzz", 0) == 0);
+    CHECK(must(frame->heir).name.size() < 100);
+}
+
+TEST_CASE("pipeline: a record without text from an overlong line is invalid, even if it is whole") {
+    const std::string fin = r(5, "FIN|1|2");
+    std::string bytes = prefixedLine(begin(5));
+    // The head ends exactly after the last field: only the overlong flag makes this invalid.
+    bytes += overlongLine(fin, fin.size(), "zzzz") + "\n";
+    bytes += prefixedLine(end(5, 3));
+    BridgePipeline pipeline;
+    const auto events = pipeline.feed(bytes);
+    const auto* damaged = damagedOnly(events);
+    REQUIRE(damaged != nullptr);
+    CHECK((damaged->reason == DamageReason::InvalidRecord));
+    // The same line without the dropped tail is a valid FIN.
+    BridgePipeline control;
+    std::string ok = prefixedLine(begin(5));
+    ok += overlongLine(fin, fin.size(), "") + "\n";
+    ok += prefixedLine(end(5, 3));
+    CHECK(completeOnly(control.feed(ok)) != nullptr);
+}
+
+TEST_CASE("pipeline: the UTF-8 tail trim also applies to a short head of an overlong line") {
+    // The head is cut inside the first 3-byte character of the name, long before 1,024 bytes of
+    // record: the half character is dropped, not repaired into a replacement character.
+    const std::string heir = r(5, "HEIR|1|2|1|0|Test ");
+    std::string bytes = prefixedLine(begin(5));
+    bytes += std::string(4096 - heir.size() - 2, '.') + heir + "\xE2\x82\xAC\xE2\x82\xAC" + "\n";
+    bytes += prefixedLine(end(5, 3));
+    BridgePipeline pipeline;
+    const auto events = pipeline.feed(bytes);
+    const Frame* frame = completeOnly(events);
+    REQUIRE(frame != nullptr);
+    REQUIRE(frame->heir.has_value());
+    CHECK(must(frame->heir).name == "Test");
+    CHECK(frame->textShortened);
+}
+
+// ---- snap mismatch in both directions ----------------------------------------------------------
+
+TEST_CASE("state row: a LOWER snap damages the frame too, for every kind of record") {
+    {
+        Rig rig;
+        rig.feed({begin(9)});
+        CHECK(damagedWith(rig.feed(r(3, "FIN|1|2")), DamageReason::SnapMismatch));
+    }
+    {
+        Rig rig;
+        rig.feed({begin(9)});
+        CHECK(damagedWith(rig.feed(r(3, "FOO|1")), DamageReason::SnapMismatch));
+    }
+    {
+        Rig rig;
+        rig.feed({begin(9)});
+        const auto events = rig.feed(r(3, "END|2"));
+        CHECK(damagedWith(events, DamageReason::SnapMismatch));
+        CHECK(rig.state() == FrameAssembler::State::Idle);
+    }
+    {
+        // The foreign record is never merged: no Complete frame comes out of this.
+        Rig rig;
+        const auto events = rig.feed({begin(9), r(3, "FIN|1|2"), end(9, 3)});
+        CHECK(damagedWith(events, DamageReason::SnapMismatch));
+        CHECK(eventsOfType<FrameComplete>(events).empty());
+    }
+}
+
+// ---- hygiene reaches every text field -----------------------------------------------------------
+
+TEST_CASE("assembler: hygiene is applied to every text-bearing record kind") {
+    const std::string u(1, '\x15');
+    const std::string messy = "Install " + u + "ONCLICK:CHARACTER,1 " + u + "TOOLTIP:CHARACTER,1 " +
+                              u + "L Test Ruler" + u + "!" + u + "!" + u + "! on the " + u +
+                              "ONCLICK:TITLE,2 " + u + "TOOLTIP:LANDED_TITLE,2 " + u +
+                              "L; Test Realm" + u + "!" + u + "!" + u + "! Throne";
+    const std::string clean = "Install Test Ruler on the Test Realm Throne";
+    const std::vector<std::string> lines = {
+        r(5, "BEGIN|0|0.1.0|1066|9|15|1001|" + messy),
+        r(5, "HEIR|1|2|1|0|" + messy),
+        r(5, "VASSALS|1|1"),
+        r(5, "VASSAL|1|2|3|4|5|" + messy),
+        r(5, "WARS|1"),
+        r(5, "WAR|1|NAME|" + messy),
+        r(5, "WAR|1|ATTACKER|2|" + messy),
+        r(5, "WAR|1|DEFENDER|3|" + messy),
+        r(5, "CLAIMS|1|0|1"),
+        r(5, "CLAIM|1|weak|4|" + messy),
+        r(5, "FACTIONS|1|0|1"),
+        r(5, "FACTION|1|INFO|against|3|1|1|1"),
+        r(5, "FACTION|1|LEADER|4|" + messy),
+        r(5, "FACTION|1|CLAIMANT|5|" + messy),
+        r(5, "FACTION|1|TITLE|4|" + messy),
+        r(5, "FACTION|1|TARGET|6|" + messy),
+        r(5, "END|17"),
+    };
+    Rig rig;
+    const auto events = rig.feed(lines);
+    const Frame* frame = completeOnly(events);
+    REQUIRE(frame != nullptr);
+    CHECK(frame->rulerName == clean);
+    CHECK(must(frame->heir).name == clean);
+    CHECK(must(frame->vassals).listed.at(0).name == clean);
+    CHECK(must(frame->wars).wars.at(0).name == clean);
+    CHECK(must(frame->wars).wars.at(0).attacker.name == clean);
+    CHECK(must(frame->wars).wars.at(0).defender.name == clean);
+    CHECK(must(frame->claims).listed.at(0).title == clean);
+    const Faction& faction = must(frame->factions).listed.at(0);
+    CHECK(must(faction.leader).name == clean);
+    CHECK(must(faction.claimant).name == clean);
+    CHECK(must(faction.title).title == clean);
+    CHECK(must(faction.target).name == clean);
+}
+
+// ---- CLAIMANT and TITLE outside type 3 ---------------------------------------------------------
+
+TEST_CASE("assembler: a claimant and a title in a faction that is not type 3 are not kept") {
+    for (const int type : {1, 2, 4, 5, 6, 7}) {
+        CAPTURE(type);
+        const std::string t = std::to_string(type);
+        const auto events =
+            run({r(5, "FACTIONS|1|0|1"), r(5, "FACTION|1|INFO|against|" + t + "|1|1|1"),
+                 r(5, "FACTION|1|LEADER|4|Test Leader"), r(5, "FACTION|1|CLAIMANT|5|Test Special"),
+                 r(5, "FACTION|1|TITLE|4|Test Title"), r(5, "FACTION|1|TARGET|6|Test Target")});
+        const Frame* frame = completeOnly(events);
+        REQUIRE(frame != nullptr);  // the values are valid records: the frame stays Complete
+        const Faction& faction = must(frame->factions).listed.at(0);
+        CHECK_FALSE(faction.claimant.has_value());
+        CHECK_FALSE(faction.title.has_value());
+        CHECK(must(faction.leader).name == "Test Leader");
+        CHECK(must(faction.target).name == "Test Target");
+    }
+    const auto events =
+        run({r(5, "FACTIONS|1|0|1"), r(5, "FACTION|1|INFO|against|3|1|1|1"),
+             r(5, "FACTION|1|LEADER|4|Test Leader"), r(5, "FACTION|1|CLAIMANT|5|Test Claimant"),
+             r(5, "FACTION|1|TITLE|4|Test Title"), r(5, "FACTION|1|TARGET|6|Test Target")});
+    const Frame* frame = completeOnly(events);
+    REQUIRE(frame != nullptr);
+    const Faction& faction = must(frame->factions).listed.at(0);
+    CHECK(must(faction.claimant).name == "Test Claimant");
+    CHECK(must(faction.title).tier == 4);
+}
+
+// ---- choices the spec does not spell out (pinned so that a change is deliberate) ----------------
+
+TEST_CASE("choice: a count violation wins over an order violation at END") {
+    // VASSALS listed 2 but total 1 (count) and the ranks are swapped (order).
+    CHECK(damagedWith(
+        run({r(5, "VASSALS|1|2"), r(5, "VASSAL|2|1|1|1|1|a"), r(5, "VASSAL|1|1|1|1|1|b")}),
+        DamageReason::CountMismatch));
+    // The same records with total 2: only the order is wrong.
+    CHECK(damagedWith(
+        run({r(5, "VASSALS|2|2"), r(5, "VASSAL|2|1|1|1|1|a"), r(5, "VASSAL|1|1|1|1|1|b")}),
+        DamageReason::Order));
+}
+
+TEST_CASE("choice: too large is decided before snap mismatch") {
+    // The 513th frame record has a foreign snap.
+    std::vector<std::string> lines{begin(5)};
+    for (int i = 0; i < 511; ++i) {
+        lines.push_back(r(5, "FOO|1"));
+    }
+    lines.push_back(r(6, "FOO|1"));
+    Rig rig;
+    CHECK(damagedWith(rig.feed(lines), DamageReason::TooLarge));
+}
+
+TEST_CASE("choice: unknown records count with their full length toward the 128 KiB sum") {
+    // 34 unknown records of about 3,900 bytes: 133,000 bytes, above 128 KiB, although a cut at
+    // 1,024 bytes (which does not apply to unknown types) would have kept the sum at 35 KiB.
+    std::vector<std::string> lines{begin(5)};
+    for (int i = 0; i < 34; ++i) {
+        lines.push_back(r(5, "FOO|" + std::string(3900, 'x')));
+    }
+    Rig rig;
+    CHECK(damagedWith(rig.feed(lines), DamageReason::TooLarge));
+}
+
+// ---- bounded memory and diagnostics
+// ---------------------------------------------------------------
+
+TEST_CASE("pipeline: diagnostics are capped between two frame events and counted") {
+    BridgePipeline pipeline;
+    std::string bytes;
+    for (int i = 0; i < 200; ++i) {
+        bytes += prefixedLine(r(5, "FIN|bad|1"), static_cast<std::size_t>(i));
+    }
+    const auto events = pipeline.feed(bytes);
+    CHECK(eventsOfType<Diagnostic>(events).size() == BridgePipeline::kMaxDiagnosticsInARun);
+    CHECK(pipeline.suppressedDiagnostics() == 200 - BridgePipeline::kMaxDiagnosticsInARun);
+    // A frame event ends the run: the next invalid record is reported again.
+    CHECK(completeOnly(pipeline.feed(streamOf(frameOf(6, {})))) != nullptr);
+    CHECK(eventsOfType<Diagnostic>(pipeline.feed(prefixedLine(r(5, "FIN|bad|1")))).size() == 1);
+}
+
+TEST_CASE("pipeline: the diagnostic cap does not depend on how the bytes are chunked") {
+    std::string bytes;
+    for (int i = 0; i < 150; ++i) {
+        bytes += prefixedLine(r(5, "FIN|bad|1"), static_cast<std::size_t>(i));
+    }
+    bytes += streamOf(frameOf(6, {}));
+    for (int i = 0; i < 70; ++i) {
+        bytes += prefixedLine(r(5, "FIN|bad|1"), static_cast<std::size_t>(i));
+    }
+    BridgePipeline whole;
+    const auto expected = whole.feed(bytes);
+    BridgePipeline chunked;
+    std::vector<Event> got;
+    for (std::size_t pos = 0; pos < bytes.size(); pos += 7) {
+        for (Event& e : chunked.feed(std::string_view(bytes).substr(pos, 7))) {
+            got.push_back(std::move(e));
+        }
+    }
+    CHECK(got.size() == expected.size());
+    CHECK(chunked.suppressedDiagnostics() == whole.suppressedDiagnostics());
+    CHECK(whole.suppressedDiagnostics() == 86 + 6);
+}
+
+TEST_CASE("pipeline: a large block of empty lines produces no events and no per-line storage") {
+    BridgePipeline pipeline;
+    const std::string block(4U * 1024U * 1024U, '\n');
+    CHECK(pipeline.feed(block).empty());
+    CHECK(pipeline.splitter().pendingBytes() == 0);
 }

@@ -18,9 +18,38 @@
         "month": 9,
         "year": 1066
       },
+      "factions": {
+        "against": 1,
+        "listed": [
+          {
+            "claimant": {
+              "id": 1102,
+              "name": "Test Claimant"
+            },
+            "leader": {
+              "id": 1101,
+              "name": "Test Leader"
+            },
+            "members": 2,
+            "power": 10,
+            "role": "against",
+            "target": {
+              "id": 1001,
+              "name": "Test Target"
+            },
+            "threshold": 100,
+            "title": {
+              "tier": 4,
+              "title": "Test Title"
+            },
+            "type": 3
+          }
+        ],
+        "member": false
+      },
       "mod_version": "0.1.0",
       "mode": 0,
-      "record_count": 10,
+      "record_count": 16,
       "ruler": {
         "id": 1001,
         "name": "Test Ruler One"

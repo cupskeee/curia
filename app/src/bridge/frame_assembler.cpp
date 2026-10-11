@@ -40,6 +40,9 @@ constexpr int kSectionWars = 3;
 constexpr int kSectionClaims = 4;
 constexpr int kSectionFactions = 5;
 
+// The faction type for which CLAIMANT and TITLE mean anything (section 4).
+constexpr std::int32_t kClaimantFactionType = 3;
+
 constexpr std::size_t kWarGroupSize = 3;
 constexpr std::size_t kFactionGroupSize = 5;
 
@@ -261,15 +264,16 @@ Verdict buildFrame(const std::vector<Record>& records, Frame& frame) {
                     if (c->part == FactionPart::Leader) {
                         faction.leader = std::move(ref);
                     } else if (c->part == FactionPart::Claimant) {
-                        faction.claimant = std::move(ref);
+                        // Valid but ignored outside type 3 (W6c).
+                        if (faction.type == kClaimantFactionType) {
+                            faction.claimant = std::move(ref);
+                        }
                     } else {
                         faction.target = std::move(ref);
                     }
                 } else if (const auto* t = std::get_if<FactionTitleFields>(&rec.fields)) {
-                    if (!t->none) {
+                    if (!t->none && faction.type == kClaimantFactionType) {
                         faction.title = TitleRef{t->tier, cleanText(rec.text)};
-                    } else {
-                        faction.title.reset();
                     }
                 }
             }

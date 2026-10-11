@@ -883,3 +883,90 @@ TEST_CASE("parser never reads out of bounds on truncated input") {
         }
     }
 }
+
+// ---- ranges of every field kind (review findings) ---------------------------------------------
+
+namespace {
+
+std::string withValue(std::string text, const std::string& value) {
+    const std::size_t at = text.find('@');
+    REQUIRE(at != std::string::npos);
+    text.replace(at, 1, value);
+    return text;
+}
+
+}  // namespace
+
+TEST_CASE("ranges: every non-negative field rejects -1, -0, 2147483648 and an empty value") {
+    const std::vector<std::string> templates = {
+        "CURIA1|7|BEGIN|0|0.1.0|1066|9|15|@|x",
+        "CURIA1|7|HEIR|@|0|1|1|x",
+        "CURIA1|7|VASSALS|@|0",
+        "CURIA1|7|VASSALS|0|@",
+        "CURIA1|7|VASSAL|1|@|0|0|0|x",
+        "CURIA1|7|VASSAL|1|1|0|0|@|x",
+        "CURIA1|7|WARS|@",
+        "CURIA1|7|WAR|1|ATTACKER|@|x",
+        "CURIA1|7|WAR|1|DEFENDER|@|x",
+        "CURIA1|7|CLAIMS|@|0|0",
+        "CURIA1|7|CLAIMS|0|@|0",
+        "CURIA1|7|CLAIMS|0|0|@",
+        "CURIA1|7|FACTIONS|@|0|0",
+        "CURIA1|7|FACTIONS|0|0|@",
+        "CURIA1|7|FACTION|1|INFO|against|3|@|1|1",
+        "CURIA1|7|FACTION|1|INFO|against|3|1|@|1",
+        "CURIA1|7|FACTION|1|INFO|against|3|1|1|@",
+        "CURIA1|7|FACTION|1|LEADER|@|x",
+        "CURIA1|7|FACTION|1|CLAIMANT|@|x",
+        "CURIA1|7|FACTION|1|TARGET|@|x",
+        "CURIA1|7|END|@",
+    };
+    for (const std::string& t : templates) {
+        CAPTURE(t);
+        CHECK(isValid(withValue(t, "0")));
+        CHECK(isValid(withValue(t, "2147483647")));
+        CHECK(isInvalid(withValue(t, "-1")));
+        CHECK(isInvalid(withValue(t, "-0")));
+        CHECK(isInvalid(withValue(t, "2147483648")));
+        CHECK(isInvalid(withValue(t, "")));
+        CHECK(isInvalid(withValue(t, "01")));
+        CHECK(isInvalid(withValue(t, "+1")));
+    }
+}
+
+TEST_CASE("ranges: the signed fields take -1 and -0 but not a value outside int32") {
+    const std::vector<std::string> templates = {
+        "CURIA1|7|FIN|@|0",
+        "CURIA1|7|FIN|0|@",
+        "CURIA1|7|HEIR|1|@|1|1|x",
+        "CURIA1|7|VASSAL|1|1|@|0|0|x",
+        "CURIA1|7|VASSAL|1|1|0|@|0|x",
+    };
+    for (const std::string& t : templates) {
+        CAPTURE(t);
+        CHECK(isValid(withValue(t, "-1")));
+        CHECK(isValid(withValue(t, "-0")));
+        CHECK(isValid(withValue(t, "-2147483648")));
+        CHECK(isValid(withValue(t, "2147483647")));
+        CHECK(isInvalid(withValue(t, "-2147483649")));
+        CHECK(isInvalid(withValue(t, "2147483648")));
+        CHECK(isInvalid(withValue(t, "")));
+        CHECK(isInvalid(withValue(t, "-")));
+    }
+}
+
+TEST_CASE("ranges: the 0/1 flags reject 2 in every position") {
+    CHECK(isValid("CURIA1|7|HEIR|1|2|1|1|x"));
+    CHECK(isInvalid("CURIA1|7|HEIR|1|2|1|2|x"));               // landed
+    CHECK(isInvalid("CURIA1|7|HEIR|1|2|2|1|x"));               // has_liege
+    CHECK(isInvalid("CURIA1|7|FACTIONS|0|2|0"));               // member
+    CHECK(isInvalid("CURIA1|7|BEGIN|2|0.1.0|1066|9|15|1|x"));  // mode
+}
+
+TEST_CASE("token: an underscore is allowed in a version, a space is not") {
+    CHECK(isValid("CURIA1|0|LOAD|0.1_rc"));
+    CHECK(isValid("CURIA1|0|LOAD|0.1.0+build-5"));
+    CHECK(isInvalid("CURIA1|0|LOAD|0.1 rc"));
+    CHECK(isInvalid("CURIA1|0|LOAD|0.1/rc"));
+    CHECK(isInvalid("CURIA1|0|LOAD|"));
+}

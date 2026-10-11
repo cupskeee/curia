@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
+#include <algorithm>
 #include <cstddef>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace curia::bridge {
@@ -25,8 +27,14 @@ public:
     static constexpr std::size_t kMaxLineBytes = 4096;
 
     // Returns the lines completed by `bytes`. An unterminated tail is held back (never returned);
-    // memory held is bounded by kMaxLineBytes however long the tail grows.
+    // memory held is bounded by kMaxLineBytes however long the tail grows. The result itself holds
+    // every line of `bytes` at once (32 bytes per empty line); a caller that feeds a large block
+    // should use the callback form below.
     std::vector<Line> feed(std::string_view bytes);
+
+    // The same, handing each completed line to `onLine(Line&&)` as it completes, so that the memory
+    // used is bounded by the longest line however large `bytes` is.
+    template <typename OnLine> void feed(std::string_view bytes, OnLine&& onLine);
 
     // The log was truncated: forget the unterminated tail.
     void reset() noexcept;
@@ -39,5 +47,36 @@ private:
     // '\n'.
     bool dropping_ = false;
 };
+
+template <typename OnLine> void LineSplitter::feed(std::string_view bytes, OnLine&& onLine) {
+    std::size_t pos = 0;
+    while (pos < bytes.size()) {
+        const std::size_t newline = bytes.find('\n', pos);
+        const std::size_t end = newline == std::string_view::npos ? bytes.size() : newline;
+        if (!dropping_) {
+            const std::size_t room = kMaxLineBytes - tail_.size();
+            const std::size_t take = std::min(room, end - pos);
+            tail_.append(bytes.substr(pos, take));
+            // A byte beyond the limit makes the line overlong even if it is a '\r' that would have
+            // been removed: the limit is measured before the '\r' removal.
+            if (take < end - pos) {
+                dropping_ = true;
+            }
+        }
+        if (newline == std::string_view::npos) {
+            break;
+        }
+        Line line;
+        line.overlong = dropping_;
+        if (!dropping_ && !tail_.empty() && tail_.back() == '\r') {
+            tail_.pop_back();
+        }
+        line.text = std::move(tail_);
+        tail_.clear();
+        dropping_ = false;
+        pos = newline + 1;
+        onLine(std::move(line));
+    }
+}
 
 }  // namespace curia::bridge
