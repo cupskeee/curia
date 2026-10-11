@@ -46,4 +46,8 @@ nlohmann::json toJson(const std::vector<Event>& events);
 // Pretty-printed (two spaces), invalid UTF-8 replaced instead of throwing, ending in a newline.
 std::string dumpJson(const nlohmann::json& json);
 
+// One line: compact, invalid UTF-8 replaced, no trailing newline (the JSON Lines form of the
+// headless watch mode).
+std::string dumpJsonLine(const nlohmann::json& json);
+
 }  // namespace curia::bridge

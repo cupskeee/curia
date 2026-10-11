@@ -3,6 +3,8 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -162,6 +164,101 @@ Fixture loadFixture(const std::string& name) {
     }
     flush();
     return fixture;
+}
+
+void FakeFile::append(std::string_view bytes) {
+    const std::lock_guard<std::mutex> lock(mutex_);
+    content_.append(bytes);
+}
+
+void FakeFile::truncate() {
+    const std::lock_guard<std::mutex> lock(mutex_);
+    content_.clear();
+}
+
+void FakeFile::remove() {
+    const std::lock_guard<std::mutex> lock(mutex_);
+    exists_ = false;
+    content_.clear();
+}
+
+void FakeFile::create() {
+    const std::lock_guard<std::mutex> lock(mutex_);
+    exists_ = true;
+}
+
+void FakeFile::setReadError(bool on) {
+    const std::lock_guard<std::mutex> lock(mutex_);
+    readError_ = on;
+}
+
+void FakeFile::setStatError(bool on) {
+    const std::lock_guard<std::mutex> lock(mutex_);
+    statError_ = on;
+}
+
+std::uint64_t FakeFile::size() const {
+    const std::lock_guard<std::mutex> lock(mutex_);
+    return content_.size();
+}
+
+std::size_t FakeFile::largestRead() const {
+    const std::lock_guard<std::mutex> lock(mutex_);
+    return largestRead_;
+}
+
+std::size_t FakeFile::readCalls() const {
+    const std::lock_guard<std::mutex> lock(mutex_);
+    return readCalls_;
+}
+
+std::size_t FakeFile::statCalls() const {
+    const std::lock_guard<std::mutex> lock(mutex_);
+    return statCalls_;
+}
+
+IFileSource::Stat FakeFile::stat() {
+    const std::lock_guard<std::mutex> lock(mutex_);
+    ++statCalls_;
+    if (!exists_) {
+        return {IFileSource::State::Missing, 0};
+    }
+    if (statError_) {
+        return {IFileSource::State::Error, 0};
+    }
+    return {IFileSource::State::Ok, content_.size()};
+}
+
+bool FakeFile::read(std::uint64_t offset, std::size_t maxBytes, std::string& out) {
+    const std::lock_guard<std::mutex> lock(mutex_);
+    ++readCalls_;
+    largestRead_ = std::max(largestRead_, maxBytes);
+    if (!exists_ || readError_) {
+        return false;
+    }
+    if (offset < content_.size()) {
+        out.append(content_, static_cast<std::size_t>(offset), maxBytes);
+    }
+    return true;
+}
+
+TempDir::TempDir() {
+    static std::atomic<unsigned> counter{0};
+    const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
+    const std::filesystem::path dir =
+        std::filesystem::temp_directory_path() /
+        ("curia_test_" + std::to_string(stamp) + "_" + std::to_string(counter.fetch_add(1)));
+    std::filesystem::create_directories(dir);
+    dir_ = dir.string();
+}
+
+TempDir::~TempDir() {
+    std::error_code ec;
+    std::filesystem::remove_all(std::filesystem::path(dir_), ec);
+}
+
+std::string TempDir::path(const std::string& name) const {
+    return (std::filesystem::path(dir_) / name).string();
 }
 
 namespace {

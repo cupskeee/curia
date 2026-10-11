@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #include "bridge/bridge_pipeline.h"
 
+#include <string>
 #include <utility>
 #include <variant>
 
@@ -28,6 +29,9 @@ std::vector<Event> BridgePipeline::feedLine(const Line& line) {
 }
 
 void BridgePipeline::feedLineInto(const Line& line, std::vector<Event>& events) {
+    if (line.text.find(kMarker) != std::string::npos) {
+        curiaLineBytes_ += line.text.size() + 1;
+    }
     collect(assembler_.consume(parseLine(line.text, line.overlong)), events);
 }
 

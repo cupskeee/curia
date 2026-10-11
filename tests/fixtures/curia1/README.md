@@ -9,7 +9,7 @@ pair of files:
 All names in the fixtures are artificial ("Test Ruler One", "Test Vassal Three"). No engine log
 line is stored here: the harness adds a synthetic engine-style prefix of about 120 bytes to every
 bare record at test time (the app's own fixture loader in `app/tests/bridge_test_support.cpp`, and
-later `tools/fake_ck3`), because the real prefix is not part of the format and must never be
+`tools/fake_ck3`), because the real prefix is not part of the format and must never be
 committed. A second implementation may use any prefix of **at least 1 byte** that does not contain
 the marker (a marker at offset 0 is not a record, so an empty prefix would make every record fail).
 No golden depends on the prefix length: the records that matter for the 1,024-byte and 4,096-byte
@@ -81,3 +81,13 @@ from the build directory, then read the diff against the specification before co
 | `marker_offset0` | the marker at offset 0 is not a record |
 | `invalid_records_idle` | the worked invalid records of the specification, between frames |
 | `valid_notable` | the valid-and-notable records of the specification |
+
+## Who reads these files
+
+- `app/tests/test_bridge_fixtures.cpp`: golden comparison, all chunkings; `test_log_tailer.cpp`: the
+  same fixtures through the log tailer with growing fake files.
+- `app/fuzz/`: `curia_fuzz_replay` (CTest `fuzz_replay`) replays every file of this folder; the CI
+  fuzz smoke job gives the folder to libFuzzer as a seed corpus.
+- `tools/fake_ck3/e2e_test.py`: plays each fixture through the fake CK3 into `curia --watch-log`
+  and compares the printed events with the golden file (prefix, noise and write pattern must not
+  matter).

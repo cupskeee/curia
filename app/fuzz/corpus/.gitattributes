@@ -1,0 +1,2 @@
+# The seed files contain carriage returns and control bytes: keep every byte as written.
+* -text

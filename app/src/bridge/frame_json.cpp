@@ -188,4 +188,8 @@ std::string dumpJson(const Json& json) {
     return text;
 }
 
+std::string dumpJsonLine(const Json& json) {
+    return json.dump(-1, ' ', false, Json::error_handler_t::replace);
+}
+
 }  // namespace curia::bridge

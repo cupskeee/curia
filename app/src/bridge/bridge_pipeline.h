@@ -41,11 +41,17 @@ public:
     // Diagnostics dropped by the cap above since this object was created.
     std::uint64_t suppressedDiagnostics() const noexcept { return suppressedDiagnostics_; }
 
+    // Bytes (line text plus its '\n') of the completed lines that contain the marker anywhere,
+    // since this object was created; the log-budget input of architecture.md section 4. A lower
+    // bound: an overlong line counts its 4,096-byte head only and a removed '\r' is not counted.
+    std::uint64_t curiaLineBytes() const noexcept { return curiaLineBytes_; }
+
 private:
     LineSplitter splitter_;
     FrameAssembler assembler_;
     std::size_t diagnosticRun_ = 0;
     std::uint64_t suppressedDiagnostics_ = 0;
+    std::uint64_t curiaLineBytes_ = 0;
 
     void feedLineInto(const Line& line, std::vector<Event>& events);
     void collect(std::vector<Event>&& from, std::vector<Event>& to);

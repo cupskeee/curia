@@ -3,14 +3,18 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
+#include <mutex>
 #include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "bridge/bridge_pipeline.h"
 #include "bridge/events.h"
+#include "bridge/log_tailer.h"
 #include "bridge/record.h"
 
 // Helpers shared by the test_bridge_*.cpp files: the synthetic engine prefix, the fixture loader
@@ -64,6 +68,65 @@ std::vector<Event> runBytes(std::string_view bytes);
 
 // The golden form of a list of events.
 std::string eventsText(const std::vector<Event>& events);
+
+// A file kept in memory, shared between the test (which grows, truncates and breaks it) and the
+// FakeFileSource the tailer reads it through. Thread-safe: the watcher tests use it from two
+// threads.
+class FakeFile {
+public:
+    void append(std::string_view bytes);
+    // The file keeps existing with size 0 (what the game does at launch).
+    void truncate();
+    // The file disappears.
+    void remove();
+    void create();
+    void setReadError(bool on);
+    void setStatError(bool on);
+    std::uint64_t size() const;
+
+    // What the tailer asked of it.
+    std::size_t largestRead() const;
+    std::size_t readCalls() const;
+    std::size_t statCalls() const;
+
+    IFileSource::Stat stat();
+    bool read(std::uint64_t offset, std::size_t maxBytes, std::string& out);
+
+private:
+    mutable std::mutex mutex_;
+    bool exists_ = true;
+    bool readError_ = false;
+    bool statError_ = false;
+    std::string content_;
+    std::size_t largestRead_ = 0;
+    std::size_t readCalls_ = 0;
+    std::size_t statCalls_ = 0;
+};
+
+class FakeFileSource final : public IFileSource {
+public:
+    explicit FakeFileSource(std::shared_ptr<FakeFile> file) : file_(std::move(file)) {}
+    Stat stat() override { return file_->stat(); }
+    bool read(std::uint64_t offset, std::size_t maxBytes, std::string& out) override {
+        return file_->read(offset, maxBytes, out);
+    }
+
+private:
+    std::shared_ptr<FakeFile> file_;
+};
+
+// A scratch directory under the system temp folder, removed (with its contents) on destruction.
+class TempDir {
+public:
+    TempDir();
+    ~TempDir();
+    TempDir(const TempDir&) = delete;
+    TempDir& operator=(const TempDir&) = delete;
+    std::string path(const std::string& name) const;
+
+private:
+    std::string dir_;
+};
 
 // The value of an optional that the test has already shown to be there; fails the test case
 // (an exception) otherwise. Written so that static analysis sees the check.
