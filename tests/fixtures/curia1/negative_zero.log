@@ -1,0 +1,7 @@
+# -0 is valid in the signed fields (gold, income, opinion) and reads as 0.
+CURIA1|3|BEGIN|0|0.1.0|1066|9|15|1001|Test Ruler One
+CURIA1|3|FIN|-0|-0
+CURIA1|3|HEIR|1002|-0|0|0|Test Heir Two
+CURIA1|3|VASSALS|1|1
+CURIA1|3|VASSAL|1|1003|-0|-0|0|Test Vassal Three
+CURIA1|3|END|6

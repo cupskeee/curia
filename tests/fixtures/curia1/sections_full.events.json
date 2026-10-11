@@ -1,0 +1,133 @@
+[
+  {
+    "event": "frame_complete",
+    "frame": {
+      "claims": {
+        "explicit": 3,
+        "implicit": 2,
+        "listed": [
+          {
+            "kind": "strong",
+            "tier": 5,
+            "title": "Test Empire"
+          },
+          {
+            "kind": "weak",
+            "tier": 3,
+            "title": "Test Duchy"
+          },
+          {
+            "kind": "weak",
+            "tier": 1,
+            "title": "Test Barony"
+          }
+        ]
+      },
+      "date": {
+        "day": 1,
+        "month": 1,
+        "year": 867
+      },
+      "factions": {
+        "against": 1,
+        "listed": [
+          {
+            "claimant": null,
+            "leader": {
+              "id": 1004,
+              "name": "Test Vassal Four"
+            },
+            "members": 4,
+            "power": 10,
+            "role": "against",
+            "target": {
+              "id": 1001,
+              "name": "Test Ruler One"
+            },
+            "threshold": 80,
+            "title": null,
+            "type": 2
+          }
+        ],
+        "member": false
+      },
+      "fin": {
+        "gold": -5,
+        "income_tenths": -23
+      },
+      "heir": {
+        "has_liege": true,
+        "id": 1002,
+        "landed": true,
+        "name": "Test Heir Two",
+        "none": false,
+        "opinion": -30
+      },
+      "mod_version": "0.2.3-rc.1",
+      "mode": 1,
+      "record_count": 25,
+      "ruler": {
+        "id": 1001,
+        "name": "Test Ruler One"
+      },
+      "snap": 12,
+      "text_shortened": false,
+      "vassals": {
+        "listed": [
+          {
+            "gold": 120,
+            "id": 1003,
+            "name": "Test Vassal Three",
+            "opinion": 55,
+            "rank": 1,
+            "strength": 1523
+          },
+          {
+            "gold": 40,
+            "id": 1004,
+            "name": "Test Vassal Four",
+            "opinion": -12,
+            "rank": 2,
+            "strength": 310
+          },
+          {
+            "gold": 0,
+            "id": 1006,
+            "name": "Test Vassal Six",
+            "opinion": 0,
+            "rank": 3,
+            "strength": 90
+          }
+        ],
+        "total": 12
+      },
+      "wars": {
+        "total": 2,
+        "wars": [
+          {
+            "attacker": {
+              "id": 1001,
+              "name": "Test Ruler One"
+            },
+            "defender": {
+              "id": 2001,
+              "name": "Test Enemy Seven"
+            },
+            "name": "Test War One"
+          },
+          {
+            "attacker": {
+              "id": 2002,
+              "name": "Test Aggressor Eight"
+            },
+            "defender": {
+              "id": 2003,
+              "name": "Test Defender Nine"
+            },
+            "name": "Test War Two"
+          }
+        ]
+      }
+    }
+  }
+]

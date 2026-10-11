@@ -1,0 +1,58 @@
+[
+  {
+    "event": "frame_complete",
+    "frame": {
+      "date": {
+        "day": 15,
+        "month": 9,
+        "year": 1066
+      },
+      "factions": {
+        "against": 2,
+        "listed": [
+          {
+            "claimant": null,
+            "leader": null,
+            "members": 3,
+            "power": 50,
+            "role": "member",
+            "target": null,
+            "threshold": 100,
+            "title": null,
+            "type": 1
+          },
+          {
+            "claimant": null,
+            "leader": {
+              "id": 1010,
+              "name": "Test Peasant Ten"
+            },
+            "members": 9,
+            "power": 170,
+            "role": "against",
+            "target": {
+              "id": 1001,
+              "name": "Test Ruler One"
+            },
+            "threshold": 0,
+            "title": null,
+            "type": 5
+          }
+        ],
+        "member": true
+      },
+      "heir": {
+        "none": true
+      },
+      "mod_version": "0.1.0",
+      "mode": 0,
+      "record_count": 14,
+      "ruler": {
+        "id": 1001,
+        "name": "Test Ruler One"
+      },
+      "snap": 4,
+      "text_shortened": false
+    }
+  }
+]

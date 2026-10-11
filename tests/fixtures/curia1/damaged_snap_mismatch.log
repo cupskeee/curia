@@ -1,0 +1,11 @@
+# A record with another snap inside a frame, and an END with another snap.
+CURIA1|30|BEGIN|0|0.1.0|1066|9|15|1001|Test Ruler One
+CURIA1|30|FIN|312|78
+CURIA1|31|WARS|0
+CURIA1|30|END|4
+CURIA1|32|BEGIN|0|0.1.0|1066|9|15|1001|Test Ruler One
+CURIA1|32|END|2
+CURIA1|33|BEGIN|0|0.1.0|1066|9|15|1001|Test Ruler One
+CURIA1|34|END|2
+CURIA1|35|BEGIN|0|0.1.0|1066|9|15|1001|Test Ruler One
+CURIA1|35|END|2

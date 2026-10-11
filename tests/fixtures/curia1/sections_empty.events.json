@@ -1,0 +1,46 @@
+[
+  {
+    "event": "frame_complete",
+    "frame": {
+      "claims": {
+        "explicit": 0,
+        "implicit": 0,
+        "listed": []
+      },
+      "date": {
+        "day": 15,
+        "month": 9,
+        "year": 1066
+      },
+      "factions": {
+        "against": 0,
+        "listed": [],
+        "member": false
+      },
+      "fin": {
+        "gold": 0,
+        "income_tenths": 0
+      },
+      "heir": {
+        "none": true
+      },
+      "mod_version": "0.1.0",
+      "mode": 0,
+      "record_count": 8,
+      "ruler": {
+        "id": 1001,
+        "name": "Test Ruler One"
+      },
+      "snap": 2,
+      "text_shortened": false,
+      "vassals": {
+        "listed": [],
+        "total": 0
+      },
+      "wars": {
+        "total": 0,
+        "wars": []
+      }
+    }
+  }
+]

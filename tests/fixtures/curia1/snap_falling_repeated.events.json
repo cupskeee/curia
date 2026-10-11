@@ -1,0 +1,90 @@
+[
+  {
+    "event": "frame_complete",
+    "frame": {
+      "date": {
+        "day": 15,
+        "month": 9,
+        "year": 1066
+      },
+      "fin": {
+        "gold": 1,
+        "income_tenths": 2
+      },
+      "mod_version": "0.1.0",
+      "mode": 0,
+      "record_count": 3,
+      "ruler": {
+        "id": 1001,
+        "name": "Test Ruler One"
+      },
+      "snap": 7,
+      "text_shortened": false
+    }
+  },
+  {
+    "event": "frame_complete",
+    "frame": {
+      "date": {
+        "day": 15,
+        "month": 9,
+        "year": 1066
+      },
+      "fin": {
+        "gold": 3,
+        "income_tenths": 4
+      },
+      "mod_version": "0.1.0",
+      "mode": 0,
+      "record_count": 3,
+      "ruler": {
+        "id": 1001,
+        "name": "Test Ruler One"
+      },
+      "snap": 3,
+      "text_shortened": false
+    }
+  },
+  {
+    "event": "frame_complete",
+    "frame": {
+      "date": {
+        "day": 15,
+        "month": 9,
+        "year": 1066
+      },
+      "fin": {
+        "gold": 3,
+        "income_tenths": 4
+      },
+      "mod_version": "0.1.0",
+      "mode": 0,
+      "record_count": 3,
+      "ruler": {
+        "id": 1001,
+        "name": "Test Ruler One"
+      },
+      "snap": 3,
+      "text_shortened": false
+    }
+  },
+  {
+    "event": "frame_complete",
+    "frame": {
+      "date": {
+        "day": 15,
+        "month": 9,
+        "year": 1066
+      },
+      "mod_version": "0.1.0",
+      "mode": 0,
+      "record_count": 2,
+      "ruler": {
+        "id": 1001,
+        "name": "Test Ruler One"
+      },
+      "snap": 1,
+      "text_shortened": false
+    }
+  }
+]

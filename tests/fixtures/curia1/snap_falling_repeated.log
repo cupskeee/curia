@@ -1,0 +1,12 @@
+# Arrival order decides: snap 7, then 3, then 3 again, then 1; all are Complete frames.
+CURIA1|7|BEGIN|0|0.1.0|1066|9|15|1001|Test Ruler One
+CURIA1|7|FIN|1|2
+CURIA1|7|END|3
+CURIA1|3|BEGIN|0|0.1.0|1066|9|15|1001|Test Ruler One
+CURIA1|3|FIN|3|4
+CURIA1|3|END|3
+CURIA1|3|BEGIN|0|0.1.0|1066|9|15|1001|Test Ruler One
+CURIA1|3|FIN|3|4
+CURIA1|3|END|3
+CURIA1|1|BEGIN|0|0.1.0|1066|9|15|1001|Test Ruler One
+CURIA1|1|END|2

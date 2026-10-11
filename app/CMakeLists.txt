@@ -33,6 +33,12 @@ endif()
 configure_file(src/core/version.h.in ${CMAKE_CURRENT_BINARY_DIR}/generated/curia/version.h @ONLY)
 
 add_library(curia_core STATIC
+    src/bridge/bridge_pipeline.cpp
+    src/bridge/frame_assembler.cpp
+    src/bridge/frame_json.cpp
+    src/bridge/line_splitter.cpp
+    src/bridge/record.cpp
+    src/bridge/text_hygiene.cpp
     src/core/build_info.cpp
     src/core/cli.cpp
     src/net/ca_bundle.cpp
@@ -126,6 +132,14 @@ if(CURIA_BUILD_TESTS)
     find_package(doctest CONFIG REQUIRED)
     add_executable(curia_tests
         tests/test_main.cpp
+        tests/bridge_test_support.cpp
+        tests/test_bridge_assembler.cpp
+        tests/test_bridge_fixtures.cpp
+        tests/test_bridge_hygiene.cpp
+        tests/test_bridge_json.cpp
+        tests/test_bridge_parser.cpp
+        tests/test_bridge_robustness.cpp
+        tests/test_bridge_splitter.cpp
         tests/test_build_info.cpp
         tests/test_cli.cpp
         tests/test_ca_bundle.cpp
@@ -138,6 +152,9 @@ if(CURIA_BUILD_TESTS)
         target_link_libraries(curia_tests PRIVATE curia_probe_core)
     endif()
     target_link_libraries(curia_tests PRIVATE curia_core doctest::doctest)
+    # The committed CURIA1 fixtures and their golden outputs (tests/fixtures/curia1/README.md).
+    target_compile_definitions(curia_tests PRIVATE
+        CURIA_FIXTURE_DIR="${PROJECT_SOURCE_DIR}/tests/fixtures")
     curia_configure_target(curia_tests)
     include(doctest)
     doctest_discover_tests(curia_tests PROPERTIES LABELS unit)

@@ -1,0 +1,10 @@
+# An invalid record inside a frame: one Damaged event (invalid record), the rest of the frame is
+# ignored, the next frame is read.
+CURIA1|20|BEGIN|0|0.1.0|1066|9|15|1001|Test Ruler One
+CURIA1|20|FIN|312|78
+CURIA1|20|HEIR|1002|84|1|0
+CURIA1|20|WARS|0
+CURIA1|20|FIN|oops
+CURIA1|20|END|6
+CURIA1|21|BEGIN|0|0.1.0|1066|9|15|1001|Test Ruler One
+CURIA1|21|END|2

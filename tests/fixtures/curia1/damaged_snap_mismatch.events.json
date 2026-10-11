@@ -1,0 +1,52 @@
+[
+  {
+    "detail": "record with snap 31 inside the frame with snap 30",
+    "event": "frame_damaged",
+    "reason": "snap_mismatch",
+    "snap": 30
+  },
+  {
+    "event": "frame_complete",
+    "frame": {
+      "date": {
+        "day": 15,
+        "month": 9,
+        "year": 1066
+      },
+      "mod_version": "0.1.0",
+      "mode": 0,
+      "record_count": 2,
+      "ruler": {
+        "id": 1001,
+        "name": "Test Ruler One"
+      },
+      "snap": 32,
+      "text_shortened": false
+    }
+  },
+  {
+    "detail": "record with snap 34 inside the frame with snap 33",
+    "event": "frame_damaged",
+    "reason": "snap_mismatch",
+    "snap": 33
+  },
+  {
+    "event": "frame_complete",
+    "frame": {
+      "date": {
+        "day": 15,
+        "month": 9,
+        "year": 1066
+      },
+      "mod_version": "0.1.0",
+      "mode": 0,
+      "record_count": 2,
+      "ruler": {
+        "id": 1001,
+        "name": "Test Ruler One"
+      },
+      "snap": 35,
+      "text_shortened": false
+    }
+  }
+]

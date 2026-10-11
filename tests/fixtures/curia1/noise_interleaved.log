@@ -1,0 +1,11 @@
+# Lines without the marker between the records of a frame are ignored and not counted.
+!noise some engine message before the frame
+CURIA1|100|BEGIN|0|0.1.0|1066|9|15|1001|Test Ruler One
+!noise an error entry
+!noise    that continues on a second line
+CURIA1|100|FIN|312|78
+!noise CURIA2|100|FIN|1|2 is another marker version
+CURIA1|100|HEIR|none
+!noise -
+CURIA1|100|END|4
+!noise after the frame

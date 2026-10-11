@@ -1,0 +1,55 @@
+[
+  {
+    "detail": "snap 0 is valid only on LOAD",
+    "event": "diagnostic",
+    "reason": "snap_rule",
+    "snap": 0
+  },
+  {
+    "detail": "snap 0 is valid only on LOAD",
+    "event": "diagnostic",
+    "reason": "snap_rule",
+    "snap": 0
+  },
+  {
+    "detail": "LOAD needs snap 0",
+    "event": "diagnostic",
+    "reason": "snap_rule",
+    "snap": 1
+  },
+  {
+    "detail": "snap 0 is valid only on LOAD",
+    "event": "diagnostic",
+    "reason": "snap_rule",
+    "snap": 0
+  },
+  {
+    "detail": "snap 0 is valid only on LOAD",
+    "event": "diagnostic",
+    "reason": "snap_rule",
+    "snap": 0
+  },
+  {
+    "event": "frame_complete",
+    "frame": {
+      "date": {
+        "day": 15,
+        "month": 9,
+        "year": 1066
+      },
+      "fin": {
+        "gold": 1,
+        "income_tenths": 2
+      },
+      "mod_version": "0.1.0",
+      "mode": 0,
+      "record_count": 3,
+      "ruler": {
+        "id": 1001,
+        "name": "Test Ruler One"
+      },
+      "snap": 170,
+      "text_shortened": false
+    }
+  }
+]

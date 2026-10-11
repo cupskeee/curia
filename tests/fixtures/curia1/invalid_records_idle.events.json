@@ -1,0 +1,121 @@
+[
+  {
+    "detail": "income: missing field",
+    "event": "diagnostic",
+    "reason": "field_count",
+    "snap": 7
+  },
+  {
+    "detail": "record: too many fields",
+    "event": "diagnostic",
+    "reason": "field_count",
+    "snap": 7
+  },
+  {
+    "detail": "gold: not a valid integer",
+    "event": "diagnostic",
+    "reason": "field_value",
+    "snap": 7
+  },
+  {
+    "detail": "gold: not a valid integer",
+    "event": "diagnostic",
+    "reason": "field_value",
+    "snap": 7
+  },
+  {
+    "detail": "gold: not a valid integer",
+    "event": "diagnostic",
+    "reason": "field_value",
+    "snap": 7
+  },
+  {
+    "detail": "gold: not a valid integer",
+    "event": "diagnostic",
+    "reason": "field_value",
+    "snap": 7
+  },
+  {
+    "detail": "count: not a valid integer",
+    "event": "diagnostic",
+    "reason": "field_value",
+    "snap": 7
+  },
+  {
+    "detail": "text: delimiter or field missing",
+    "event": "diagnostic",
+    "reason": "field_count",
+    "snap": 7
+  },
+  {
+    "detail": "heir: bytes after none",
+    "event": "diagnostic",
+    "reason": "none_form",
+    "snap": 7
+  },
+  {
+    "detail": "text: delimiter or field missing",
+    "event": "diagnostic",
+    "reason": "field_count",
+    "snap": 7
+  },
+  {
+    "detail": "kind: not one of the allowed words",
+    "event": "diagnostic",
+    "reason": "field_value",
+    "snap": 7
+  },
+  {
+    "event": "unsupported_format",
+    "leading_fields": "0|1.0 0|1066",
+    "snap": 7
+  },
+  {
+    "detail": "header: type word does not match",
+    "event": "diagnostic",
+    "reason": "header",
+    "snap": 7
+  },
+  {
+    "detail": "faction record: bytes after none",
+    "event": "diagnostic",
+    "reason": "none_form",
+    "snap": 7
+  },
+  {
+    "detail": "sub-kind: missing",
+    "event": "diagnostic",
+    "reason": "sub_kind",
+    "snap": 7
+  },
+  {
+    "detail": "total: not a valid integer",
+    "event": "diagnostic",
+    "reason": "field_value",
+    "snap": 7
+  },
+  {
+    "detail": "header: no type",
+    "event": "diagnostic",
+    "reason": "header",
+    "snap": null
+  },
+  {
+    "detail": "header: snap is not an integer in range",
+    "event": "diagnostic",
+    "reason": "header",
+    "snap": null
+  },
+  {
+    "detail": "header: snap is not an integer in range",
+    "event": "diagnostic",
+    "reason": "header",
+    "snap": null
+  },
+  {
+    "detail": "n: out of range",
+    "event": "diagnostic",
+    "reason": "sub_kind",
+    "snap": 7
+  }
+]

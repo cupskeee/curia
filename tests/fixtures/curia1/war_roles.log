@@ -1,0 +1,13 @@
+# Three wars: the ruler attacks, the ruler defends, the ruler is only an ally on either side.
+CURIA1|6|BEGIN|0|0.1.0|1066|9|15|1001|Test Ruler One
+CURIA1|6|WARS|3
+CURIA1|6|WAR|1|NAME|Test War One
+CURIA1|6|WAR|1|ATTACKER|1001|Test Ruler One
+CURIA1|6|WAR|1|DEFENDER|2001|Test Enemy Seven
+CURIA1|6|WAR|2|NAME|Test War Two
+CURIA1|6|WAR|2|ATTACKER|2001|Test Enemy Seven
+CURIA1|6|WAR|2|DEFENDER|1001|Test Ruler One
+CURIA1|6|WAR|3|NAME|Test War Three
+CURIA1|6|WAR|3|ATTACKER|2002|Test Aggressor Eight
+CURIA1|6|WAR|3|DEFENDER|2003|Test Defender Nine
+CURIA1|6|END|12

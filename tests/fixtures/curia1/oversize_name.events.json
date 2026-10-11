@@ -1,0 +1,42 @@
+[
+  {
+    "event": "frame_complete",
+    "frame": {
+      "date": {
+        "day": 15,
+        "month": 9,
+        "year": 1066
+      },
+      "mod_version": "0.1.0",
+      "mode": 0,
+      "record_count": 5,
+      "ruler": {
+        "id": 1001,
+        "name": "Test Ruler One"
+      },
+      "snap": 160,
+      "text_shortened": true,
+      "vassals": {
+        "listed": [
+          {
+            "gold": 1,
+            "id": 1003,
+            "name": "Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Test Long Name Tes",
+            "opinion": 2,
+            "rank": 1,
+            "strength": 3
+          },
+          {
+            "gold": 5,
+            "id": 1004,
+            "name": "ab€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€",
+            "opinion": 6,
+            "rank": 2,
+            "strength": 7
+          }
+        ],
+        "total": 2
+      }
+    }
+  }
+]

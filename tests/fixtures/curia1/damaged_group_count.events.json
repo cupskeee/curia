@@ -1,0 +1,51 @@
+[
+  {
+    "detail": "VASSALS listed differs from the VASSAL records",
+    "event": "frame_damaged",
+    "reason": "count_mismatch",
+    "snap": 50
+  },
+  {
+    "detail": "WARS total differs from the WAR groups",
+    "event": "frame_damaged",
+    "reason": "count_mismatch",
+    "snap": 51
+  },
+  {
+    "detail": "CLAIMS listed differs from the CLAIM records",
+    "event": "frame_damaged",
+    "reason": "count_mismatch",
+    "snap": 52
+  },
+  {
+    "detail": "FACTIONS member differs from the groups with role member",
+    "event": "frame_damaged",
+    "reason": "count_mismatch",
+    "snap": 53
+  },
+  {
+    "detail": "VASSALS listed exceeds total",
+    "event": "frame_damaged",
+    "reason": "count_mismatch",
+    "snap": 54
+  },
+  {
+    "event": "frame_complete",
+    "frame": {
+      "date": {
+        "day": 15,
+        "month": 9,
+        "year": 1066
+      },
+      "mod_version": "0.1.0",
+      "mode": 0,
+      "record_count": 2,
+      "ruler": {
+        "id": 1001,
+        "name": "Test Ruler One"
+      },
+      "snap": 55,
+      "text_shortened": false
+    }
+  }
+]

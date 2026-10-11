@@ -182,7 +182,7 @@ jobs:
       - name: clang-tidy (core, net, Linux platform, tests)
         run: |
           # The macOS-only probe tests (test_probe_*) are not part of this configuration.
-          find app/src/core app/src/net app/src/platform/linux app/tests -name '*.cpp' -not -name 'test_probe_*' -print0 |
+          find app/src/bridge app/src/core app/src/net app/src/platform/linux app/tests -name '*.cpp' -not -name 'test_probe_*' -print0 |
             xargs -0 -n1 clang-tidy-18 -p build/linux-x64-sanitize --quiet
 
   dependency-review:

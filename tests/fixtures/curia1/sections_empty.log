@@ -1,0 +1,9 @@
+# Every section present and empty (not the same as absent).
+CURIA1|2|BEGIN|0|0.1.0|1066|9|15|1001|Test Ruler One
+CURIA1|2|FIN|0|0
+CURIA1|2|HEIR|none
+CURIA1|2|VASSALS|0|0
+CURIA1|2|WARS|0
+CURIA1|2|CLAIMS|0|0|0
+CURIA1|2|FACTIONS|0|0|0
+CURIA1|2|END|8

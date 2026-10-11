@@ -1,0 +1,52 @@
+[
+  {
+    "event": "frame_complete",
+    "frame": {
+      "claims": {
+        "explicit": 5,
+        "implicit": 4,
+        "listed": [
+          {
+            "kind": "strong",
+            "tier": 5,
+            "title": "Test Empire"
+          },
+          {
+            "kind": "strong",
+            "tier": 4,
+            "title": "Test Kingdom"
+          },
+          {
+            "kind": "weak",
+            "tier": 3,
+            "title": "Test Duchy"
+          },
+          {
+            "kind": "weak",
+            "tier": 2,
+            "title": "Test County"
+          },
+          {
+            "kind": "weak",
+            "tier": 1,
+            "title": "Test Barony"
+          }
+        ]
+      },
+      "date": {
+        "day": 15,
+        "month": 9,
+        "year": 1066
+      },
+      "mod_version": "0.1.0",
+      "mode": 0,
+      "record_count": 8,
+      "ruler": {
+        "id": 1001,
+        "name": "Test Ruler One"
+      },
+      "snap": 8,
+      "text_shortened": false
+    }
+  }
+]

@@ -1,0 +1,32 @@
+[
+  {
+    "detail": "mod_version: not a token",
+    "event": "diagnostic",
+    "reason": "field_value",
+    "snap": 0
+  },
+  {
+    "event": "unsupported_format",
+    "leading_fields": "1066.9.15|Test Ruler One|extra field",
+    "snap": 1
+  },
+  {
+    "event": "frame_complete",
+    "frame": {
+      "date": {
+        "day": 15,
+        "month": 9,
+        "year": 1066
+      },
+      "mod_version": "0.1.0",
+      "mode": 0,
+      "record_count": 2,
+      "ruler": {
+        "id": 1001,
+        "name": "Test Ruler One"
+      },
+      "snap": 2,
+      "text_shortened": false
+    }
+  }
+]

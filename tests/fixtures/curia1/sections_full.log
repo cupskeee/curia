@@ -1,0 +1,27 @@
+# Every section with items: a negative income, a full heir, three of twelve vassals, two wars
+# (the ruler attacks in one and is only an ally in the other), strong and weak claims, a faction.
+CURIA1|12|BEGIN|1|0.2.3-rc.1|867|1|1|1001|Test Ruler One
+CURIA1|12|FIN|-5|-23
+CURIA1|12|HEIR|1002|-30|1|1|Test Heir Two
+CURIA1|12|VASSALS|12|3
+CURIA1|12|VASSAL|1|1003|120|55|1523|Test Vassal Three
+CURIA1|12|VASSAL|2|1004|40|-12|310|Test Vassal Four
+CURIA1|12|VASSAL|3|1006|0|0|90|Test Vassal Six
+CURIA1|12|WARS|2
+CURIA1|12|WAR|1|NAME|Test War One
+CURIA1|12|WAR|1|ATTACKER|1001|Test Ruler One
+CURIA1|12|WAR|1|DEFENDER|2001|Test Enemy Seven
+CURIA1|12|WAR|2|NAME|Test War Two
+CURIA1|12|WAR|2|ATTACKER|2002|Test Aggressor Eight
+CURIA1|12|WAR|2|DEFENDER|2003|Test Defender Nine
+CURIA1|12|CLAIMS|3|2|3
+CURIA1|12|CLAIM|1|strong|5|Test Empire
+CURIA1|12|CLAIM|2|weak|3|Test Duchy
+CURIA1|12|CLAIM|3|weak|1|Test Barony
+CURIA1|12|FACTIONS|1|0|1
+CURIA1|12|FACTION|1|INFO|against|2|10|80|4
+CURIA1|12|FACTION|1|LEADER|1004|Test Vassal Four
+CURIA1|12|FACTION|1|CLAIMANT|none
+CURIA1|12|FACTION|1|TITLE|none
+CURIA1|12|FACTION|1|TARGET|1001|Test Ruler One
+CURIA1|12|END|25

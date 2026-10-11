@@ -1,0 +1,6 @@
+# PROBE records are an unknown type: counted, never invalid, any bytes.
+CURIA1|140|BEGIN|1|0.1.0|1066|9|15|1001|Test Ruler One
+CURIA1|140|PROBE|claim detail|1|2|3|Test Realm
+CURIA1|140|FIN|1|2
+CURIA1|140|PROBE|faction|x||y
+CURIA1|140|END|5

@@ -1,0 +1,152 @@
+[
+  {
+    "event": "frame_complete",
+    "frame": {
+      "date": {
+        "day": 15,
+        "month": 9,
+        "year": 1066
+      },
+      "factions": {
+        "against": 9,
+        "listed": [
+          {
+            "claimant": null,
+            "leader": {
+              "id": 1101,
+              "name": "Test Leader 1"
+            },
+            "members": 2,
+            "power": 10,
+            "role": "against",
+            "target": {
+              "id": 1001,
+              "name": "Test Ruler One"
+            },
+            "threshold": 100,
+            "title": null,
+            "type": 1
+          },
+          {
+            "claimant": null,
+            "leader": {
+              "id": 1102,
+              "name": "Test Leader 2"
+            },
+            "members": 3,
+            "power": 20,
+            "role": "against",
+            "target": {
+              "id": 1001,
+              "name": "Test Ruler One"
+            },
+            "threshold": 100,
+            "title": null,
+            "type": 2
+          },
+          {
+            "claimant": {
+              "id": 1203,
+              "name": "Test Claimant 3"
+            },
+            "leader": {
+              "id": 1103,
+              "name": "Test Leader 3"
+            },
+            "members": 4,
+            "power": 30,
+            "role": "against",
+            "target": {
+              "id": 1001,
+              "name": "Test Ruler One"
+            },
+            "threshold": 100,
+            "title": {
+              "tier": 4,
+              "title": "Test Title 3"
+            },
+            "type": 3
+          },
+          {
+            "claimant": null,
+            "leader": {
+              "id": 1104,
+              "name": "Test Leader 4"
+            },
+            "members": 5,
+            "power": 40,
+            "role": "against",
+            "target": {
+              "id": 1001,
+              "name": "Test Ruler One"
+            },
+            "threshold": 100,
+            "title": null,
+            "type": 4
+          },
+          {
+            "claimant": null,
+            "leader": {
+              "id": 1105,
+              "name": "Test Leader 5"
+            },
+            "members": 6,
+            "power": 50,
+            "role": "against",
+            "target": {
+              "id": 1001,
+              "name": "Test Ruler One"
+            },
+            "threshold": 0,
+            "title": null,
+            "type": 5
+          },
+          {
+            "claimant": null,
+            "leader": {
+              "id": 1106,
+              "name": "Test Leader 6"
+            },
+            "members": 7,
+            "power": 60,
+            "role": "against",
+            "target": {
+              "id": 1001,
+              "name": "Test Ruler One"
+            },
+            "threshold": 100,
+            "title": null,
+            "type": 6
+          },
+          {
+            "claimant": null,
+            "leader": {
+              "id": 1107,
+              "name": "Test Leader 7"
+            },
+            "members": 8,
+            "power": 70,
+            "role": "member",
+            "target": {
+              "id": 1001,
+              "name": "Test Ruler One"
+            },
+            "threshold": 100,
+            "title": null,
+            "type": 7
+          }
+        ],
+        "member": true
+      },
+      "mod_version": "0.1.0",
+      "mode": 0,
+      "record_count": 38,
+      "ruler": {
+        "id": 1001,
+        "name": "Test Ruler One"
+      },
+      "snap": 5,
+      "text_shortened": false
+    }
+  }
+]
