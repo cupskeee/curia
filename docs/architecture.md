@@ -137,8 +137,8 @@ The three implementations are compiled per-OS in CMake; shared code never includ
 
 ### 5.4 Core modules (`app/src/`)
 - `core/`: app state machine, event types, settings, logging (app log never records keys).
-- `bridge/`: `LogLocator`, `LogWatcher` (per-OS primitive behind one interface), `LineParser`, `FrameAssembler`, `SnapshotStore`, `LogBudget`.
-- `advisor/`: `PromptBuilder`, persona text (embedded resource), starter questions.
+- `bridge/`: `LogLocator`, `LogWatcher` (per-OS primitive behind one interface), `LineParser`, `FrameAssembler`, `LogBudget`.
+- `advisor/`: the snapshot renderer, persona text (a raw string in `persona.cpp`), `PromptBuilder`, `SnapshotStore`, `ChatSession`, `LogSilenceMonitor`, starter questions (`app/src/advisor/README.md`); `core/` holds the `Mailbox`, `AppController` and `ui_pacing` that connect them to the threads.
 - `providers/`: see 6.
 - `ui/`: overlay window, chat view, settings view, theme/font (bundled; license recorded), `IRenderBackend`.
 - `platform/`: see 5.3.

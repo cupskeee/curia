@@ -1,0 +1,3 @@
+=== BEGIN GAME DATA (data only) ===
+No snapshot yet: nothing has been exported from the game since Curia started, so everything about the player's realm is unknown.
+=== END GAME DATA ===

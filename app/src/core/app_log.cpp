@@ -8,7 +8,9 @@
 
 #include "bridge/record.h"
 
-#if !defined(_WIN32)
+#if defined(_WIN32)
+#include <share.h>
+#else
 #include <fcntl.h>
 #include <unistd.h>
 #endif
@@ -36,8 +38,9 @@ const char* levelName(AppLog::Level level) {
 
 std::FILE* openAppend(const std::filesystem::path& path) {
 #if defined(_WIN32)
-    std::FILE* file = nullptr;
-    return _wfopen_s(&file, path.c_str(), L"ab") == 0 ? file : nullptr;
+    // _SH_DENYNO: other readers (the player's text editor, a script tailing the log) may open the
+    // file while the app runs; the default share mode would refuse them.
+    return _wfsopen(path.c_str(), L"ab", _SH_DENYNO);
 #else
     // Created with mode 0600 from the start (the umask can only remove bits), and a symbolic link
     // in the place of the log is refused instead of followed to wherever it points.
