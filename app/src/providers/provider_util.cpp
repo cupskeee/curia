@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 #include "providers/provider_util.h"
 
+#include <utility>
+
 namespace curia::providers {
 
 namespace {
@@ -87,7 +89,10 @@ std::optional<nlohmann::json> parseBoundedJson(std::string_view text, std::size_
     if (value.is_discarded()) {
         return std::nullopt;
     }
-    return value;
+    // Construct in place: GCC finds the implicit optional<json> conversion ambiguous under -Wconversion.
+    std::optional<nlohmann::json> result;
+    result.emplace(std::move(value));
+    return result;
 }
 
 std::string printableExcerpt(std::string_view text, std::size_t maxBytes) {
