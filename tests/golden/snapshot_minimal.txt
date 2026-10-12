@@ -8,5 +8,5 @@ Vassals (Vassals window): not exported
 Wars: not exported
 Claims: not exported
 Factions (Factions window): not exported
-Not in this snapshot at all: your skills, traits and stress, your court and family beyond the heir, the titles and land you hold, your own armies, buildings, schemes and plots, other realms, and anything that happened before or after this moment.
+Not in this snapshot at all: your skills, traits and stress, your court and family beyond the heir, the titles and land you hold, your own armies, buildings, schemes and plots, other realms, war score and enemy strength in your wars, faction discontent, and anything that happened before or after this moment.
 === END GAME DATA ===

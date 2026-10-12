@@ -23,10 +23,10 @@ Claims: 3 explicit (all listed); implicit claims: 2 (a count only, not listed)
   2. "Test Duchy Of Epsilon" (duchy): unpressed
   3. "Test Barony Of Zeta" (barony): unpressed
 Factions (Factions window): 1 against you; you are in a faction: yes
-  Power and threshold are the Factions window's figures: power is approximate (about +-1) and can be above the threshold, and a threshold of 0 can occur. What happens when power reaches the threshold is not in this snapshot.
+  Power and threshold are the Factions window's figures: power is approximate (about +-1) and can be above the threshold, and a threshold of 0 can occur. Faction discontent (how close a faction is to acting) is not in this snapshot.
   1. against you, claimant faction: power 33, threshold 100, 2 members
      leader: "Test Vassal Two" (your vassal #2 by strength); claimant: "Test Claimant Eta"; wants the title "Test Duchy Of Epsilon" (duchy); target: you
   2. you are a member, independence faction: power 12, threshold 60, 3 members
      leader: "Test Vassal Five" (your vassal #5 by strength); target: "Test Liege Theta"
-Not in this snapshot at all: your skills, traits and stress, your court and family beyond the heir, the titles and land you hold, your own armies, buildings, schemes and plots, other realms, and anything that happened before or after this moment.
+Not in this snapshot at all: your skills, traits and stress, your court and family beyond the heir, the titles and land you hold, your own armies, buildings, schemes and plots, other realms, war score and enemy strength in your wars, faction discontent, and anything that happened before or after this moment.
 === END GAME DATA ===

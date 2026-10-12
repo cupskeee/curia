@@ -406,7 +406,7 @@ void renderFactions(const bridge::Frame& frame, const People& people, Lines& out
     if (!shown.empty()) {
         out.add("  Power and threshold are the Factions window's figures: power is approximate "
                 "(about +-1) and can be above the threshold, and a threshold of 0 can occur. "
-                "What happens when power reaches the threshold is not in this snapshot.");
+                "Faction discontent (how close a faction is to acting) is not in this snapshot.");
     }
     for (std::size_t i = 0; i < shown.size(); ++i) {
         const bridge::Faction& faction = *shown[i];
@@ -439,7 +439,7 @@ People collectPeople(const bridge::Frame& frame) {
 constexpr std::string_view kNotExportedLine =
     "Not in this snapshot at all: your skills, traits and stress, your court and family beyond "
     "the heir, the titles and land you hold, your own armies, buildings, schemes and plots, other "
-    "realms, "
+    "realms, war score and enemy strength in your wars, faction discontent, "
     "and anything that happened before or after this moment.";
 
 }  // namespace

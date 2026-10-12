@@ -393,7 +393,8 @@ TEST_CASE("snapshot: the factions show the limits of power and threshold") {
     const std::string text = renderSnapshot(richFrame());
     CHECK(contains(text, "power is approximate (about +-1)"));
     CHECK(contains(text, "a threshold of 0 can occur"));
-    CHECK(contains(text, "What happens when power reaches the threshold is not in this snapshot"));
+    CHECK(contains(
+        text, "Faction discontent (how close a faction is to acting) is not in this snapshot"));
     // No faction listed: no note.
     CHECK_FALSE(contains(renderSnapshot(emptyFrame()), "threshold"));
 }

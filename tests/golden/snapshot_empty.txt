@@ -9,5 +9,5 @@ Vassals (Vassals window): none
 Wars: none
 Claims: none explicit; implicit claims: 0 (a count only, not listed)
 Factions (Factions window): 0 against you; you are in a faction: no
-Not in this snapshot at all: your skills, traits and stress, your court and family beyond the heir, the titles and land you hold, your own armies, buildings, schemes and plots, other realms, and anything that happened before or after this moment.
+Not in this snapshot at all: your skills, traits and stress, your court and family beyond the heir, the titles and land you hold, your own armies, buildings, schemes and plots, other realms, war score and enemy strength in your wars, faction discontent, and anything that happened before or after this moment.
 === END GAME DATA ===

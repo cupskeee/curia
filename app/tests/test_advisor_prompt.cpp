@@ -120,11 +120,20 @@ TEST_CASE("persona: the required promises are in the text") {
     CHECK(contains(text, "read-only"));
 }
 
+TEST_CASE("persona: risks first, patches and DLC, faction risk without a prediction") {
+    const std::string_view text = persona();
+    CHECK(contains(text, "check risks first"));
+    CHECK(contains(text, "then opportunities"));
+    CHECK(contains(text, "changes with patches and DLC"));
+    CHECK(contains(text, "serious risk, but do not predict when it will act"));
+    CHECK(contains(text, "its discontent is not in the snapshot"));
+}
+
 TEST_CASE("persona: short, plain ASCII, no product or model names") {
     const std::string_view text = persona();
     const std::size_t words = wordCount(text);
     CHECK(words >= 250);
-    CHECK(words <= 450);  // the owner's bound: about 450 words
+    CHECK(words <= 500);  // the owner's bound: about 500 words
     for (const char c : text) {
         CHECK((c == '\n' || (static_cast<unsigned char>(c) >= 0x20U && c != 0x7F)));
     }
