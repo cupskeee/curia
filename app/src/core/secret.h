@@ -24,10 +24,11 @@ void wipe(std::string& text) noexcept;
 // line, a stream, a format call or a copy by accident: it has no copy operations, no operator<<
 // (deleted), no conversion to std::string, std::string_view or bool, and no comparison operators.
 //
-// The only way to read the bytes is reveal(). Only the transport (app/src/http, the Anthropic
-// provider) may call it; tools/ci/check_source_rules.sh fails the build of the repository on any
-// other call outside the allowlist there. Everything else asks narrow questions (size(), empty(),
-// contains()) or hands the SecretString to SecretRegistry::add().
+// The only way to read the bytes is reveal(). Only the transport (app/src/http/http_client.*, the
+// one place that builds the header line) may call it; tools/ci/check_source_rules.sh fails the
+// build of the repository on any other call outside the allowlist there. Everything else asks
+// narrow questions (size(), empty(), contains()) or hands the SecretString to
+// SecretRegistry::add().
 //
 // The bytes live in a private heap buffer that is zeroed (best effort, see secureZero) when the
 // object is destroyed or assigned over. A moved-from object is empty.

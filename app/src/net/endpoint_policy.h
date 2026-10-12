@@ -44,6 +44,13 @@ inline constexpr std::string_view kAnthropicMessagesUrl = "https://api.anthropic
 bool makeEndpoint(std::optional<std::string_view> testEndpointFlag, const SecretString* key,
                   Endpoint& out, std::string& error);
 
+// True only if `url` has exactly the form makeEndpoint() gives a test endpoint: "http://" + a
+// loopback literal (127.x.y.z or [::1]) + ":" + a port + "/v1/messages", nothing else. Always false
+// in a build without CURIA_ENABLE_DEV_ENV. The HTTP client calls it again before it honours
+// Endpoint::isTest, so an Endpoint built by hand (not through makeEndpoint) cannot make plain
+// http or "no proxy" apply to another host.
+bool isLoopbackTestUrl(std::string_view url);
+
 // True only if `requestUrl` is exactly the endpoint's URL. The transport asserts this before it
 // attaches the key to a request, so a redirect target, a typo or a future code path that builds
 // another URL can never carry the key.

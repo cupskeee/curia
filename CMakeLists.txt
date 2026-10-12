@@ -29,6 +29,10 @@ option(CURIA_BUILD_FUZZ "Build the libFuzzer targets curia_fuzz_bridge and curia
 # environment and accept the --test-endpoint flag. ON in development and CI; turn it OFF for release builds.
 option(CURIA_ENABLE_DEV_ENV "Development configuration: env-var API key and --test-endpoint (OFF for release builds, D19)" ON)
 
+# CI turns this ON so that a missing Python 3 fails the configuration instead of silently dropping the
+# end-to-end tests that need it.
+option(CURIA_REQUIRE_PYTHON "Fail the configuration if Python 3 is missing (otherwise the end-to-end tests are skipped)" OFF)
+
 include(CTest)
 
 add_subdirectory(app)

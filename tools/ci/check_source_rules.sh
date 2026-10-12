@@ -7,7 +7,8 @@
 #      Authorization header) or weaken TLS (peer or host verification, NO_REVOKE). The existing
 #      CURLSSLOPT_REVOKE_BEST_EFFORT is fine.
 #   3. calls of reveal() on a SecretString outside the transport: only app/src/core/secret.*,
-#      app/src/core/redact.*, app/src/http/, app/src/providers/anthropic_* and app/tests/ may read the bytes.
+#      app/src/core/redact.*, app/src/http/http_client.* (the one site that builds the header line),
+#      app/src/providers/anthropic_* and app/tests/ may read the bytes.
 #   4. the development environment variables (CURIA_ANTHROPIC..., CURIA_MODEL...) and any getenv/getEnv of a
 #      CURIA_ name outside app/src/core/dev_config.cpp and app/tests/: one reader, one place that validates.
 # Comments are NOT exempt from any rule (a model ID or a variable name in a string literal is the thing to avoid,
@@ -52,9 +53,9 @@ check "model-ID literal in app/ (discover models from the provider; tests use mo
 check "forbidden libcurl option (verbose/debug/trace output or weakened TLS)" \
   'CURLOPT_(VERBOSE|DEBUGFUNCTION|DEBUGDATA|STDERR|TRACE_[A-Za-z0-9_]*|SSL_VERIFYPEER|SSL_VERIFYHOST|PROXY_SSL_VERIFY[A-Za-z0-9_]*)|NO_REVOKE'
 
-check "reveal() outside the allowlist (core/secret.*, core/redact.*, http/, providers/anthropic_*, tests/)" \
+check "reveal() outside the allowlist (core/secret.*, core/redact.*, http/http_client.*, providers/anthropic_*, tests/)" \
   '(^|[^A-Za-z0-9_])reveal[[:space:]]*\(' \
-  '^app/src/core/secret\.|^app/src/core/redact\.|^app/src/http/|^app/src/providers/anthropic_|^app/tests/'
+  '^app/src/core/secret\.|^app/src/core/redact\.|^app/src/http/http_client\.(h|cpp):|^app/src/providers/anthropic_|^app/tests/'
 
 check "CURIA_ environment variable outside app/src/core/dev_config.cpp (and app/tests/)" \
   'get[Ee]nv[[:space:]]*\([[:space:]]*"CURIA_|"[^"]*CURIA_(ANTHROPIC|MODEL)' \
