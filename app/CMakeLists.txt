@@ -112,6 +112,10 @@ if(CURIA_BUILD_APP)
         src/http/tls_policy.cpp
         src/http/transport_error.cpp)
     target_link_libraries(curia_http PUBLIC curia_core CURL::libcurl)
+    if(WIN32)
+        # curl pulls in <windows.h>, whose min/max macros break std::min/std::max.
+        target_compile_definitions(curia_http PUBLIC NOMINMAX WIN32_LEAN_AND_MEAN)
+    endif()
     curia_configure_target(curia_http)
 
     add_executable(curia
