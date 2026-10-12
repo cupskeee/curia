@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: MIT
 #include <cstdio>
+#include <cstdlib>
 #include <iostream>
 #include <string>
 
 #include "app.h"
 #include "core/build_info.h"
 #include "core/cli.h"
+#include "core/headless_chat.h"
 #include "core/watch_log.h"
+#include "headless/headless_modes.h"
 
 int main(int argc, char** argv) {
     curia::CliOptions options;
@@ -27,6 +30,32 @@ int main(int argc, char** argv) {
     // Headless: must run before runApp, which initialises SDL and opens a window.
     if (!options.watchLogPath.empty()) {
         return curia::runWatchLog(options, std::cout, std::cerr);
+    }
+    if (options.headlessChat) {
+        curia::HeadlessChatResult result;
+        try {
+            result = curia::headless::runHeadlessChatMode(options, std::cin, std::cout, std::cerr);
+        } catch (...) {
+            // No text of the exception is printed here: it could hold anything.
+            std::fputs("curia: internal error\n", stderr);
+            return curia::kHeadlessExitInternal;
+        }
+        std::cout << std::flush;
+        std::cerr << std::flush;
+        if (result.inputStillBlocked) {
+            // A read of the terminal is still pending in the reader thread; leave without
+            // waiting for it.
+            std::_Exit(result.exitCode);
+        }
+        return result.exitCode;
+    }
+    if (options.checkApi) {
+        try {
+            return curia::headless::runCheckApiMode(options, std::cout, std::cerr);
+        } catch (...) {
+            std::fputs("curia: internal error\n", stderr);
+            return curia::kHeadlessExitInternal;
+        }
     }
     return curia::runApp(options);
 }

@@ -572,3 +572,66 @@ TEST_CASE("redact: concurrent add, remove and redact") {
     writer.join();
     CHECK(failures.load() == 0);
 }
+
+// --- redactFinal and redactRegistered
+// ---------------------------------------------------------------------
+
+TEST_CASE("redactFinal: a key cut in two by the end of the text loses its start") {
+    const std::string key = "GATEWAY-key-0123456789-abcdef";
+    Fixture fx({key});
+    // The whole key is replaced as redact() does.
+    CHECK(fx.registry.redactFinal("The key is " + key + " ok") == "The key is " + kMark + " ok");
+    // Every cut from 6 bytes up is removed; the text before it stays.
+    for (std::size_t cut = SecretRegistry::kMinPartialSecretBytes; cut < key.size(); ++cut) {
+        CAPTURE(cut);
+        const std::string out = fx.registry.redactFinal("The key is " + key.substr(0, cut));
+        CHECK(out == "The key is ");
+    }
+    // Shorter starts are left (they would match innocent text), so at most 5 bytes can survive.
+    CHECK(fx.registry.redactFinal("The key is GATEW") == "The key is GATEW");
+    // A text that merely ends with an ordinary word is untouched.
+    CHECK(fx.registry.redactFinal("Check your heir.") == "Check your heir.");
+    CHECK(fx.registry.redactFinal("") == "");
+}
+
+TEST_CASE("redactFinal: an unfinished key-shaped run is cut, a finished one is replaced") {
+    Fixture fx;
+    // "sk-ant-" with fewer than 16 key characters after it is not covered by redact().
+    CHECK(fx.registry.redact("see sk-ant-FAKE0123") == "see sk-ant-FAKE0123");
+    CHECK(fx.registry.redactFinal("see sk-ant-FAKE0123") == "see ");
+    CHECK(fx.registry.redactFinal("see sk-ant-") == "see ");
+    CHECK(fx.registry.redactFinal("see sk-ant-abc def") == "see sk-ant-abc def");
+    CHECK(fx.registry.redactFinal("see " + fakeKey() + " and sk-ant-FAKE01") ==
+          "see " + kMark + " and ");
+    CHECK(fx.registry.redactFinal("see " + fakeKey()) == "see " + kMark);
+}
+
+TEST_CASE("redactFinal: several secrets, and a secret that starts with another's end") {
+    Fixture fx({"first-secret-0001", "second-secret-0002"});
+    CHECK(fx.registry.redactFinal("a second-sec") == "a ");
+    CHECK(fx.registry.redactFinal("a first-secret-00") == "a ");
+    CHECK(fx.registry.redactFinal("a second-sec and first-sec") == "a second-sec and ");
+}
+
+TEST_CASE("redactFinal: no registry entries and long texts") {
+    SecretRegistry empty;
+    CHECK(empty.redactFinal("plain text") == "plain text");
+    Fixture fx({"long-secret-value-01"});
+    const std::string big(200000, 'x');
+    CHECK(fx.registry.redactFinal(big + " long-secret-va") == big + " ");
+}
+
+TEST_CASE("redactRegistered: only registered secrets, never a shape") {
+    const std::string key = "tok-0123456789-abcdef";
+    Fixture fx({key});
+    CHECK(fx.registry.redactRegistered("a " + key + " b") == "a " + kMark + " b");
+    // The shape of a key is not touched: the front of a key that goes on in the next piece.
+    CHECK(fx.registry.redactRegistered(fakeKey()) == fakeKey());
+    CHECK(fx.registry.redactRegistered("Authorization: Bearer abcdef") ==
+          "Authorization: Bearer abcdef");
+    CHECK(fx.registry.redactRegistered("") == "");
+    SecretRegistry empty;
+    CHECK(empty.redactRegistered("anything") == "anything");
+    // Two copies, adjacent and apart.
+    CHECK(fx.registry.redactRegistered(key + key + " x " + key) == kMark + " x " + kMark);
+}

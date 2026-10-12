@@ -75,13 +75,19 @@ the end of a request, which is forced in.
 
 ## Redaction
 
-The provider redacts each token alone; a key split over two tokens passes through as two pieces that may each
-be harmless. The session therefore keeps the raw joined answer in a private buffer (never in the transcript)
+The provider replaces a registered key that lies whole inside one token, and nothing else (a shape such as
+`sk-ant-` plus 16 characters would match the front of a key that goes on in the next token, replace it alone
+and leave the rest in the clear); a key split over two tokens passes through as two pieces that may each be
+harmless. The session therefore keeps the raw joined answer in a private buffer (never in the transcript)
 and shows `redact(whole buffer)` after every token, so a key is found however it was split (a key rule needs
 16 characters after `sk-ant-`, so redacting the already-redacted text again would miss the tail). While the
 answer streams, the last word (the trailing run of letters, digits, `-` and `_`) is held back from the
 transcript, so the start of a key that is still arriving is never shown; it appears with the next blank or at
-the end of the answer (a stop or an error shows it too). The question is redacted before it is stored or sent.
+the end of the answer. The final text (a stop, an error or the end of the answer) goes through `redactFinal()`,
+which also cuts a key that the end of the stream split in two (a cancel or a dropped connection after the
+first half of a key): a trailing run of 6 or more bytes that is the start of a registered key, or `sk-ant-`
+with fewer than 16 characters after it, is removed, so at most 5 bytes of a registered key can survive.
+The question is redacted before it is stored or sent.
 A registered secret that contains other characters can show as a prefix for a moment, until it is complete.
 
 An answer that ends with no text at all is an error ("The service sent an empty answer. Try again."), not a

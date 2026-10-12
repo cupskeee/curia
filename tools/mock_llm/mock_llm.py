@@ -169,7 +169,8 @@ class RenderContext:
     """What a scenario builder may look at: the request, the received key, the decoy URL."""
 
     def __init__(self, request: Any = None, key: str = "", decoy_url: str = DEFAULT_DECOY_URL,
-                 cache_fn: Optional[Callable[[], Dict[str, int]]] = None):
+                 cache_fn: Optional[Callable[[], Dict[str, int]]] = None, arg: Optional[str] = None):
+        self.arg = arg
         self.request = request
         self.key = key
         self.decoy_url = decoy_url
@@ -198,11 +199,73 @@ _FULL_USAGE = {"input_tokens": 21, "cache_creation_input_tokens": 340, "cache_re
 
 
 def _b_cite(ctx: RenderContext) -> Dict[str, Any]:
+    """Quotes the gold figure and the heir's name found in the system blocks. It understands the
+    rendered snapshot of the app ("Treasury: 312 gold; ..." and 'Heir: "Name"; ...') and, as a
+    fallback, plain "gold: N" / "heir: Name" lines. The usage numbers come from the cache emulator,
+    so a second request with the same system prefix reports cache_read_input_tokens."""
     text = ctx.system_text()
-    gold = re.search(r"(?im)^[ \t]*gold:[ \t]*(-?\d+)", text)
-    heir = re.search(r"(?im)^[ \t]*heir:[ \t]*(.+?)[ \t]*$", text)
-    parts = ["Gold is ", gold.group(1) if gold else "unknown", ". Heir is ", heir.group(1) if heir else "unknown", "."]
-    return {"steps": [_gen(text_parts=parts)]}
+    gold = (re.search(r"(?m)^Treasury:[ \t]*(-?\d+) gold", text)
+            or re.search(r"(?im)^[ \t]*gold:[ \t]*(-?\d+)", text))
+    heir = (re.search(r'(?m)^Heir:[ \t]*"([^"]*)"', text)
+            or re.search(r"(?im)^[ \t]*heir:[ \t]*(.+?)[ \t]*$", text))
+    parts = ["Gold is ", gold.group(1) if gold else "unknown", ". Heir is ",
+             heir.group(1) if heir else "unknown", "."]
+    return {"steps": [_gen(text_parts=parts, usage=dict(ctx.cache_usage(), output_tokens=12))]}
+
+
+def _b_echo_key_split(ctx: RenderContext) -> Dict[str, Any]:
+    """Streams the received key back in two text deltas, cut after ``arg`` characters of the key
+    (default 12), and puts the cut on a TCP boundary too: the first delta's bytes end exactly after
+    the first part of the key. A client must redact the joined text, not only each token."""
+    key = ctx.key or "no-key-received"
+    try:
+        offset = int(ctx.arg) if ctx.arg else 12
+    except ValueError:
+        offset = 12
+    offset = max(1, min(offset, len(key) - 1)) if len(key) > 1 else 1
+    first_text, second_text = "The key is " + key[:offset], key[offset:] + " and that is all."
+
+    def delta(text: str) -> Dict[str, Any]:
+        return {"type": "content_block_delta", "index": 0, "delta": {"type": "text_delta", "text": text}}
+
+    skeleton = answer_steps({"text_parts": ["x"]})  # start, block start, one delta, stop, delta, stop
+    steps = skeleton[:2]
+    first = sse("content_block_delta", delta(first_text))
+    wire = step_bytes(first) or b""
+    # Cut right after the key's first part inside the JSON string (before its closing quote).
+    cut = wire.index(first_text.encode("utf-8")) + len(first_text.encode("utf-8"))
+    first["chunks"] = [cut]
+    first["piece_delay_ms"] = 60
+    second = sse("content_block_delta", delta(second_text))
+    second["delay_ms"] = 60
+    return {"steps": steps + [first, second] + skeleton[-3:]}
+
+
+def _half_key_head(ctx: RenderContext) -> List[Dict[str, Any]]:
+    """message_start, a text block start and one delta holding only the first ``arg`` characters of
+    the received key (default 20): the stream is then cut, so the key never arrives whole."""
+    key = ctx.key or "no-key-received"
+    try:
+        offset = int(ctx.arg) if ctx.arg else 20
+    except ValueError:
+        offset = 20
+    offset = max(1, min(offset, len(key) - 1)) if len(key) > 1 else 1
+    skeleton = answer_steps({"text_parts": ["x"]})
+    delta = {"type": "content_block_delta", "index": 0,
+             "delta": {"type": "text_delta", "text": "The key is " + key[:offset]}}
+    return skeleton[:2] + [sse("content_block_delta", delta)]
+
+
+def _b_echo_key_half(ctx: RenderContext) -> Dict[str, Any]:
+    """The first part of the key in one delta, then silence until the client closes (a cancel
+    leaves the key cut in two)."""
+    return {"steps": _half_key_head(ctx) + [{"hold_ms": 120000, "until_client_close": True}]}
+
+
+def _b_echo_key_half_close(ctx: RenderContext) -> Dict[str, Any]:
+    """The first part of the key in one delta, then the connection is cut (a network error with
+    the key cut in two in the partial text)."""
+    return {"steps": _half_key_head(ctx) + [{"close": "truncate"}]}
 
 
 def _partial_stream(extra: Sequence[Dict[str, Any]], tokens: int = 3) -> List[Dict[str, Any]]:
@@ -284,6 +347,9 @@ BUILTINS: Dict[str, Union[Dict[str, Any], Callable[[RenderContext], Dict[str, An
     "redirect_307": {"status": 307, "headers": {"location": "{decoy_url}"},
                      "steps": [{"text": error_body("api_error", "Mock redirect")}]},
     "cite": _b_cite,
+    "echo_key_split": _b_echo_key_split,
+    "echo_key_half": _b_echo_key_half,
+    "echo_key_half_close": _b_echo_key_half_close,
     "cache_demo": _b_cache_demo,
 }
 
@@ -952,6 +1018,9 @@ class MockLlm:
         if isinstance(item, str):
             if item in BUILTINS:
                 return [(item, BUILTINS[item])]
+            base, _, arg = item.partition(":")
+            if arg and base in BUILTINS and callable(BUILTINS[base]):
+                return [(item, BUILTINS[base])]
             if item in self._named:
                 return [(item, self._named[item])]
             if os.path.isfile(item):
@@ -981,6 +1050,8 @@ class MockLlm:
             if isinstance(model, str) and model.startswith("mock:"):
                 name = model[len("mock:"):]
                 source = self._named.get(name, BUILTINS.get(name))
+                if source is None and ":" in name:
+                    source = BUILTINS.get(name.split(":", 1)[0])
                 return (name, source) if source is not None else ("unknown:" + name, None)
             if len(self._queue) > 1:
                 return self._queue.pop(0)  # the last one stays and repeats
@@ -1163,7 +1234,8 @@ class MockLlm:
                     usage = self.cache.usage(body_json)
                     self._update(rec, cache=usage)
                     return usage
-                ctx = RenderContext(body_json, key, self.decoy_url, cache_fn)
+                arg = name.split(":", 1)[1] if ":" in name else None
+                ctx = RenderContext(body_json, key, self.decoy_url, cache_fn, arg)
                 try:
                     scenario = resolve_scenario(source, ctx, name)
                 except ValueError as bad:

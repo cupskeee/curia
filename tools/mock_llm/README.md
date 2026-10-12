@@ -42,7 +42,7 @@ Windows, where a terminated process cannot say `DONE`).
 | `--list` | list the builtin scenario names |
 
 Scenario selection: a request whose JSON `model` starts with `mock:` plays the named scenario
-(builtin, or one added by name) and does not consume the queue; an unknown name is an HTTP 404 with
+(builtin, or one added by name; `mock:name:arg` and `--scenario name:arg` pass an argument to a builder that takes one, as `echo_key_split:20` does) and does not consume the queue; an unknown name is an HTTP 404 with
 an Anthropic-style error body. Otherwise the queue is used.
 
 ## Scenarios
@@ -102,7 +102,10 @@ chunk sizes.
 | `echo_key` | reflects the received key into a text delta and into an SSE `error` event (HTTP 200) |
 | `echo_key_http` | reflects the received key into the message of an HTTP 401 error body |
 | `redirect_307` | `307` with `Location: <decoy url>` |
-| `cite` | reads the `system` text blocks for lines `gold: <n>` and `heir: <name>` and quotes them: proves the snapshot reached the request |
+| `cite` | reads the `system` text blocks for the gold figure and the heir's name and quotes them ("Gold is 312. Heir is Test Heir Two."), proving the snapshot reached the request. It understands the app's rendered snapshot (`Treasury: 312 gold ...`, `Heir: "Name"; ...`) and, as a fallback, plain `gold: N` / `heir: Name` lines. Its usage numbers come from the cache emulator, so a second request with the same system prefix reports `cache_read_input_tokens` |
+| `echo_key_split` (`echo_key_split:N`) | streams the received key back in two `text_delta` events, cut after N characters of the key (default 12), and the first event's bytes also end on a TCP piece boundary right after the key's first part. Neither event holds the whole key: a client must redact the joined text. (The cut is found in the wire bytes, so a key with a quote or backslash, which JSON escapes, is not supported.) |
+| `echo_key_half` (`echo_key_half:N`) | one `text_delta` with the first N characters of the received key (default 20), then silence until the client closes: a cancel leaves the key cut in two |
+| `echo_key_half_close` (`echo_key_half_close:N`) | the same first part, then the connection is cut: a network error whose partial text holds half a key |
 | `cache_demo` | like `basic`, usage from the cache emulator |
 | `basic_close_framing`, `unicode_escaped` | `basic` with `Connection: close` framing; the UTF-8 text with `\u` escapes |
 

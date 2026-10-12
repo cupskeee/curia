@@ -26,6 +26,17 @@ struct DevConfig {
     // What is wrong with a variable that is set but unusable, or why nothing was read. Each entry
     // names the variable and the rule, never the value.
     std::vector<std::string> problems;
+
+    // CURIA_LOG_CONTENT=1 (exactly "1"): the headless chat writes a transcript of each question
+    // and answer into transcriptDir (core/transcript_writer.h). Off unless asked for; the app log
+    // never holds content either way.
+    bool logContent = false;
+    // CURIA_TRANSCRIPT_DIR: where transcripts go instead of the default folder under the home
+    // directory (rules in core/transcript_writer.h).
+    std::optional<std::string> transcriptDir;
+    // Notes about settings that are set but ignored (a wrong value for CURIA_LOG_CONTENT). Not
+    // reasons to refuse to run; never hold a value.
+    std::vector<std::string> warnings;
 };
 
 // The problem recorded in a build without CURIA_ENABLE_DEV_ENV.
@@ -48,5 +59,15 @@ DevConfig loadDevConfig();
 // The message for the chat view when the key or the model is missing or unusable: it names the
 // variables and the rules, never a value. Empty if both are present.
 std::string describeNotConfigured(const DevConfig& config);
+
+// The names of the variables that stop Curia from talking to the service: the key and the model
+// when they are missing or unusable (both in a build without CURIA_ENABLE_DEV_ENV). Names only,
+// never a value. Empty when the configuration is complete. This is the one way for other code to
+// name the variables.
+std::vector<std::string> missingVariables(const DevConfig& config);
+
+// The names of the two variables, for messages that must tell the owner which one to fix.
+std::string_view keyVariableName();
+std::string_view modelVariableName();
 
 }  // namespace curia

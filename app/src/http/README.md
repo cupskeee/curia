@@ -43,8 +43,12 @@ keep building without it.
   batch it is in, ends what is still in flight (`End::Shutdown` callbacks can run once more) and
   frees the state. The provider mutes its handlers first, so none of them runs after its destructor
   has started.
-- Redaction: tokens are redacted one by one, so a key the server splits over two tokens is not
-  caught there; whoever joins the tokens into text (the UI, PR 6) redacts the joined text as well.
+- Redaction: a token only loses a registered key that lies whole inside it (shapes are not applied
+  to a piece: the front of a key that continues in the next token would be replaced alone and the
+  rest of the key would stay in the clear). A key the server splits over two tokens passes as it
+  is, so whoever joins the tokens into text (`ChatSession`) redacts the joined text with
+  `redact()` and the final text with `redactFinal()`, which also cuts a key that the end of the
+  stream split. The error message and the partial text of an error are redacted whole here.
 - Memory is bounded: the client keeps no body (the consumer decides; the provider keeps the SSE
   parser's bounded buffers and at most 32 KiB of an error body).
 
@@ -65,3 +69,5 @@ keep building without it.
   what closed the socket), key secrecy, no redirect, no proxy, the auth fallback, deterministic request
   bytes and the cache emulation.
 - `curia_chat_probe` (`app/tools/chat_probe.cpp`) prints one JSON object per event; see its header.
+- `chat_e2e` and `e2e_secrecy` (`app/tests/chat_e2e.py`): the whole chain through `curia --headless-chat` and `curia --check-api` (library `curia_headless`, `app/src/headless/`), with the key, redirect and proxy checks described in the file header.
+- The provider reports the numbers of each connection (`AnthropicProviderOptions::onNetDone`: status, whether the CA fallback was used, connect and total times) for `--check-api`; it never carries text.

@@ -94,6 +94,22 @@ public:
 
     std::string redact(std::string_view text) const;
 
+    // Only (a): the registered secrets, nothing shaped. For a piece of a stream, where a shape can
+    // match the front of a key that continues in the next piece and so hide the key's start while
+    // its end stays in the clear; the joined text is then redacted with redact().
+    std::string redactRegistered(std::string_view text) const;
+
+    // A trailing run of at least this many bytes that is the start of a registered secret is an
+    // unfinished key.
+    static constexpr std::size_t kMinPartialSecretBytes = 6;
+
+    // redact() for text that is final (the stream ended, was cut or failed): also cuts an
+    // unfinished key off the end, because a key that was cut in two by the end of the stream can
+    // not be recognised by redact(). Cut: the end of the text when it is the first
+    // kMinPartialSecretBytes or more bytes of a registered secret, or "sk-ant-" with fewer than 16
+    // key characters after it. At most 5 bytes of a registered key can survive.
+    std::string redactFinal(std::string_view text) const;
+
 private:
     void rebuildLocked();
 
@@ -104,5 +120,9 @@ private:
 
 // redact() with the process-wide registry.
 std::string redact(std::string_view text);
+// redactRegistered() with the process-wide registry.
+std::string redactRegistered(std::string_view text);
+// redactFinal() with the process-wide registry.
+std::string redactFinal(std::string_view text);
 
 }  // namespace curia

@@ -52,10 +52,15 @@ add_library(curia_core STATIC
     src/core/build_info.cpp
     src/core/app_controller.cpp
     src/core/app_log.cpp
+    src/core/check_api_report.cpp
     src/core/cli.cpp
     src/core/dev_config.cpp
+    src/core/headless_chat.cpp
+    src/core/headless_commands.cpp
+    src/core/json_lines.cpp
     src/core/redact.cpp
     src/core/secret.cpp
+    src/core/transcript_writer.cpp
     src/core/ui_message.cpp
     src/core/ui_pacing.cpp
     src/core/watch_log.cpp
@@ -129,11 +134,19 @@ if(CURIA_BUILD_APP)
     endif()
     curia_configure_target(curia_http)
 
+    # The headless modes of the curia executable (--headless-chat, --check-api): the shared logic is
+    # in curia_core, this adds the Anthropic provider and the endpoint. No SDL.
+    add_library(curia_headless STATIC
+        src/headless/check_api.cpp
+        src/headless/headless_modes.cpp)
+    target_link_libraries(curia_headless PUBLIC curia_http)
+    curia_configure_target(curia_headless)
+
     add_executable(curia
         src/main.cpp
         src/app.cpp
         src/ui/sdl_renderer_backend.cpp)
-    target_link_libraries(curia PRIVATE curia_core SDL3::SDL3 imgui::imgui)
+    target_link_libraries(curia PRIVATE curia_core curia_headless SDL3::SDL3 imgui::imgui)
     curia_configure_target(curia)
 
     # Small tool used by CI to prove TLS works with the chosen libcurl configuration (milestone M1, A16).
@@ -219,13 +232,18 @@ if(CURIA_BUILD_TESTS)
         tests/test_bridge_robustness.cpp
         tests/test_bridge_splitter.cpp
         tests/test_build_info.cpp
+        tests/test_check_api_report.cpp
         tests/test_cli.cpp
         tests/test_app_log.cpp
         tests/test_ca_bundle.cpp
         tests/test_dev_config.cpp
         tests/test_endpoint_policy.cpp
+        tests/test_headless_chat.cpp
+        tests/test_headless_commands.cpp
+        tests/test_json_lines.cpp
         tests/test_redact.cpp
         tests/test_secret.cpp
+        tests/test_transcript_writer.cpp
         tests/test_log_tailer.cpp
         tests/test_log_watcher.cpp
         tests/test_mailbox.cpp
@@ -297,8 +315,7 @@ if(CURIA_BUILD_APP AND CURIA_BUILD_TESTS)
     doctest_discover_tests(curia_http_tests PROPERTIES LABELS unit)
 
     if(Python3_Interpreter_FOUND)
-        # fake CK3 -> curia --watch-log -> golden events. The mock-LLM leg of the chain
-        # (tools/mock_llm) arrives with the headless chat (M4 PR 6).
+        # fake CK3 -> curia --watch-log -> golden events. The chain with the mock LLM is chat_e2e below.
         add_test(NAME e2e_fake_ck3
                  COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/fake_ck3/e2e_test.py
                          --curia $<TARGET_FILE:curia>
@@ -314,10 +331,25 @@ if(CURIA_BUILD_APP AND CURIA_BUILD_TESTS)
                              --probe $<TARGET_FILE:curia_chat_probe>
                              --mock ${PROJECT_SOURCE_DIR}/tools/mock_llm/mock_llm.py)
             set_tests_properties(provider_mock PROPERTIES LABELS "e2e;provider" TIMEOUT 300)
+
+            # fake CK3 -> curia --headless-chat -> mock LLM, and the same chain with a random fake key
+            # that must appear nowhere (tests/chat_e2e.py).
+            add_test(NAME chat_e2e
+                     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/chat_e2e.py
+                             --suite chat --curia $<TARGET_FILE:curia>
+                             --mock ${PROJECT_SOURCE_DIR}/tools/mock_llm/mock_llm.py
+                             --fake-ck3 ${PROJECT_SOURCE_DIR}/tools/fake_ck3/fake_ck3.py)
+            set_tests_properties(chat_e2e PROPERTIES LABELS "e2e;chat" TIMEOUT 600)
+            add_test(NAME e2e_secrecy
+                     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/chat_e2e.py
+                             --suite secrecy --curia $<TARGET_FILE:curia>
+                             --mock ${PROJECT_SOURCE_DIR}/tools/mock_llm/mock_llm.py
+                             --fake-ck3 ${PROJECT_SOURCE_DIR}/tools/fake_ck3/fake_ck3.py)
+            set_tests_properties(e2e_secrecy PROPERTIES LABELS "e2e;secrecy" TIMEOUT 600)
         else()
-            message(STATUS "CURIA_ENABLE_DEV_ENV is OFF: the end-to-end test provider_mock is not registered")
+            message(STATUS "CURIA_ENABLE_DEV_ENV is OFF: the end-to-end tests provider_mock, chat_e2e and e2e_secrecy are not registered")
         endif()
     else()
-        message(STATUS "Python 3 not found: the end-to-end tests e2e_fake_ck3 and provider_mock are not registered")
+        message(STATUS "Python 3 not found: the end-to-end tests e2e_fake_ck3, provider_mock, chat_e2e and e2e_secrecy are not registered")
     endif()
 endif()

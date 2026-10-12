@@ -4,6 +4,8 @@
 #include <charconv>
 #include <string_view>
 
+#include "core/redact.h"
+
 namespace curia {
 
 namespace {
@@ -16,6 +18,106 @@ bool parseWholeNumber(std::string_view text, int min, int max, int& out) {
         return false;
     }
     out = value;
+    return true;
+}
+
+// An argument that is safe to repeat in an error message: a flag-shaped word of reasonable
+// length, with anything key-shaped scrubbed. A stray positional word is never repeated (a key
+// pasted by mistake must not be echoed back).
+std::string describeArgument(std::string_view arg) {
+    if (arg.size() > 2 && arg.substr(0, 2) == "--" && arg.size() <= 40) {
+        return redact(arg);
+    }
+    return "(not a recognised option)";
+}
+
+// Reads the value of a flag that takes a number. Returns false (and sets `error`) if it is
+// missing or out of range.
+bool numberFlag(int argc, const char* const* argv, int& i, std::string_view flag, int min, int max,
+                int& out, std::string& error) {
+    if (i + 1 >= argc || !parseWholeNumber(argv[i + 1], min, max, out)) {
+        error = std::string(flag) + " needs a whole number between " + std::to_string(min) +
+                " and " + std::to_string(max);
+        return false;
+    }
+    ++i;
+    return true;
+}
+
+bool optionalNumberFlag(int argc, const char* const* argv, int& i, std::string_view flag, int min,
+                        int max, std::optional<int>& out, std::string& error) {
+    int value = 0;
+    if (!numberFlag(argc, argv, i, flag, min, max, value, error)) {
+        return false;
+    }
+    out = value;
+    return true;
+}
+
+bool textFlag(int argc, const char* const* argv, int& i, std::string_view flag, std::string& out,
+              std::string& error) {
+    if (i + 1 >= argc || std::string_view(argv[i + 1]).empty()) {
+        error = std::string(flag) + " needs a value";
+        return false;
+    }
+    out = argv[++i];
+    return true;
+}
+
+int modeCount(const CliOptions& o) {
+    int count = 0;
+    count += o.smoke ? 1 : 0;
+    count += o.idleSeconds > 0 ? 1 : 0;
+    count += !o.watchLogPath.empty() ? 1 : 0;
+    count += o.headlessChat ? 1 : 0;
+    count += o.checkApi ? 1 : 0;
+    return count;
+}
+
+bool validate(const CliOptions& out, std::string& error) {
+    if (out.smoke && out.idleSeconds > 0) {
+        error = "--smoke and --idle-test cannot be combined";
+        return false;
+    }
+    if (modeCount(out) > 1) {
+        error = "only one of --smoke, --idle-test, --watch-log, --headless-chat and --check-api "
+                "can be used at a time";
+        return false;
+    }
+    const bool watch = !out.watchLogPath.empty();
+    if (!watch && out.maxFrames > 0) {
+        error = "--max-frames needs --watch-log";
+        return false;
+    }
+    if (!watch && !out.headlessChat && (out.fromStart || out.timeoutSeconds > 0)) {
+        error = "--from-start and --timeout-seconds need --watch-log or --headless-chat";
+        return false;
+    }
+    if (out.headlessChat && out.logPath.empty()) {
+        error = "--headless-chat needs --log <path of the game's debug.log>";
+        return false;
+    }
+    const bool headlessOnly = !out.logPath.empty() || out.frameSnap.has_value() ||
+                              out.maxTokens > 0 || out.showThinking || out.hasTestOnlyOptions();
+    if (!out.headlessChat && headlessOnly) {
+        error = "--log, --frame, --max-tokens, --show-thinking and the test-only timing options "
+                "need --headless-chat";
+        return false;
+    }
+    if (out.frameSnap.has_value() && !out.fromStart) {
+        error = "--frame needs --from-start (without it the log is read from its end, so no "
+                "earlier snapshot is ever seen)";
+        return false;
+    }
+    if (out.cacheProbe && !out.checkApi) {
+        error = "--cache-probe needs --check-api";
+        return false;
+    }
+    if (!out.headlessChat && !out.checkApi &&
+        (!out.testEndpoint.empty() || out.auth != AuthMode::Bearer || !out.appLogDir.empty())) {
+        error = "--test-endpoint, --auth and --log-dir need --headless-chat or --check-api";
+        return false;
+    }
     return true;
 }
 
@@ -58,30 +160,86 @@ bool parseCli(int argc, const char* const* argv, CliOptions& out, std::string& e
                 error = "--timeout-seconds needs a whole number of seconds between 1 and 86400";
                 return false;
             }
+        } else if (arg == "--headless-chat") {
+            out.headlessChat = true;
+        } else if (arg == "--log") {
+            if (!textFlag(argc, argv, i, arg, out.logPath, error)) {
+                return false;
+            }
+        } else if (arg == "--frame") {
+            if (!optionalNumberFlag(argc, argv, i, arg, 1, 2147483647, out.frameSnap, error)) {
+                return false;
+            }
+        } else if (arg == "--max-tokens") {
+            if (!numberFlag(argc, argv, i, arg, 1, 64000, out.maxTokens, error)) {
+                return false;
+            }
+        } else if (arg == "--show-thinking") {
+            out.showThinking = true;
+        } else if (arg == "--check-api") {
+            out.checkApi = true;
+        } else if (arg == "--cache-probe") {
+            out.cacheProbe = true;
+        } else if (arg == "--test-endpoint") {
+            if (!textFlag(argc, argv, i, arg, out.testEndpoint, error)) {
+                return false;
+            }
+        } else if (arg == "--auth") {
+            if (i + 1 >= argc) {
+                error = "--auth needs bearer or x-api-key";
+                return false;
+            }
+            const std::string_view value = argv[++i];
+            if (value == "bearer") {
+                out.auth = AuthMode::Bearer;
+            } else if (value == "x-api-key") {
+                out.auth = AuthMode::XApiKey;
+            } else {
+                error = "--auth needs bearer or x-api-key";
+                return false;
+            }
+        } else if (arg == "--log-dir") {
+            if (!textFlag(argc, argv, i, arg, out.appLogDir, error)) {
+                return false;
+            }
+        } else if (arg == "--armed-wait-ms") {
+            if (!optionalNumberFlag(argc, argv, i, arg, 1, 3600000, out.armedWaitMs, error)) {
+                return false;
+            }
+        } else if (arg == "--arm-snapshot-age-ms") {
+            if (!optionalNumberFlag(argc, argv, i, arg, 0, 3600000, out.armSnapshotAgeMs, error)) {
+                return false;
+            }
+        } else if (arg == "--passive-silence-ms") {
+            if (!optionalNumberFlag(argc, argv, i, arg, 1, 3600000, out.passiveSilenceMs, error)) {
+                return false;
+            }
+        } else if (arg == "--tick-ms") {
+            if (!optionalNumberFlag(argc, argv, i, arg, 1, 60000, out.tickMs, error)) {
+                return false;
+            }
+        } else if (arg == "--poll-ms") {
+            if (!optionalNumberFlag(argc, argv, i, arg, 1, 60000, out.pollMs, error)) {
+                return false;
+            }
+        } else if (arg == "--selftest-throw") {
+            out.selftestThrow = true;
         } else {
-            error = "unknown argument: " + std::string(arg);
+            error = "unknown argument: " + describeArgument(arg);
             return false;
         }
     }
-    if (out.smoke && out.idleSeconds > 0) {
-        error = "--smoke and --idle-test cannot be combined";
-        return false;
-    }
-    if (!out.watchLogPath.empty() && (out.smoke || out.idleSeconds > 0)) {
-        error = "--watch-log cannot be combined with --smoke or --idle-test";
-        return false;
-    }
-    if (out.watchLogPath.empty() &&
-        (out.fromStart || out.maxFrames > 0 || out.timeoutSeconds > 0)) {
-        error = "--from-start, --max-frames and --timeout-seconds need --watch-log";
-        return false;
-    }
-    return true;
+    return validate(out, error);
 }
 
 std::string_view cliUsage() {
     return "Usage: curia [--smoke | --idle-test <seconds> | --watch-log <path> [--from-start]\n"
            "             [--max-frames <n>] [--timeout-seconds <s>]] [--version] [--help]\n"
+           "       curia --headless-chat --log <path> [--from-start] [--frame <snap>]\n"
+           "             [--test-endpoint <url>] [--auth bearer|x-api-key] [--max-tokens <n>]\n"
+           "             [--show-thinking] [--log-dir <dir>] [--timeout-seconds <s>]\n"
+           "       curia --check-api [--cache-probe] [--auth bearer|x-api-key]\n"
+           "             [--test-endpoint <url>] [--log-dir <dir>]\n"
            "  --smoke              open a window, render 3 frames, exit (CI smoke test)\n"
            "  --idle-test <sec>    run the event loop and check that nothing renders while idle\n"
            "  --watch-log <path>   no window: tail a log file and print one JSON object per\n"
@@ -89,6 +247,22 @@ std::string_view cliUsage() {
            "                       file unless --from-start. Exit 0 after --max-frames complete\n"
            "                       frames, or at the timeout when no frame count was asked for\n"
            "                       (default 60 s); exit 3 on a timeout before the frames\n"
+           "  --headless-chat      no window: read the game's log like the app, answer questions\n"
+           "                       typed as commands on stdin (ask <text>, cancel, arm, refresh,\n"
+           "                       retry, ck3 running|stopped, quit; end of input quits once the\n"
+           "                       work is done), print one JSON object per event. The API key "
+           "and\n"
+           "                       the model come from the environment (development builds).\n"
+           "                       --from-start reads the log from its beginning and uses its\n"
+           "                       newest complete snapshot (--frame <n> picks snapshot n);\n"
+           "                       without it the run attaches at the end of the log and has no\n"
+           "                       snapshot until the game writes one\n"
+           "                       Exit 0 ok, 1 an answer failed, 2 bad arguments or not\n"
+           "                       configured (nothing sent), 3 timeout, 4 internal error\n"
+           "  --check-api          print the result of each step of a connection check against\n"
+           "                       the real service (key, model, TLS, sign-in header, one tiny\n"
+           "                       answer; --cache-probe also tests the prompt cache). Exit 0 ok,\n"
+           "                       1 a step failed, 2 not configured, 3 timeout\n"
            "  --version            print build information as JSON\n";
 }
 

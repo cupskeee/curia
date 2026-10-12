@@ -91,3 +91,107 @@ TEST_CASE("--watch-log conflicts with the window modes, and its options need it"
     CHECK_FALSE(parse({"--max-frames", "2"}, options, error));
     CHECK_FALSE(parse({"--timeout-seconds", "2"}, options, error));
 }
+
+TEST_CASE("--headless-chat and its options") {
+    curia::CliOptions options;
+    std::string error;
+    CHECK_FALSE(parse({"--headless-chat"}, options, error));  // needs --log
+    CHECK(parse({"--headless-chat", "--log", "debug.log"}, options, error));
+    CHECK(options.headlessChat);
+    CHECK(options.logPath == "debug.log");
+    CHECK_FALSE(options.frameSnap.has_value());
+    CHECK(options.auth == curia::AuthMode::Bearer);
+    CHECK(parse({"--headless-chat", "--log", "d.log", "--from-start", "--frame", "12",
+                 "--max-tokens", "300", "--show-thinking", "--test-endpoint", "http://127.0.0.1:1",
+                 "--auth", "x-api-key", "--log-dir", "logs", "--timeout-seconds", "30"},
+                options, error));
+    CHECK(options.fromStart);
+    CHECK(options.frameSnap == 12);
+    CHECK(options.maxTokens == 300);
+    CHECK(options.showThinking);
+    CHECK(options.testEndpoint == "http://127.0.0.1:1");
+    CHECK(options.auth == curia::AuthMode::XApiKey);
+    CHECK(options.appLogDir == "logs");
+    CHECK(options.timeoutSeconds == 30);
+    CHECK_FALSE(options.hasTestOnlyOptions());
+}
+
+TEST_CASE("--headless-chat: bad values and misplaced options") {
+    curia::CliOptions options;
+    std::string error;
+    const std::vector<const char*> base = {"--headless-chat", "--log", "d.log"};
+    auto with = [&](std::vector<const char*> extra) {
+        std::vector<const char*> args = base;
+        args.insert(args.end(), extra.begin(), extra.end());
+        return parse(args, options, error);
+    };
+    // A snapshot number is only found by reading the log from its start.
+    CHECK_FALSE(with({"--frame", "3"}));
+    CHECK(error.find("--from-start") != std::string::npos);
+    CHECK(with({"--from-start", "--frame", "3"}));
+    CHECK_FALSE(with({"--frame", "0"}));
+    CHECK_FALSE(with({"--frame", "x"}));
+    CHECK_FALSE(with({"--max-tokens", "0"}));
+    CHECK_FALSE(with({"--max-tokens", "64001"}));
+    CHECK_FALSE(with({"--auth", "basic"}));
+    CHECK_FALSE(with({"--auth"}));
+    CHECK_FALSE(with({"--log-dir", ""}));
+    CHECK_FALSE(with({"--smoke"}));
+    CHECK_FALSE(with({"--check-api"}));
+    // The options belong to the modes that use them.
+    CHECK_FALSE(parse({"--log", "d.log"}, options, error));
+    CHECK_FALSE(parse({"--frame", "3"}, options, error));
+    CHECK_FALSE(parse({"--test-endpoint", "http://127.0.0.1:1"}, options, error));
+    CHECK_FALSE(parse({"--smoke", "--log-dir", "x"}, options, error));
+}
+
+TEST_CASE("test-only timing options are parsed and flagged") {
+    curia::CliOptions options;
+    std::string error;
+    CHECK(parse({"--headless-chat", "--log", "d.log", "--armed-wait-ms", "700",
+                 "--arm-snapshot-age-ms", "0", "--passive-silence-ms", "900", "--tick-ms", "20",
+                 "--poll-ms", "30"},
+                options, error));
+    CHECK(options.armedWaitMs == 700);
+    CHECK(options.armSnapshotAgeMs == 0);
+    CHECK(options.passiveSilenceMs == 900);
+    CHECK(options.tickMs == 20);
+    CHECK(options.pollMs == 30);
+    CHECK(options.hasTestOnlyOptions());
+    CHECK(parse({"--headless-chat", "--log", "d.log", "--selftest-throw"}, options, error));
+    CHECK(options.selftestThrow);
+    CHECK(options.hasTestOnlyOptions());
+    CHECK_FALSE(parse({"--headless-chat", "--log", "d.log", "--tick-ms", "0"}, options, error));
+    CHECK_FALSE(parse({"--armed-wait-ms", "5"}, options, error));
+    CHECK_FALSE(parse({"--selftest-throw"}, options, error));
+}
+
+TEST_CASE("--check-api and --cache-probe") {
+    curia::CliOptions options;
+    std::string error;
+    CHECK(parse({"--check-api"}, options, error));
+    CHECK(options.checkApi);
+    CHECK_FALSE(options.cacheProbe);
+    CHECK(parse({"--check-api", "--cache-probe", "--auth", "x-api-key", "--test-endpoint",
+                 "http://127.0.0.1:9", "--log-dir", "d"},
+                options, error));
+    CHECK(options.cacheProbe);
+    CHECK(options.auth == curia::AuthMode::XApiKey);
+    CHECK_FALSE(parse({"--cache-probe"}, options, error));
+    CHECK_FALSE(parse({"--check-api", "--smoke"}, options, error));
+    CHECK_FALSE(parse({"--check-api", "--max-tokens", "5"}, options, error));
+    CHECK_FALSE(parse({"--check-api", "--from-start"}, options, error));
+}
+
+TEST_CASE("an unknown positional word is never repeated in the error") {
+    curia::CliOptions options;
+    std::string error;
+    const std::string stray = std::string("sk-ant-") + "FAKE0123456789abcdefgh";
+    CHECK_FALSE(parse({stray.c_str()}, options, error));
+    CHECK(error.find("FAKE") == std::string::npos);
+    CHECK_FALSE(parse({"--nope"}, options, error));
+    CHECK(error.find("--nope") != std::string::npos);
+    const std::string flagLike = "--" + stray;
+    CHECK_FALSE(parse({flagLike.c_str()}, options, error));
+    CHECK(error.find("FAKE0123") == std::string::npos);
+}

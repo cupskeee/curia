@@ -12,6 +12,8 @@ constexpr const char* kKeyVariable = "CURIA_ANTHROPIC_API_KEY";
 constexpr const char* kModelVariable = "CURIA_MODEL";
 
 #if defined(CURIA_ENABLE_DEV_ENV)
+constexpr const char* kLogContentVariable = "CURIA_LOG_CONTENT";
+constexpr const char* kTranscriptDirVariable = "CURIA_TRANSCRIPT_DIR";
 constexpr std::size_t kMaxKeyBytes = 4096;
 constexpr std::size_t kMaxModelBytes = 128;
 
@@ -22,6 +24,23 @@ constexpr std::string_view kKeyNotRegisteredRule =
     "CURIA_ANTHROPIC_API_KEY is not usable: it cannot be protected from the logs";
 constexpr std::string_view kModelRule =
     "CURIA_MODEL is not usable: it must be 1 to 128 characters from letters, digits and . _ : -";
+constexpr std::string_view kLogContentWarning =
+    "CURIA_LOG_CONTENT is ignored: it only counts when it is exactly 1";
+constexpr std::string_view kTranscriptDirWarning =
+    "CURIA_TRANSCRIPT_DIR is ignored: it must be 1 to 4096 characters without control characters";
+constexpr std::size_t kMaxPathBytes = 4096;
+
+bool validPathText(const std::string& value) {
+    if (value.empty() || value.size() > kMaxPathBytes) {
+        return false;
+    }
+    for (const char ch : value) {
+        if (static_cast<unsigned char>(ch) < 0x20 || ch == 0x7f) {
+            return false;
+        }
+    }
+    return true;
+}
 
 bool validKey(const std::string& value) {
     if (value.size() < SecretRegistry::kMinSecretBytes || value.size() > kMaxKeyBytes) {
@@ -115,6 +134,20 @@ DevConfig loadDevConfig(const platform::GetEnv& getenv, SecretRegistry& registry
             config.problems.emplace_back(kModelRule);
         }
     }
+    const std::string logContent = getenv(kLogContentVariable);
+    if (logContent == "1") {
+        config.logContent = true;
+    } else if (!logContent.empty() && logContent != "0") {
+        config.warnings.emplace_back(kLogContentWarning);
+    }
+    std::string transcriptDir = getenv(kTranscriptDirVariable);
+    if (!transcriptDir.empty()) {
+        if (validPathText(transcriptDir)) {
+            config.transcriptDir = std::move(transcriptDir);
+        } else {
+            config.warnings.emplace_back(kTranscriptDirWarning);
+        }
+    }
 #else
     // Not even a lookup: a release build must not look at these variables.
     (void)getenv;
@@ -157,6 +190,29 @@ std::string describeNotConfigured(const DevConfig& config) {
         message += " Set them in the environment that starts Curia, then start it again.";
     }
     return message;
+}
+
+std::string_view keyVariableName() {
+    return kKeyVariable;
+}
+
+std::string_view modelVariableName() {
+    return kModelVariable;
+}
+
+std::vector<std::string> missingVariables(const DevConfig& config) {
+    std::vector<std::string> missing;
+    if (!config.apiKey.has_value()) {
+        missing.emplace_back(kKeyVariable);
+    }
+    if (!config.model.has_value()) {
+        missing.emplace_back(kModelVariable);
+    }
+    if (hasProblemAbout(config, kDevConfigDisabledProblem) && missing.empty()) {
+        missing.emplace_back(kKeyVariable);
+        missing.emplace_back(kModelVariable);
+    }
+    return missing;
 }
 
 }  // namespace curia

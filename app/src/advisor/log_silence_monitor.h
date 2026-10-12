@@ -25,14 +25,16 @@ enum class Notice {
 
 const char* toString(Notice notice) noexcept;
 
+// The values are in milliseconds so that the headless end-to-end tests can use thresholds of a
+// fraction of a second; the app's defaults are 120 s, 15 s and 10 minutes.
 struct LogSilenceConfig {
     // Armed detector: the snapshot must be at least this old when the overlay is opened by the
     // player (a younger one is fresh enough) ...
-    std::chrono::seconds armSnapshotAge{120};
+    std::chrono::milliseconds armSnapshotAge{120000};
     // ... and no frame may arrive within this time of the opening.
-    std::chrono::seconds armWait{15};
+    std::chrono::milliseconds armWait{15000};
     // Passive detector: the log grew earlier and has been silent for this long.
-    std::chrono::seconds passiveSilence{600};
+    std::chrono::milliseconds passiveSilence{600000};
 };
 
 // A pure state machine over an injected clock: the inputs say what happened, notice() says what to

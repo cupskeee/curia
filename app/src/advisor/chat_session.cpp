@@ -86,7 +86,12 @@ std::string ChatSession::scrub(std::string_view text) const {
 }
 
 void ChatSession::showAnswer(bool final) {
-    std::string shown = scrub(rawAnswer_);
+    // The final text also loses a key that the end of the stream cut in two (cancel, a dropped
+    // connection, an error): redact() needs the whole key to know it.
+    std::string shown =
+        final ? (options_.registry != nullptr ? options_.registry->redactFinal(rawAnswer_)
+                                              : curia::redactFinal(rawAnswer_))
+              : scrub(rawAnswer_);
     if (!final) {
         // The start of a key that is still arriving looks like a word: wait for its end.
         std::size_t end = shown.size();

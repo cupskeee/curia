@@ -183,6 +183,30 @@ TEST_CASE("anthropic-provider: a refused connection is a retryable network error
     CHECK(outcome.terminals.load() == 1);
 }
 
+TEST_CASE("anthropic-provider: the connection's numbers are reported once per request") {
+    std::promise<curia::http::NetSummary> summary;
+    std::atomic<int> calls{0};
+    AnthropicProviderOptions options;
+    options.onNetDone = [&](const curia::http::NetSummary& value) {
+        if (++calls == 1) {
+            summary.set_value(value);
+        }
+    };
+    AnthropicProvider provider(testEndpoint(1), keyForProvider(), options);
+    Outcome outcome;
+    auto future = outcome.error.get_future();
+    provider.streamChat(oneQuestion(), outcome.handlers(), CancelToken{});
+    REQUIRE(future.wait_for(10s) == std::future_status::ready);
+    auto netFuture = summary.get_future();
+    REQUIRE(netFuture.wait_for(10s) == std::future_status::ready);
+    const curia::http::NetSummary net = netFuture.get();
+    CHECK(net.httpStatus == 0);
+    CHECK(net.curlCode != 0);
+    CHECK_FALSE(net.tlsRetried);
+    CHECK(net.connectMs == -1);
+    CHECK(calls.load() == 1);
+}
+
 #if !defined(_WIN32)
 
 TEST_CASE("anthropic-provider: destroying the provider mid-request calls no handler and closes the "
