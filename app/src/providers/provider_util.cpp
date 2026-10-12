@@ -89,7 +89,7 @@ std::optional<nlohmann::json> parseBoundedJson(std::string_view text, std::size_
     if (value.is_discarded()) {
         return std::nullopt;
     }
-    // Construct in place: GCC finds the implicit optional<json> conversion ambiguous under -Wconversion.
+    // In place: GCC finds the implicit optional<json> conversion ambiguous under -Wconversion.
     std::optional<nlohmann::json> result;
     result.emplace(std::move(value));
     return result;
