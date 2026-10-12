@@ -1,0 +1,16 @@
+{
+  "error": {
+    "code": "Other",
+    "httpStatus": 0,
+    "message": "malformed event from the server",
+    "partialText": "",
+    "requestId": "msg_mock0001",
+    "retryable": false
+  },
+  "statuses": [
+    "TextStarted"
+  ],
+  "terminal": "error",
+  "text": "",
+  "tokens": []
+}

@@ -1,0 +1,12 @@
+8nEevent: message_start
+data: {"type":"message_start","message":{"id":"msg_mock0001","type":"message","role":"assistant","model":"mock-model-1","content":[],"stop_reason":null}}
+
+event: content_block_start
+data: {"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":""}}
+
+event: content_block_delta
+data: {"delta":{"type":"thinking_delta","thinking":"â‚"}}
+
+event: message_stop
+data: {"type":"message_stop"}
+

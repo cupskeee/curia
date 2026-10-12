@@ -1,0 +1,9 @@
+0zQevent: message_start
+data: {"type":"message_start","message":{"id":"msg_mock0001","type":"message","role":"assistant","model":"mock-model-1","content":[],"stop_reason":null}}
+
+event: content_block_delta
+data: {"delta":{"type":"text_delta","text":5}}
+
+event: message_stop
+data: {"type":"message_stop"}
+

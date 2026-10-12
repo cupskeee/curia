@@ -1,0 +1,9 @@
+0vMevent: message_start
+data: {"type":"message_start","message":{"id":"msg_mock0001","type":"message","role":"assistant","model":"mock-model-1","content":[],"stop_reason":null}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"a"}}
+
+event: error
+data: {"type":"error","request_id":"req_mock_0001","error":{"type":"rate_limit_error","message":"Slow down"}}
+

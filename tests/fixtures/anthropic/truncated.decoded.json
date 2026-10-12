@@ -1,0 +1,25 @@
+{
+  "error": {
+    "code": "Network",
+    "httpStatus": 0,
+    "message": "the connection ended before the answer was complete",
+    "partialText": "Test token 1.Test token 2.",
+    "requestId": "msg_mock0001",
+    "retryable": true
+  },
+  "statuses": [
+    "TextStarted"
+  ],
+  "terminal": "error",
+  "text": "Test token 1.Test token 2.",
+  "tokens": [
+    {
+      "kind": "Text",
+      "text": "Test token 1."
+    },
+    {
+      "kind": "Text",
+      "text": "Test token 2."
+    }
+  ]
+}

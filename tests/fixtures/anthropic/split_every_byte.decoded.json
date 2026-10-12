@@ -1,0 +1,32 @@
+{
+  "statuses": [
+    "TextStarted"
+  ],
+  "terminal": "done",
+  "text": "Test café costs €5 and 😀 done.",
+  "tokens": [
+    {
+      "kind": "Text",
+      "text": "Test café"
+    },
+    {
+      "kind": "Text",
+      "text": " costs €5"
+    },
+    {
+      "kind": "Text",
+      "text": " and 😀"
+    },
+    {
+      "kind": "Text",
+      "text": " done."
+    }
+  ],
+  "usage": {
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "input": 25,
+    "output": 12,
+    "stopReason": "end_turn"
+  }
+}

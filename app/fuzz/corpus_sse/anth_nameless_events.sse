@@ -1,0 +1,10 @@
+0iZdata: {"type":"message_start","message":{"id":"msg_x","usage":{"input_tokens":4}}}
+
+data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"anon"}}
+
+data: {"type":"ping"}
+
+data: {"hello":1}
+
+data: {"type":"message_stop"}
+

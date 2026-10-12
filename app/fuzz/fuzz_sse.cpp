@@ -7,6 +7,7 @@
 //   byte 0, low 3 bits: limits {line, event}. 0 = the real ones (1 MiB each); 1 = {8, 12},
 //                       2 = {64, 96}, 3 = {300, 200}, 4 = {16, 32}, so that the overflow paths are
 //                       reached by inputs of a few hundred bytes; 5 to 7 = the real ones;
+//   byte 0, bit 3 (value 8): showThinking of the stream decoder;
 //   byte 1: the largest chunk size of the random chunking (1 + byte % 97);
 //   byte 2: the seed of that chunking.
 //
@@ -19,7 +20,12 @@
 //  - the bytes held never exceed what the limits allow, and a failed parser stays failed, delivers
 //    nothing more and holds nothing;
 //  - every event is well formed: a non-empty type, data within the event limit, no NUL in the id,
-//    no negative retry.
+//    no negative retry;
+//  - the events also drive an AnthropicStreamDecoder (providers/anthropic_stream.h), which must
+//    not throw, call exactly one of onDone and onError and only once (the connection end that
+//    follows the stream included), deliver nothing after that call, keep text() equal to the
+//    concatenation of the Text tokens, report usage within [0, INT32_MAX], deliver no Thinking
+//    token unless showThinking, and give the same transcript however the bytes were chunked.
 //
 // The same function is linked into curia_fuzz_sse_replay (fuzz_sse_replay_main.cpp), which feeds it
 // files without libFuzzer so that every platform can replay the seed corpus.
@@ -29,18 +35,28 @@
 #include <cstdio>
 #include <cstdlib>
 #include <limits>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
+#include "providers/anthropic_stream.h"
+#include "providers/chat_types.h"
 #include "providers/sse_parser.h"
 
 namespace {
 
+using curia::providers::AnthropicStreamDecoder;
+using curia::providers::ChatError;
 using curia::providers::SseEvent;
 using curia::providers::SseParser;
 using curia::providers::SseStatus;
+using curia::providers::StreamHandlers;
+using curia::providers::StreamStatus;
+using curia::providers::TokenKind;
+using curia::providers::Usage;
 
 constexpr std::size_t kMaxInputBytes = 1 << 20;
 constexpr std::size_t kHeaderBytes = 3;
@@ -72,14 +88,129 @@ Limits limitsFor(std::uint8_t selector) {
     }
 }
 
+// Everything the decoder's handlers were called with, in order.
+struct DecoderLog {
+    std::vector<std::pair<bool, std::string>> tokens;  // {is thinking, text}
+    std::vector<StreamStatus> statuses;
+    int doneCalls = 0;
+    int errorCalls = 0;
+    Usage usage;
+    ChatError error;
+    std::string text;
+};
+
+bool operator==(const DecoderLog& a, const DecoderLog& b) {
+    return a.tokens == b.tokens && a.statuses == b.statuses && a.doneCalls == b.doneCalls &&
+           a.errorCalls == b.errorCalls && a.usage.input == b.usage.input &&
+           a.usage.output == b.usage.output && a.usage.cacheRead == b.usage.cacheRead &&
+           a.usage.cacheWrite == b.usage.cacheWrite && a.usage.stopReason == b.usage.stopReason &&
+           a.error.code == b.error.code && a.error.message == b.error.message &&
+           a.error.retryable == b.error.retryable && a.error.httpStatus == b.error.httpStatus &&
+           a.error.retryAfterSeconds == b.error.retryAfterSeconds &&
+           a.error.requestId == b.error.requestId && a.error.partialText == b.error.partialText &&
+           a.text == b.text;
+}
+
+bool usageInRange(const Usage& usage) {
+    constexpr int kMax = std::numeric_limits<int>::max();
+    return usage.input >= 0 && usage.input <= kMax && usage.output >= 0 && usage.output <= kMax &&
+           usage.cacheRead >= 0 && usage.cacheRead <= kMax && usage.cacheWrite >= 0 &&
+           usage.cacheWrite <= kMax;
+}
+
 struct Outcome {
     std::vector<SseEvent> events;
     SseStatus status = SseStatus::Ok;
+    DecoderLog decoded;
 };
 
 bool operator==(const Outcome& a, const Outcome& b) {
-    return a.status == b.status && a.events == b.events;
+    return a.status == b.status && a.events == b.events && a.decoded == b.decoded;
 }
+
+// A decoder wired to a log that checks, as the calls happen, that no callback comes after the
+// terminal one and that there is only one terminal.
+class DecoderRig {
+public:
+    explicit DecoderRig(bool showThinking) : showThinking_(showThinking) {
+        decoder_ = std::make_unique<AnthropicStreamDecoder>(makeHandlers(), showThinking);
+    }
+
+    void onEvent(const SseEvent& event) {
+        const bool wasFinished = decoder_->finished();
+        const std::size_t tokens = log_.tokens.size();
+        const std::size_t statuses = log_.statuses.size();
+        const int terminals = log_.doneCalls + log_.errorCalls;
+        const std::size_t textSize = decoder_->text().size();
+        decoder_->onEvent(event);
+        if (wasFinished) {
+            require(log_.tokens.size() == tokens && log_.statuses.size() == statuses &&
+                        log_.doneCalls + log_.errorCalls == terminals &&
+                        decoder_->text().size() == textSize,
+                    "the decoder ignores events after the terminal one");
+        }
+        check();
+    }
+
+    // The stream is over: the connection ends, and every other way to end must now do nothing.
+    DecoderLog finish() {
+        decoder_->onTransportEnd();
+        require(decoder_->finished(), "the connection end finishes the decoder");
+        require(log_.doneCalls + log_.errorCalls == 1, "exactly one terminal callback");
+        const DecoderLog before = log_;
+        decoder_->onTransportEnd();
+        decoder_->onHttpError(429, R"({"error":{"type":"overloaded_error"}})", "5", "req");
+        decoder_->onEvent(SseEvent{"message_stop", "{}", "", std::nullopt});
+        require(log_ == before, "nothing happens after the terminal callback");
+        check();
+        require(decoder_->text() == textTokens_, "text() is the concatenation of the Text tokens");
+        log_.text = decoder_->text();
+        return log_;
+    }
+
+private:
+    StreamHandlers makeHandlers() {
+        StreamHandlers h;
+        h.onToken = [this](TokenKind kind, std::string_view text) {
+            require(log_.doneCalls + log_.errorCalls == 0, "no token after the terminal callback");
+            require(kind == TokenKind::Text || showThinking_, "no thinking token unless shown");
+            log_.tokens.emplace_back(kind == TokenKind::Thinking, std::string(text));
+            if (kind == TokenKind::Text) {
+                textTokens_ += text;
+            }
+        };
+        h.onStatus = [this](StreamStatus status) {
+            require(log_.doneCalls + log_.errorCalls == 0, "no status after the terminal callback");
+            log_.statuses.push_back(status);
+        };
+        h.onDone = [this](const Usage& usage) {
+            require(log_.doneCalls + log_.errorCalls == 0, "one terminal callback only");
+            require(usageInRange(usage), "usage within [0, INT32_MAX]");
+            ++log_.doneCalls;
+            log_.usage = usage;
+        };
+        h.onError = [this](const ChatError& error) {
+            require(log_.doneCalls + log_.errorCalls == 0, "one terminal callback only");
+            ++log_.errorCalls;
+            log_.error = error;
+            require(error.partialText == decoder_->text(), "partialText is the text so far");
+        };
+        return h;
+    }
+
+    void check() const {
+        const int terminals = log_.doneCalls + log_.errorCalls;
+        require(terminals <= 1, "at most one terminal callback");
+        require(decoder_->finished() == (terminals == 1), "finished() agrees with the callbacks");
+        // The full comparison is made once, at the end; per event the length is enough.
+        require(decoder_->text().size() == textTokens_.size(), "text() grows with the Text tokens");
+    }
+
+    bool showThinking_;
+    DecoderLog log_;
+    std::string textTokens_;
+    std::unique_ptr<AnthropicStreamDecoder> decoder_;
+};
 
 // The standard, whole buffer, one pass: no state survives between calls.
 Outcome referenceModel(std::string_view in, const Limits& limits) {
@@ -179,10 +310,14 @@ enum class Mode : std::uint8_t { Whole, Chunked, Bytewise };
 
 // Feeds the stream the given way, checks the per-feed invariants, and returns what came out.
 Outcome runParser(std::string_view stream, const Limits& limits, Mode mode, std::uint8_t maxChunk,
-                  std::uint8_t seed) {
+                  std::uint8_t seed, bool showThinking) {
     SseParser parser(limits.line, limits.event);
     Outcome out;
-    const SseParser::EventHandler handler = [&out](const SseEvent& e) { out.events.push_back(e); };
+    DecoderRig rig(showThinking);
+    const SseParser::EventHandler handler = [&out, &rig](const SseEvent& e) {
+        out.events.push_back(e);
+        rig.onEvent(e);
+    };
     const std::size_t bound = 3 * limits.line + limits.event;
 
     const auto feed = [&](std::string_view piece) {
@@ -229,6 +364,7 @@ Outcome runParser(std::string_view stream, const Limits& limits, Mode mode, std:
         }
     }
     out.status = parser.finish();
+    out.decoded = rig.finish();
     require(out.status == parser.status(), "finish returns the status");
     require(parser.bufferedBytes() == 0, "finish frees everything");
     for (const SseEvent& event : out.events) {
@@ -254,11 +390,14 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
     const std::string_view stream(reinterpret_cast<const char*>(data) + kHeaderBytes,
                                   size - kHeaderBytes);
 
-    const Outcome whole = runParser(stream, limits, Mode::Whole, maxChunk, seed);
-    require(runParser(stream, limits, Mode::Chunked, maxChunk, seed) == whole,
-            "events and status do not depend on the chunking");
-    require(runParser(stream, limits, Mode::Bytewise, maxChunk, seed) == whole,
-            "events and status are the same one byte at a time");
-    require(referenceModel(stream, limits) == whole, "the whole-buffer model agrees");
+    const bool showThinking = (data[0] & 8U) != 0;
+    const Outcome whole = runParser(stream, limits, Mode::Whole, maxChunk, seed, showThinking);
+    require(runParser(stream, limits, Mode::Chunked, maxChunk, seed, showThinking) == whole,
+            "events, status and decoder output do not depend on the chunking");
+    require(runParser(stream, limits, Mode::Bytewise, maxChunk, seed, showThinking) == whole,
+            "events, status and decoder output are the same one byte at a time");
+    const Outcome model = referenceModel(stream, limits);
+    require(model.status == whole.status && model.events == whole.events,
+            "the whole-buffer model agrees");
     return 0;
 }
