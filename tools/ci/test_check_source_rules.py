@@ -196,6 +196,8 @@ class EnvRule(unittest.TestCase):
             'const char* a = "%s";' % self.MODEL,
             'const char* a = "see %s for details";' % self.KEY,
             'puts("set %s first");' % self.MODEL,
+            'const char* a = "%s";' % ("CURIA_" + "LOG_CONTENT"),
+            'const char* a = "see %s";' % ("CURIA_" + "TRANSCRIPT_DIR"),
         ]:
             with self.subTest(text=text):
                 code, out = run({"app/src/core/other.cpp": text + "\n"})

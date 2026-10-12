@@ -231,6 +231,7 @@ advisor::AskContext AppController::makeContext() const {
     advisor::AskContext context;
     context.settings.model = model_;
     context.settings.maxTokens = options_.maxTokens;
+    context.settings.showThinking = options_.showThinking;
     context.snapshotText = store_.hasSnapshot() ? store_.text() : std::string();
     context.freshness = store_.freshness(now, monitor_.secondsSinceLogGrew(now).value_or(0));
     return context;

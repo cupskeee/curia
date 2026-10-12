@@ -553,6 +553,43 @@ TEST_CASE("session: a key split after its 20th character never shows in the join
     }
 }
 
+TEST_CASE("session: half a key at the end of the stream never reaches the final text") {
+    // A key without the usual prefix, registered; the stream ends (stop, error, done) after its
+    // first half, so the key is never whole in the text.
+    const std::string key = "FAKEgateway0123456789abcdefghij";
+    const std::string half = key.substr(0, 20);
+    for (const int ending : {0, 1, 2, 3}) {
+        CAPTURE(ending);
+        Rig rig;
+        REQUIRE(rig.registry.add(key));
+        rig.ask("Q");
+        const auto handlers = rig.handlers(0);
+        handlers.onToken(TokenKind::Text, "The key is " + half);
+        rig.pump();
+        if (ending == 0) {
+            CHECK(rig.session.cancel());
+        } else if (ending == 1) {
+            ChatError error = errorWith(ChatError::Code::Network, "connection lost");
+            error.partialText = "The key is " + half;
+            handlers.onError(error);
+            rig.pump();
+        } else if (ending == 2) {
+            handlers.onDone(usageWith());
+            rig.pump();
+        } else {
+            // An error whose partial text is longer than what the session saw.
+            ChatError error = errorWith(ChatError::Code::Network, "connection lost");
+            error.partialText = "The key is " + key.substr(0, 25);
+            handlers.onError(error);
+            rig.pump();
+        }
+        const std::string& text = rig.session.transcript()[1].text;
+        CHECK_FALSE(contains(text, "FAKEgate"));
+        CHECK_FALSE(contains(text, "gateway"));
+        CHECK(text == "The key is ");
+    }
+}
+
 TEST_CASE("session: a registered key with odd characters, split in three, is hidden") {
     const std::string key = "tok+en/with.odd=chars-0123456789";
     Rig rig;

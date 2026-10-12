@@ -79,6 +79,9 @@ public:
         UiMailbox::Wake wake;
         advisor::LogSilenceConfig silence;
         int maxTokens = 4096;
+        // Ask the provider to report the model's reasoning as it happens (the session shows only
+        // that the model is thinking, never the reasoning text).
+        bool showThinking = false;
     };
 
     explicit AppController(Options options);

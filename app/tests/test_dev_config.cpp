@@ -51,6 +51,62 @@ struct ProcessKeyGuard {
 
 #if defined(CURIA_ENABLE_DEV_ENV)
 
+TEST_CASE("dev config: content logging and the transcript folder") {
+    FakeEnv env;
+    env.values = {{"CURIA_LOG_CONTENT", "1"}, {"CURIA_TRANSCRIPT_DIR", "/some/folder"}};
+    SecretRegistry registry;
+    DevConfig config = curia::loadDevConfig(env.getter(), registry);
+    CHECK(config.logContent);
+    CHECK(config.transcriptDir == "/some/folder");
+    CHECK(config.warnings.empty());
+
+    env.values = {};
+    config = curia::loadDevConfig(env.getter(), registry);
+    CHECK_FALSE(config.logContent);
+    CHECK_FALSE(config.transcriptDir.has_value());
+
+    // Only exactly 1 turns it on; a wrong value is noted, 0 is a quiet no.
+    for (const char* value : {"true", "yes", "2", "01"}) {
+        env.values = {{"CURIA_LOG_CONTENT", value}};
+        config = curia::loadDevConfig(env.getter(), registry);
+        CHECK_FALSE(config.logContent);
+        REQUIRE(config.warnings.size() == 1);
+        CHECK(config.warnings[0].find("CURIA_LOG_CONTENT") == 0);
+        CHECK(config.warnings[0].find(value) == std::string::npos);
+    }
+    env.values = {{"CURIA_LOG_CONTENT", "0"}};
+    config = curia::loadDevConfig(env.getter(), registry);
+    CHECK_FALSE(config.logContent);
+    CHECK(config.warnings.empty());
+
+    env.values = {{"CURIA_TRANSCRIPT_DIR", std::string("bad\x01path")}};
+    config = curia::loadDevConfig(env.getter(), registry);
+    CHECK_FALSE(config.transcriptDir.has_value());
+    REQUIRE(config.warnings.size() == 1);
+    CHECK(config.warnings[0].find("bad") == std::string::npos);
+    // A warning is not a reason to call the setup incomplete.
+    env.values = {
+        {kKeyName, fakeKey()}, {kModelName, "mock-model-1"}, {"CURIA_LOG_CONTENT", "yes"}};
+    config = curia::loadDevConfig(env.getter(), registry);
+    CHECK(curia::describeNotConfigured(config).empty());
+    CHECK(curia::missingVariables(config).empty());
+}
+
+TEST_CASE("dev config: missingVariables names what is missing, never a value") {
+    FakeEnv env;
+    SecretRegistry registry;
+    DevConfig config = curia::loadDevConfig(env.getter(), registry);
+    CHECK(curia::missingVariables(config) == std::vector<std::string>{kKeyName, kModelName});
+    env.values = {{kKeyName, fakeKey()}};
+    config = curia::loadDevConfig(env.getter(), registry);
+    CHECK(curia::missingVariables(config) == std::vector<std::string>{kModelName});
+    env.values = {{kKeyName, "short"}, {kModelName, "mock-model-1"}};
+    config = curia::loadDevConfig(env.getter(), registry);
+    CHECK(curia::missingVariables(config) == std::vector<std::string>{kKeyName});
+    CHECK(std::string(curia::keyVariableName()) == kKeyName);
+    CHECK(std::string(curia::modelVariableName()) == kModelName);
+}
+
 namespace {
 
 bool anyContains(const DevConfig& config, const std::string& needle) {
@@ -79,8 +135,10 @@ TEST_CASE("dev config: a valid key and model") {
     }
     CHECK(config.problems.empty());
     CHECK(curia::describeNotConfigured(config).empty());
-    // Only the two variables were asked for, and the key is now scrubbed from any text.
-    CHECK(env.asked == std::set<std::string>{kKeyName, kModelName});
+    // Only the four development variables were asked for, and the key is now scrubbed from any
+    // text.
+    CHECK(env.asked ==
+          std::set<std::string>{kKeyName, kModelName, "CURIA_LOG_CONTENT", "CURIA_TRANSCRIPT_DIR"});
     CHECK(registry.size() == 1);
     CHECK(registry.redact("x " + fakeKey() + " y") == "x [redacted] y");
 }
@@ -272,6 +330,9 @@ TEST_CASE("dev config: disabled in this build, the environment is never read") {
     CHECK(message.find("disabled in this build") != std::string::npos);
     CHECK(message.find(kKeyName) == std::string::npos);
     CHECK(message.find(fakeKey()) == std::string::npos);
+    CHECK(curia::missingVariables(config) == std::vector<std::string>{kKeyName, kModelName});
+    CHECK_FALSE(config.logContent);
+    CHECK_FALSE(config.transcriptDir.has_value());
 
     // The no-argument overload does not touch the real environment either.
     const DevConfig real = curia::loadDevConfig();

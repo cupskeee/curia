@@ -38,6 +38,8 @@ jobs:
         run: python3 -m unittest discover -s tools/fake_ck3
       - name: Mock LLM unit tests (synthetic data only)
         run: python3 -m unittest discover -s tools/mock_llm
+      - name: M4 tools unit tests (synthetic data only)
+        run: python3 -m unittest discover -s tools/m4
       - name: Developer tools (pinned versions)
         run: |
           python3 -m venv .venv-tools
@@ -93,7 +95,7 @@ jobs:
       - name: Configure
         id: configure
         shell: bash
-        run: cmake --preset ${{ matrix.preset }} -DCURIA_WARNINGS_AS_ERRORS=ON
+        run: cmake --preset ${{ matrix.preset }} -DCURIA_WARNINGS_AS_ERRORS=ON -DCURIA_REQUIRE_PYTHON=ON
       - name: Build
         shell: bash
         run: cmake --build --preset ${{ matrix.preset }}

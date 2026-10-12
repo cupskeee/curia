@@ -40,6 +40,7 @@ temporary and removed on exit (`--keep` keeps it).
 | `--interleave` | noise lines and multi-line error entries inside frames |
 | `--die-after-bytes N` | stop writing for good after exactly N bytes (the cut may fall inside a line): the log cap |
 | `--fsync` | `os.fsync` after every write |
+| `--gold N`, `--income-tenths N`, `--date YYYY-M-D`, `--heir NAME`, `--heir-opinion N`, `--mod-version V`, `--ruler NAME` | the values of the generated example frame (`FIN`, `BEGIN`, `HEIR`); the defaults are the example frame of `docs/wire-format.md` section 4, so every existing test is unchanged. Synthetic data only; the date must exist in the game's calendar (no leap years: 28 February is the last day of February); a name is 1 to 64 characters without `|` or control characters, the version a token of letters, digits and `. _ - +`. The library takes the same through `FakeCk3(frame_params=FrameParams(...))` (or `fake.frame_params = ...` between frames) |
 | `--stdin` | after the workload, read commands: `frame`, `partial`, `rest` (finish a partial frame), `noise [n]`, `error`, `truncate`, `fixture <path>`, `size`, `quit` |
 
 ## Library
@@ -80,8 +81,9 @@ with fk.FakeCk3(burst=True, interleave=True) as fake:
   curia reports on stderr how far it has read (`curia: offset <n> ...`) and what happened to the file
   (`curia: log attached | truncated | missing | ...`); the test uses these to know when the tail has
   caught up, instead of sleeping.
-- The "mock LLM" leg of the chain (fake CK3 -> app -> mock LLM -> transcript) arrives with M4/M5
-  (`tools/mock_llm/`); it is not built yet.
+- The chain with the mock LLM (fake CK3 -> `curia --headless-chat` -> `tools/mock_llm`) is
+  `app/tests/chat_e2e.py` (ctest `chat_e2e` and `e2e_secrecy`): it writes frames with chosen gold, heir
+  and date through the parameters above, and uses `--die-after-bytes` for the silent log.
 
 ## Limits
 

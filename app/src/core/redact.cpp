@@ -24,6 +24,7 @@ public:
                 if (next == 0) {
                     next = static_cast<std::uint32_t>(nodes_.size());
                     nodes_.emplace_back();
+                    nodes_[next].depth = nodes_[at].depth + 1;
                     nodes_[at].children.emplace_back(byte, next);
                 }
                 at = next;
@@ -88,12 +89,34 @@ public:
         }
     }
 
+    // The length of the longest suffix of the text that is a prefix of some secret (a whole secret
+    // counts): the automaton's depth after the last byte. Linear in the text.
+    [[nodiscard]] std::size_t longestPrefixAtEnd(std::string_view text) const {
+        std::uint32_t state = 0;
+        for (const char ch : text) {
+            const auto byte = static_cast<unsigned char>(ch);
+            for (;;) {
+                const std::uint32_t next = child(state, byte);
+                if (next != 0) {
+                    state = next;
+                    break;
+                }
+                if (state == 0) {
+                    break;
+                }
+                state = nodes_[state].fail;
+            }
+        }
+        return nodes_[state].depth;
+    }
+
 private:
     using Edge = std::pair<unsigned char, std::uint32_t>;
 
     struct Node {
         std::vector<Edge> children;
         std::uint32_t fail = 0;
+        std::uint32_t depth = 0;
         // Length of the longest secret that is a suffix of the text spelled by this node.
         std::uint32_t longest = 0;
     };
@@ -447,8 +470,85 @@ std::string SecretRegistry::redact(std::string_view text) const {
     return std::string(kRedactedMarker);
 }
 
+std::string SecretRegistry::redactRegistered(std::string_view text) const {
+    std::shared_ptr<const detail::SecretMatcher> matcher;
+    {
+        const std::lock_guard<std::mutex> lock(mutex_);
+        matcher = matcher_;
+    }
+    if (matcher == nullptr) {
+        return std::string(text);
+    }
+    SpanList spans;
+    matcher->scan(text, [&spans](std::size_t start, std::size_t end) { spans.add(start, end); });
+    if (spans.empty()) {
+        return std::string(text);
+    }
+    std::string result;
+    result.reserve(text.size() + kRedactedMarker.size());
+    std::size_t copied = 0;
+    for (const Span& span : spans.spans()) {
+        result.append(text.substr(copied, span.start - copied));
+        result.append(kRedactedMarker);
+        copied = span.end;
+    }
+    result.append(text.substr(copied));
+    return result;
+}
+
+namespace {
+
+// The length of an unfinished key-shaped run at the end of the text: "sk-ant-" followed by fewer
+// than kKeyMinTail key characters up to the end (with more, redact() has covered it). 0 if none.
+std::size_t unfinishedKeyShapeTail(std::string_view text) {
+    std::size_t runStart = text.size();
+    while (runStart > 0 && isKeyChar(text[runStart - 1])) {
+        --runStart;
+    }
+    for (std::size_t at = runStart; at + kKeyPrefix.size() <= text.size(); ++at) {
+        if (text.compare(at, kKeyPrefix.size(), kKeyPrefix) == 0) {
+            if (text.size() - (at + kKeyPrefix.size()) < kKeyMinTail) {
+                return text.size() - at;
+            }
+            return 0;
+        }
+    }
+    return 0;
+}
+
+}  // namespace
+
+std::string SecretRegistry::redactFinal(std::string_view text) const {
+    std::string result = redact(text);
+    std::size_t cut = unfinishedKeyShapeTail(result);
+    std::shared_ptr<const detail::SecretMatcher> matcher;
+    {
+        const std::lock_guard<std::mutex> lock(mutex_);
+        matcher = matcher_;
+    }
+    if (matcher != nullptr) {
+        // A secret can only start inside the last kMaxSecretBytes bytes.
+        const std::size_t window = std::min(result.size(), kMaxSecretBytes);
+        const std::size_t partial =
+            matcher->longestPrefixAtEnd(std::string_view(result).substr(result.size() - window));
+        if (partial >= kMinPartialSecretBytes) {
+            cut = std::max(cut, partial);
+        }
+    }
+    result.resize(result.size() - std::min(cut, result.size()));
+    return result;
+}
+
 std::string redact(std::string_view text) {
     return SecretRegistry::instance().redact(text);
+}
+
+std::string redactRegistered(std::string_view text) {
+    return SecretRegistry::instance().redactRegistered(text);
+}
+
+std::string redactFinal(std::string_view text) {
+    return SecretRegistry::instance().redactFinal(text);
 }
 
 }  // namespace curia

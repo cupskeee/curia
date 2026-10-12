@@ -309,6 +309,68 @@ class CommandLineTests(unittest.TestCase):
                 self.assertEqual(handle.read().count(b"\n"), 16)
 
 
+class FrameParamsTests(unittest.TestCase):
+    ORIGINAL = [
+        b"CURIA1|7|BEGIN|0|0.1.0|1066|9|15|1001|Test Ruler One",
+        b"CURIA1|7|FIN|312|78",
+        b"CURIA1|7|HEIR|1002|84|1|0|Test Heir Two",
+    ]
+
+    def test_defaults_give_the_original_example_frame(self):
+        self.assertEqual(fk.example_frame_records(7)[:3], self.ORIGINAL)
+        self.assertEqual(fk.example_frame_records(7), fk.example_frame_records(7, fk.FrameParams()))
+        self.assertEqual(len(fk.example_frame_records(7)), 16)
+
+    def test_every_parameter_reaches_its_record(self):
+        params = fk.FrameParams(gold=-40, income_tenths=-23, year=1100, month=2, day=28,
+                                heir="Test Heir Nine", heir_opinion=-5, mod_version="9.8.7",
+                                ruler="Test Ruler Nine")
+        rows = fk.example_frame_records(4, params)
+        self.assertEqual(rows[0], b"CURIA1|4|BEGIN|0|9.8.7|1100|2|28|1001|Test Ruler Nine")
+        self.assertEqual(rows[1], b"CURIA1|4|FIN|-40|-23")
+        self.assertEqual(rows[2], b"CURIA1|4|HEIR|1002|-5|1|0|Test Heir Nine")
+        self.assertEqual(rows[3:], fk.example_frame_records(4)[3:])  # the rest is unchanged
+
+    def test_bad_values_are_refused(self):
+        for kwargs in ({"gold": 2 ** 31}, {"gold": True}, {"month": 13}, {"day": 0}, {"month": 2, "day": 30},
+                       {"month": 4, "day": 31}, {"heir": ""},
+                       {"heir": "a|b"}, {"ruler": "x" * 65}, {"heir": "tab\there"},
+                       {"mod_version": "has space"}, {"mod_version": ""}):
+            with self.assertRaises(ValueError, msg=repr(kwargs)):
+                fk.FrameParams(**kwargs)
+
+    def test_the_fake_writes_the_chosen_frame_and_the_parser_view_is_unchanged(self):
+        params = fk.FrameParams(gold=999, heir="Test Heir Zed")
+        with fk.FakeCk3(frame_params=params) as fake:
+            fake.launch()
+            fake.append_frame()
+            recs = records(read_lines(fake))
+            self.assertIn(b"FIN|999|78", recs[1])
+            self.assertTrue(recs[2].endswith(b"Test Heir Zed"))
+            self.assertEqual(len(recs), 16)
+
+    def test_command_line_options(self):
+        with tempfile.TemporaryDirectory() as root:
+            done = subprocess.run(
+                [sys.executable, os.path.join(HERE, "fake_ck3.py"), "--root", root, "--gold", "1234",
+                 "--income-tenths", "-15", "--date", "1100-3-4", "--heir", "Test Heir Cli",
+                 "--heir-opinion", "-7", "--mod-version", "2.0.1", "--ruler", "Test Ruler Cli"],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60, check=True)
+            log = re.search(r"^LOG (.*)$", done.stdout.decode(), re.M).group(1)
+            with open(log, "rb") as handle:
+                data = handle.read()
+            self.assertIn(b"|BEGIN|0|2.0.1|1100|3|4|1001|Test Ruler Cli", data)
+            self.assertIn(b"|FIN|1234|-15", data)
+            self.assertIn(b"|HEIR|1002|-7|1|0|Test Heir Cli", data)
+
+    def test_command_line_refuses_a_bad_date_and_a_pipe_in_a_name(self):
+        for args in (["--date", "1066/9/15"], ["--date", "1066-13-1"], ["--heir", "a|b"]):
+            done = subprocess.run([sys.executable, os.path.join(HERE, "fake_ck3.py"), *args],
+                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60)
+            self.assertEqual(done.returncode, 2, args)
+            self.assertEqual(done.stdout, b"")
+
+
 class CommandTests(unittest.TestCase):
     def test_stdin_commands(self):
         out = io.StringIO()

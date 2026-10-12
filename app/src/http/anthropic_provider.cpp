@@ -98,6 +98,7 @@ struct StreamState {
     StreamHandlers user;
     std::shared_ptr<std::atomic<bool>> closing;
     AppLog* log = nullptr;
+    std::function<void(const NetSummary&)> onNet;
     int stallSeconds = 45;
     SseParser parser;
     std::optional<AnthropicStreamDecoder> decoder;
@@ -134,11 +135,13 @@ struct StreamState {
         if (kind == TokenKind::Text && !firstTokenMs.has_value()) {
             firstTokenMs = millisBetween(start, Clock::now());
         }
-        // A key reflected by the server inside one token never reaches the screen or a log. A key
-        // split over two tokens is not caught here (each piece alone is not the key): the
-        // consumer that joins the tokens redacts the joined text (the final text and every error
-        // field are redacted here as a whole).
-        user.onToken(kind, redact(text));
+        // A registered key reflected by the server inside one token is replaced here. Shapes
+        // (redact()) are deliberately not applied to a piece: the front of a key that continues in
+        // the next token would match, be replaced alone, and leave the rest of the key in the
+        // clear. A key split over two tokens passes as it is: the consumer that joins the tokens
+        // redacts the joined text (redact()), and the final text (redactFinal()) cuts a key that
+        // the end of the stream split. Every error field is redacted here as a whole.
+        user.onToken(kind, redactRegistered(text));
     }
 
     void done(const Usage& usage) {
@@ -167,7 +170,7 @@ struct StreamState {
         }
         terminated = true;
         error.message = redact(error.message);
-        error.partialText = redact(error.partialText);
+        error.partialText = redactFinal(error.partialText);
         if (error.requestId.empty()) {
             error.requestId = requestId;
         } else {
@@ -228,6 +231,16 @@ struct StreamState {
                  {"first_byte_ms", result.timings.firstByteMs},
                  {"total_ms", result.timings.totalMs},
                  {"tls_retry", result.tlsRetried}});
+        if (onNet && !muted()) {
+            NetSummary summary;
+            summary.httpStatus = result.httpStatus;
+            summary.tlsRetried = result.tlsRetried;
+            summary.connectMs = result.timings.connectMs;
+            summary.firstByteMs = result.timings.firstByteMs;
+            summary.totalMs = result.timings.totalMs;
+            summary.curlCode = result.curlCode;
+            onNet(summary);
+        }
         if (terminated) {
             return;
         }
@@ -326,6 +339,7 @@ void AnthropicProvider::streamChat(const ChatRequest& request, StreamHandlers ha
     state->user = std::move(handlers);
     state->closing = closing_;
     state->log = options_.log;
+    state->onNet = options_.onNetDone;
     state->stallSeconds = stallSeconds_;
 
     StreamHandlers inner;

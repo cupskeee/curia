@@ -9,7 +9,7 @@
 #   3. calls of reveal() on a SecretString outside the transport: only app/src/core/secret.*,
 #      app/src/core/redact.*, app/src/http/http_client.* (the one site that builds the header line),
 #      app/src/providers/anthropic_* and app/tests/ may read the bytes.
-#   4. the development environment variables (CURIA_ANTHROPIC..., CURIA_MODEL...) and any getenv/getEnv of a
+#   4. the development environment variables (CURIA_ANTHROPIC..., CURIA_MODEL, CURIA_LOG_CONTENT, CURIA_TRANSCRIPT_DIR) and any getenv/getEnv of a
 #      CURIA_ name outside app/src/core/dev_config.cpp and app/tests/: one reader, one place that validates.
 # Comments are NOT exempt from any rule (a model ID or a variable name in a string literal is the thing to avoid,
 # and telling comments from code with grep is unreliable). Rule 4 matches string literals that contain a variable
@@ -58,7 +58,7 @@ check "reveal() outside the allowlist (core/secret.*, core/redact.*, http/http_c
   '^app/src/core/secret\.|^app/src/core/redact\.|^app/src/http/http_client\.(h|cpp):|^app/src/providers/anthropic_|^app/tests/'
 
 check "CURIA_ environment variable outside app/src/core/dev_config.cpp (and app/tests/)" \
-  'get[Ee]nv[[:space:]]*\([[:space:]]*"CURIA_|"[^"]*CURIA_(ANTHROPIC|MODEL)' \
+  'get[Ee]nv[[:space:]]*\([[:space:]]*"CURIA_|"[^"]*CURIA_(ANTHROPIC|MODEL|LOG_CONTENT|TRANSCRIPT_DIR)' \
   '^app/src/core/dev_config\.cpp:|^app/tests/'
 
 if [ "$fail" -ne 0 ]; then exit 1; fi

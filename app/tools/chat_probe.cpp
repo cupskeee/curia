@@ -19,8 +19,10 @@
 // request has closed its connection itself and not merely through the process exiting.
 //
 // The key is read exactly as the app reads it (core/dev_config.h: the process environment, in a
-// build with CURIA_ENABLE_DEV_ENV) and is never printed: the provider redacts the tokens and the
-// error texts it hands over, and the probe adds nothing of its own.
+// build with CURIA_ENABLE_DEV_ENV) and is never printed: the provider replaces the key where it
+// lies whole inside a token and redacts the error texts it hands over, and the probe adds nothing
+// of its own. (A key that a server splits over two tokens is not joined here; the app's ChatSession
+// and the headless chat do that, see http/README.md.)
 // --test-endpoint (same build only) points the probe at a mock server on loopback and then needs a
 // key that contains FAKE (net/endpoint_policy.h). Without it the probe talks to the real API.
 #include <atomic>

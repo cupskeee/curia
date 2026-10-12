@@ -11,6 +11,12 @@ at `0.y.z` and anything may change between minor versions.
 
 ### Added
 
+- Headless modes of the `curia` executable (no window): `--headless-chat` reads the game's log, keeps
+  the newest snapshot (or `--frame <snap>`) and answers questions typed on stdin, printing one JSON
+  object per event; `--check-api [--cache-probe]` is the connection check for the owner (key, model,
+  certificates, sign-in header, one tiny answer, prompt cache). Development builds only for the key
+  from the environment; development transcripts (`CURIA_LOG_CONTENT=1`) go outside the repository.
+  End-to-end tests `chat_e2e` and `e2e_secrecy` run the whole chain against the mock server.
 - Design documents under `docs/`: requirements, architecture, milestones and
   research notes with sourced facts, assumptions and open questions.
 - Milestone 0 feasibility findings (`docs/spikes/`), measured by hand on

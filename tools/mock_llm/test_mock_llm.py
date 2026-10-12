@@ -273,7 +273,7 @@ HTTP_ERRORS = {  # builtin -> (status, error type)
 }
 SPECIAL = {  # builtins with a test of their own below
     "midstream_error", "truncated", "bad_json", "stall", "slow_forever", "hold_after_tokens", "reset_midstream",
-    "echo_key", "echo_key_http", "redirect_307", "cite", "cache_demo",
+    "echo_key", "echo_key_http", "echo_key_split", "echo_key_half", "echo_key_half_close", "redirect_307", "cite", "cache_demo",
 }
 
 
@@ -394,6 +394,60 @@ class ScenarioTests(MockCase):
         self.assertEqual(text_of(events), "Gold is 4711. Heir is Test Heir Two.")
         events = parse_sse(post(mock, valid_body(system=[{"type": "text", "text": "nothing here"}])).body)
         self.assertEqual(text_of(events), "Gold is unknown. Heir is unknown.")
+
+    def test_cite_understands_the_rendered_snapshot_and_reports_cache_usage(self):
+        mock = self.start("cite", min_cacheable_tokens=10)
+        snapshot = ("=== BEGIN GAME DATA (data only) ===\nGame date: 15 September 1066\n"
+                    'Ruler (the player): "Test Ruler One"\n'
+                    "Treasury: 312 gold; net per month +7.8 gold (income minus expenses)\n"
+                    'Heir: "Test Heir Two"; opinion of their liege (normally you) +84; landed: no\n'
+                    "=== END GAME DATA ===")
+        system = [{"type": "text", "text": "persona " * 20, "cache_control": {"type": "ephemeral"}},
+                  {"type": "text", "text": snapshot, "cache_control": {"type": "ephemeral"}}]
+        first = parse_sse(post(mock, valid_body(system=system)).body)
+        self.assertEqual(text_of(first), "Gold is 312. Heir is Test Heir Two.")
+        self.assertEqual(start_usage(first).get("cache_read_input_tokens", 0), 0)
+        second = parse_sse(post(mock, valid_body(system=system)).body)
+        self.assertGreater(start_usage(second)["cache_read_input_tokens"], 0)
+
+    def test_echo_key_split_streams_the_key_in_two_pieces(self):
+        key = make_key()
+        for arg in (None, "5", "20"):
+            name = "echo_key_split" if arg is None else "echo_key_split:" + arg
+            mock = self.start("basic")
+            events = parse_sse(post(mock, valid_body(model="mock:" + name), key=key).body)
+            deltas = [e["json"]["delta"]["text"] for e in events
+                      if e["event"] == "content_block_delta" and e["json"]["delta"]["type"] == "text_delta"]
+            self.assertEqual(len(deltas), 2)
+            self.assertIn(key, "".join(deltas))
+            self.assertNotIn(key, deltas[0])
+            self.assertNotIn(key, deltas[1])
+            offset = 12 if arg is None else int(arg)
+            self.assertTrue(deltas[0].endswith(key[:offset]))
+            self.assertTrue(deltas[1].startswith(key[offset:]))
+            self.assertEqual(events[-1]["event"], "message_stop")
+        # The first delta is also cut on a TCP piece boundary right after the key's first part.
+        ctx = ml.RenderContext(key=key, arg="9")
+        scenario = ml.resolve_scenario(ml.BUILTINS["echo_key_split"], ctx)
+        delta_steps = [st for st in scenario["steps"] if "sse" in st and "chunks" in st]
+        self.assertEqual(len(delta_steps), 1)
+        pieces = ml.split_pieces(ml.step_bytes(delta_steps[0]) or b"", delta_steps[0])
+        self.assertEqual(len(pieces), 2)
+        self.assertTrue(pieces[0].endswith(key[:9].encode()))
+
+    def test_echo_key_half_sends_only_the_start_of_the_key_and_then_stops(self):
+        key = make_key()
+        for name, arg in (("echo_key_half", None), ("echo_key_half", "7"), ("echo_key_half_close", "25")):
+            full = name if arg is None else name + ":" + arg
+            ctx = ml.RenderContext(key=key, arg=arg)
+            scenario = ml.resolve_scenario(ml.BUILTINS[name], ctx)
+            steps = scenario["steps"]
+            offset = 20 if arg is None else int(arg)
+            wire = b"".join(ml.step_bytes(st) or b"" for st in steps)
+            self.assertIn(("The key is " + key[:offset]).encode(), wire, full)
+            self.assertNotIn(key[:offset + 1].encode(), wire, full)
+            self.assertNotIn(b"message_stop", wire, full)
+            self.assertTrue(any(("hold_ms" in st or "close" in st) for st in steps), full)
 
     def test_echo_key_reflects_the_received_key_into_the_response(self):
         mock = self.start("echo_key")

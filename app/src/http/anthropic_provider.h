@@ -2,6 +2,8 @@
 #pragma once
 
 #include <atomic>
+#include <cstdint>
+#include <functional>
 #include <memory>
 #include <string_view>
 #include <vector>
@@ -23,9 +25,29 @@ inline constexpr std::string_view kAnthropicVersion = "2023-06-01";
 // is the legacy form, still accepted, kept as a fallback that the owner's preflight can select.
 enum class AuthStyle { Bearer, XApiKey };
 
+// What the transport reports about one request, once, when the connection has ended (for an
+// answer that completes this comes just AFTER onDone: the server closes the connection after the
+// last event). Numbers only. Used by the connection check (`curia --check-api`).
+struct NetSummary {
+    // The HTTP status of the final response; 0 when none arrived.
+    int httpStatus = 0;
+    // The first attempt failed with a certificate-trust error and the retry with a located CA
+    // bundle was made.
+    bool tlsRetried = false;
+    // Milliseconds from the start of the request; -1 when the point was never reached.
+    std::int64_t connectMs = -1;
+    std::int64_t firstByteMs = -1;
+    std::int64_t totalMs = 0;
+    // The CURLcode of the transfer as int (0 = ok).
+    int curlCode = 0;
+};
+
 struct AnthropicProviderOptions {
     AuthStyle auth = AuthStyle::Bearer;
     ClientOptions http;
+    // Called on the net thread, once per request, with the numbers above. Optional; must not
+    // throw.
+    std::function<void(const NetSummary&)> onNetDone;
     // Where numbers about each request go (sizes, status, timings, usage); never text. Not owned,
     // may be null; must outlive the provider.
     AppLog* log = nullptr;

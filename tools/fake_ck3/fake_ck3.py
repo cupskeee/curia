@@ -21,7 +21,7 @@ import shutil
 import sys
 import tempfile
 import time
-from typing import Callable, Iterable, List, Optional, Sequence
+from typing import Callable, Iterable, List, Optional, Sequence, Tuple
 
 MARKER = b"CURIA1|"
 
@@ -54,13 +54,62 @@ def engine_prefix(variant: int = 0) -> bytes:
     return text.encode("ascii")
 
 
-def example_frame_records(snap: int) -> List[bytes]:
+# The game's calendar has no leap years.
+_DAYS_IN_MONTH = (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
+
+
+class FrameParams:
+    """The values of the example frame that tests may change (synthetic data only). The defaults
+    give exactly the example frame of docs/wire-format.md section 4."""
+
+    def __init__(self, gold: int = 312, income_tenths: int = 78, year: int = 1066, month: int = 9,
+                 day: int = 15, heir: str = "Test Heir Two", heir_opinion: int = 84,
+                 mod_version: str = "0.1.0", ruler: str = "Test Ruler One"):
+        for name, value in (("gold", gold), ("income_tenths", income_tenths), ("year", year),
+                            ("month", month), ("day", day), ("heir_opinion", heir_opinion)):
+            if isinstance(value, bool) or not isinstance(value, int) or not -2147483648 <= value <= 2147483647:
+                raise ValueError("%s must be a 32-bit integer" % name)
+        if not 1 <= month <= 12 or not 1 <= year <= 9999 or not 1 <= day <= _DAYS_IN_MONTH[month - 1]:
+            raise ValueError("the date is not a valid game date")
+        for name, text in (("heir", heir), ("ruler", ruler)):
+            _check_text(name, text)
+        if not mod_version or len(mod_version) > 32 or not all(
+                c.isascii() and (c.isalnum() or c in "._-+") for c in mod_version):
+            raise ValueError("mod_version must be a token of letters, digits and . _ - +")
+        self.gold = gold
+        self.income_tenths = income_tenths
+        self.year = year
+        self.month = month
+        self.day = day
+        self.heir = heir
+        self.heir_opinion = heir_opinion
+        self.mod_version = mod_version
+        self.ruler = ruler
+
+    @classmethod
+    def from_date_text(cls, text: str) -> Tuple[int, int, int]:
+        parts = text.split("-")
+        if len(parts) != 3 or not all(p.isdigit() for p in parts):
+            raise ValueError("a date is YYYY-M-D, for example 1066-9-15")
+        return int(parts[0]), int(parts[1]), int(parts[2])
+
+
+def _check_text(name: str, text: str) -> None:
+    """A text field of a record: no pipe, no control character, 1 to 64 characters."""
+    if not text or len(text) > 64:
+        raise ValueError("%s must be 1 to 64 characters" % name)
+    if "|" in text or any(ord(c) < 0x20 or ord(c) == 0x7F for c in text):
+        raise ValueError("%s must not contain | or control characters" % name)
+
+
+def example_frame_records(snap: int, params: Optional[FrameParams] = None) -> List[bytes]:
     """The example frame of docs/wire-format.md section 4 (artificial names), bare records."""
+    q = params if params is not None else FrameParams()
     p = "CURIA1|%d|" % snap
     rows = [
-        "BEGIN|0|0.1.0|1066|9|15|1001|Test Ruler One",
-        "FIN|312|78",
-        "HEIR|1002|84|1|0|Test Heir Two",
+        "BEGIN|0|%s|%d|%d|%d|1001|%s" % (q.mod_version, q.year, q.month, q.day, q.ruler),
+        "FIN|%d|%d" % (q.gold, q.income_tenths),
+        "HEIR|1002|%d|1|0|%s" % (q.heir_opinion, q.heir),
         "VASSALS|2|2",
         "VASSAL|1|1003|120|55|1523|Test Vassal Three",
         "VASSAL|2|1004|40|-12|310|Test Vassal Four",
@@ -157,12 +206,14 @@ class FakeCk3:
         sleep: Callable[[float], None] = time.sleep,
         keep_chunks: bool = False,
         keep: bool = False,
+        frame_params: Optional[FrameParams] = None,
     ):
         if layout not in ("plain", "wine"):
             raise ValueError("layout must be 'plain' or 'wine'")
         self._owns_root = root is None and not keep
         self.root = root if root is not None else tempfile.mkdtemp(prefix="fake_ck3_")
         self.layout = layout
+        self.frame_params = frame_params if frame_params is not None else FrameParams()
         self.line_buffer = line_buffer
         self.flush_delay = flush_delay
         self.burst = burst
@@ -324,7 +375,7 @@ class FakeCk3:
         if snap is None:
             snap = self.next_snap
         self.next_snap = snap + 1
-        frame = list(records) if records is not None else example_frame_records(snap)
+        frame = list(records) if records is not None else example_frame_records(snap, self.frame_params)
         if partial:
             self._pending_tail = frame[-1:]
             frame = frame[:-1]
@@ -429,11 +480,30 @@ def build_parser() -> argparse.ArgumentParser:
                    help="after the workload read commands from stdin (frame, partial, rest, noise [n], "
                         "error, truncate, fixture <path>, size, quit)")
     p.add_argument("--keep", action="store_true", help="do not remove a temporary root on exit")
+    p.add_argument("--gold", type=int, default=312, help="FIN gold of the generated frames")
+    p.add_argument("--income-tenths", type=int, default=78, help="FIN income in tenths of a gold piece")
+    p.add_argument("--date", default="1066-9-15", help="game date of the generated frames, YYYY-M-D")
+    p.add_argument("--heir", default="Test Heir Two", help="the heir's name")
+    p.add_argument("--heir-opinion", type=int, default=84, help="the heir's opinion of the ruler")
+    p.add_argument("--mod-version", default="0.1.0", help="the mod_version token of BEGIN")
+    p.add_argument("--ruler", default="Test Ruler One", help="the ruler's name")
     return p
 
 
+def params_from_args(args: argparse.Namespace) -> FrameParams:
+    year, month, day = FrameParams.from_date_text(args.date)
+    return FrameParams(gold=args.gold, income_tenths=args.income_tenths, year=year, month=month,
+                       day=day, heir=args.heir, heir_opinion=args.heir_opinion,
+                       mod_version=args.mod_version, ruler=args.ruler)
+
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    try:
+        frame_params = params_from_args(args)
+    except ValueError as problem:
+        parser.error(str(problem))
     fake = FakeCk3(
         root=args.root,
         layout=args.layout,
@@ -445,6 +515,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         fsync=args.fsync,
         snap_start=args.snap_start,
         keep=args.keep,
+        frame_params=frame_params,
     )
     try:
         # Previous session: written with plain per-line writes and no scenario flags.
