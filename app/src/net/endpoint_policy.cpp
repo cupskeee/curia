@@ -148,6 +148,26 @@ bool makeEndpoint(std::optional<std::string_view> testEndpointFlag, const Secret
 #endif
 }
 
+bool isLoopbackTestUrl(std::string_view url) {
+#if defined(CURIA_ENABLE_DEV_ENV)
+    if (url.size() <= kPathSuffix.size() ||
+        url.substr(url.size() - kPathSuffix.size()) != kPathSuffix) {
+        return false;
+    }
+    const std::string_view authority = url.substr(0, url.size() - kPathSuffix.size());
+    if (authority.back() == '/') {
+        return false;  // "http://127.0.0.1:1//v1/messages": makeEndpoint never builds it
+    }
+    std::string host;
+    std::string port;
+    std::string error;
+    return parseTestEndpoint(authority, host, port, error);
+#else
+    (void)url;
+    return false;
+#endif
+}
+
 bool authMayAttach(std::string_view requestUrl, const Endpoint& endpoint) {
     return !endpoint.url.empty() && requestUrl == endpoint.url;
 }

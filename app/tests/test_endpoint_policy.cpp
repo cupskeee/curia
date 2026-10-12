@@ -11,6 +11,7 @@
 
 using curia::SecretString;
 using curia::net::Endpoint;
+using curia::net::isLoopbackTestUrl;
 using curia::net::makeEndpoint;
 
 namespace {
@@ -270,6 +271,42 @@ TEST_CASE("endpoint: a test endpoint is ignored by a plain run") {
     CHECK(endpoint.url == "https://api.anthropic.com/v1/messages");
 }
 
+TEST_CASE("endpoint: isLoopbackTestUrl accepts only what makeEndpoint builds") {
+    for (const char* url : {"http://127.0.0.1:8080/v1/messages", "http://127.1.2.3:1/v1/messages",
+                            "http://[::1]:65535/v1/messages"}) {
+        CAPTURE(url);
+        CHECK(isLoopbackTestUrl(url));
+    }
+    for (const char* url : {"",
+                            "http://127.0.0.1:8080",
+                            "http://127.0.0.1:8080/",
+                            "http://127.0.0.1:8080//v1/messages",
+                            "http://127.0.0.1:8080/v1/messages/",
+                            "http://127.0.0.1:8080/v1/other",
+                            "https://127.0.0.1:8080/v1/messages",
+                            "HTTP://127.0.0.1:8080/v1/messages",
+                            "http://evil.example.com:80/v1/messages",
+                            "http://localhost:80/v1/messages",
+                            "http://128.0.0.1:80/v1/messages",
+                            "http://127.0.0.1/v1/messages",
+                            "http://127.0.0.1:0/v1/messages",
+                            "http://127.0.0.1:80@evil.example/v1/messages",
+                            "http://user@127.0.0.1:80/v1/messages",
+                            "http://127.0.0.1:80/v1/messages?x=1",
+                            "http://[::2]:80/v1/messages",
+                            "http://0x7f.0.0.1:80/v1/messages",
+                            "http://127.0.0.1:80/x/v1/messages",
+                            "/v1/messages"}) {
+        CAPTURE(url);
+        CHECK_FALSE(isLoopbackTestUrl(url));
+    }
+    // What makeEndpoint builds passes.
+    const SecretString key = fakeKey();
+    const Result result = tryEndpoint("http://127.0.0.1:4321/", &key);
+    REQUIRE(result.ok);
+    CHECK(isLoopbackTestUrl(result.endpoint.url));
+}
+
 #else  // built without CURIA_ENABLE_DEV_ENV
 
 TEST_CASE("endpoint: test endpoints are disabled in this build, whatever the flag and key") {
@@ -283,6 +320,11 @@ TEST_CASE("endpoint: test endpoints are disabled in this build, whatever the fla
     const Result noKey = tryEndpoint("http://127.0.0.1:8080", nullptr);
     CHECK_FALSE(noKey.ok);
     CHECK(noKey.error == "test endpoints are disabled in this build");
+}
+
+TEST_CASE("endpoint: isLoopbackTestUrl is always false in this build") {
+    CHECK_FALSE(isLoopbackTestUrl("http://127.0.0.1:8080/v1/messages"));
+    CHECK_FALSE(isLoopbackTestUrl("http://[::1]:8080/v1/messages"));
 }
 
 #endif

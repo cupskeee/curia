@@ -103,6 +103,21 @@ if(CURIA_BUILD_APP)
     find_package(imgui CONFIG REQUIRED)
     find_package(CURL CONFIG REQUIRED)
 
+    # curia_http: everything that needs libcurl (the net thread, the TLS policy, the Anthropic
+    # provider). curia_core stays free of curl so the sanitizer and fuzz presets still build.
+    add_library(curia_http STATIC
+        src/http/anthropic_provider.cpp
+        src/http/header_capture.cpp
+        src/http/http_client.cpp
+        src/http/tls_policy.cpp
+        src/http/transport_error.cpp)
+    target_link_libraries(curia_http PUBLIC curia_core CURL::libcurl)
+    if(WIN32)
+        # curl pulls in <windows.h>, whose min/max macros break std::min/std::max.
+        target_compile_definitions(curia_http PUBLIC NOMINMAX WIN32_LEAN_AND_MEAN)
+    endif()
+    curia_configure_target(curia_http)
+
     add_executable(curia
         src/main.cpp
         src/app.cpp
@@ -112,7 +127,7 @@ if(CURIA_BUILD_APP)
 
     # Small tool used by CI to prove TLS works with the chosen libcurl configuration (milestone M1, A16).
     add_executable(curia_https_smoke tools/https_smoke.cpp)
-    target_link_libraries(curia_https_smoke PRIVATE curia_core CURL::libcurl)
+    target_link_libraries(curia_https_smoke PRIVATE curia_http)
     curia_configure_target(curia_https_smoke)
     # Label "network" = required in CI (default CA handling, probed bundle only as a fallback).
     add_test(NAME https_smoke COMMAND curia_https_smoke)
@@ -158,6 +173,12 @@ if(CURIA_BUILD_APP)
             COMMAND codesign --force --sign - "$<TARGET_BUNDLE_DIR:curia_m2_probe>"
             VERBATIM)
     endif()
+
+    # A command-line client of the Anthropic provider: the test tool of the provider_mock test and the
+    # owner's preflight. It prints one JSON object per event (tools/chat_probe.cpp).
+    add_executable(curia_chat_probe tools/chat_probe.cpp)
+    target_link_libraries(curia_chat_probe PRIVATE curia_http)
+    curia_configure_target(curia_chat_probe)
 
     # Third-party license notices for packaging: cmake --build <dir> --target curia_notices
     add_custom_target(curia_notices
@@ -233,17 +254,51 @@ if(CURIA_BUILD_TESTS)
     set_tests_properties(fuzz_replay_sse PROPERTIES LABELS fuzz TIMEOUT 300)
 endif()
 
-# --- end-to-end test: fake CK3 -> curia --watch-log -> golden events (needs the app binary) -------
-# The mock-LLM leg of the chain (tools/mock_llm) arrives with M4/M5.
+# --- end-to-end tests (need the app binaries and Python 3) ----------------------------------------
+# Python 3 is optional unless CURIA_REQUIRE_PYTHON is ON (CI): then a missing interpreter fails the
+# configuration instead of silently dropping these tests.
 if(CURIA_BUILD_APP AND CURIA_BUILD_TESTS)
     find_package(Python3 COMPONENTS Interpreter)
+    if(NOT Python3_Interpreter_FOUND AND CURIA_REQUIRE_PYTHON)
+        message(FATAL_ERROR "CURIA_REQUIRE_PYTHON is ON but no Python 3 interpreter was found")
+    endif()
+
+    # Unit tests of curia_http (TLS policy decisions, header parsing, transfer rules, the client's
+    # lifecycle). A separate executable and a separate folder: curia_tests must not link libcurl,
+    # and the clang-tidy job of CI (core configuration, no libcurl) walks app/tests.
+    add_executable(curia_http_tests
+        tests/test_main.cpp
+        http_tests/test_anthropic_provider.cpp
+        http_tests/test_header_capture.cpp
+        http_tests/test_http_client.cpp
+        http_tests/test_tls_policy.cpp
+        http_tests/test_transport_error.cpp)
+    target_link_libraries(curia_http_tests PRIVATE curia_http doctest::doctest)
+    curia_configure_target(curia_http_tests)
+    doctest_discover_tests(curia_http_tests PROPERTIES LABELS unit)
+
     if(Python3_Interpreter_FOUND)
+        # fake CK3 -> curia --watch-log -> golden events. The mock-LLM leg of the chain
+        # (tools/mock_llm) arrives with the headless chat (M4 PR 6).
         add_test(NAME e2e_fake_ck3
                  COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/fake_ck3/e2e_test.py
                          --curia $<TARGET_FILE:curia>
                          --fixtures ${PROJECT_SOURCE_DIR}/tests/fixtures/curia1)
         set_tests_properties(e2e_fake_ck3 PROPERTIES LABELS e2e TIMEOUT 300)
+
+        # The Anthropic provider against the mock server (tools/mock_llm): every stream shape, every
+        # HTTP status, stall, cancel with a socket-close check, key secrecy, no redirect. Needs the
+        # development configuration (a key from the environment and --test-endpoint).
+        if(CURIA_ENABLE_DEV_ENV)
+            add_test(NAME provider_mock
+                     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/provider_mock.py
+                             --probe $<TARGET_FILE:curia_chat_probe>
+                             --mock ${PROJECT_SOURCE_DIR}/tools/mock_llm/mock_llm.py)
+            set_tests_properties(provider_mock PROPERTIES LABELS "e2e;provider" TIMEOUT 300)
+        else()
+            message(STATUS "CURIA_ENABLE_DEV_ENV is OFF: the end-to-end test provider_mock is not registered")
+        endif()
     else()
-        message(STATUS "Python 3 not found: the end-to-end test e2e_fake_ck3 is not registered")
+        message(STATUS "Python 3 not found: the end-to-end tests e2e_fake_ck3 and provider_mock are not registered")
     endif()
 endif()

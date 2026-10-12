@@ -151,7 +151,12 @@ class RevealRule(unittest.TestCase):
         for path in ["app/src/ui/chat.cpp", "app/src/core/app_log.cpp", "app/src/core/dev_config.cpp",
                      "app/src/net/endpoint_policy.cpp", "app/src/providers/openai_provider.cpp",
                      "app/src/core/secretive.cpp", "app/src/httpx/client.cpp", "app/src/main.cpp",
-                     "app/tools/x.cpp"]:
+                     "app/tools/x.cpp",
+                     # Inside http/ only the client itself may read the key.
+                     "app/src/http/anthropic_provider.cpp", "app/src/http/tls_policy.cpp",
+                     "app/src/http/header_capture.cpp", "app/src/http/http_client_extra.cpp",
+                     "app/src/http/http_client.cpp.bak.cpp", "app/src/http/sub/http_client.cpp",
+                     "app/src/http/old/http_client.h"]:
             with self.subTest(path=path):
                 code, out = run({path: self.CALL})
                 self.assertEqual(code, 1, out)
@@ -160,7 +165,7 @@ class RevealRule(unittest.TestCase):
 
     def test_allowed_in_the_allowlist(self):
         for path in ["app/src/core/secret.cpp", "app/src/core/secret.h", "app/src/core/redact.cpp",
-                     "app/src/core/redact.h", "app/src/http/client.cpp", "app/src/http/sub/deep.cpp",
+                     "app/src/core/redact.h", "app/src/http/http_client.cpp", "app/src/http/http_client.h",
                      "app/src/providers/anthropic_provider.cpp", "app/src/providers/anthropic_request.h",
                      "app/tests/test_secret.cpp"]:
             with self.subTest(path=path):

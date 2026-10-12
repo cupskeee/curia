@@ -157,7 +157,7 @@ build on four things.
   trace options, the peer and host verification switches, and `NO_REVOKE`. Verbose output would
   put the `Authorization` header in a log, and switching verification off would send the key to
   whoever answers.
-- **`reveal()` calls** on a `SecretString` outside `core/secret.*`, `core/redact.*`, `http/`,
+- **`reveal()` calls** on a `SecretString` outside `core/secret.*`, `core/redact.*`, `http/http_client.*`,
   `providers/anthropic_*` and `tests/`. Only the transport may read the key's bytes; everything
   else asks `size()`, `empty()` or `contains()`, so a key cannot drift into a log line or an error
   message.
