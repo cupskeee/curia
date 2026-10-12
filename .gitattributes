@@ -9,3 +9,5 @@
 *.icns binary
 # The SSE fuzz seeds carry CR bytes and arbitrary bytes; never normalise line endings.
 app/fuzz/corpus_sse/* binary
+# Synthetic SSE fixtures hold CR bytes (the crlf stream) that line-ending conversion must not touch.
+tests/fixtures/anthropic/*.sse binary
