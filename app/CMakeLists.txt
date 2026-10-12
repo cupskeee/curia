@@ -42,15 +42,24 @@ add_library(curia_core STATIC
     src/bridge/record.cpp
     src/bridge/text_hygiene.cpp
     src/core/build_info.cpp
+    src/core/app_log.cpp
     src/core/cli.cpp
+    src/core/dev_config.cpp
+    src/core/redact.cpp
+    src/core/secret.cpp
     src/core/watch_log.cpp
     src/net/ca_bundle.cpp
+    src/net/endpoint_policy.cpp
     src/providers/cancel_token.cpp
     src/providers/sse_parser.cpp
     ${CURIA_PLATFORM_SOURCES})
 target_include_directories(curia_core PUBLIC src ${CMAKE_CURRENT_BINARY_DIR}/generated)
 find_package(Threads REQUIRED)
 target_link_libraries(curia_core PUBLIC nlohmann_json::nlohmann_json Threads::Threads)
+# Public, so that the tests see the same value the library was built with (they branch on it).
+if(CURIA_ENABLE_DEV_ENV)
+    target_compile_definitions(curia_core PUBLIC CURIA_ENABLE_DEV_ENV=1)
+endif()
 curia_configure_target(curia_core)
 
 # --- fuzz target: libFuzzer, Clang only (Apple's Clang ships no libFuzzer runtime) ---------------
@@ -169,7 +178,12 @@ if(CURIA_BUILD_TESTS)
         tests/test_bridge_splitter.cpp
         tests/test_build_info.cpp
         tests/test_cli.cpp
+        tests/test_app_log.cpp
         tests/test_ca_bundle.cpp
+        tests/test_dev_config.cpp
+        tests/test_endpoint_policy.cpp
+        tests/test_redact.cpp
+        tests/test_secret.cpp
         tests/test_log_tailer.cpp
         tests/test_log_watcher.cpp
         tests/test_platform.cpp

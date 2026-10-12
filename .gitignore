@@ -7,6 +7,10 @@ CMakeUserPresets.json
 # Local-only reference material: Paradox script dumps and raw game logs. NEVER commit these.
 /reference/
 
+# Dev content transcripts (CURIA_LOG_CONTENT) belong outside the repository; if one is made inside a checkout, keep it out.
+/curia_m4_results/
+/transcripts/
+
 # Local assistant configuration and notes (never committed)
 /CLAUDE.md
 /.claude/

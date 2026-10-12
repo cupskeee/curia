@@ -3,9 +3,14 @@
 
 #include <cstdlib>
 #include <filesystem>
+#include <functional>
 #include <string>
 
 namespace curia::platform {
+
+// A lookup of environment variables that code can be given instead of the real environment, so that
+// tests never depend on (or touch) the machine's variables. Returns an empty string if unset.
+using GetEnv = std::function<std::string(const char*)>;
 
 // Returns the value of an environment variable, or an empty string if it is unset.
 inline std::string getEnv(const char* name) {
