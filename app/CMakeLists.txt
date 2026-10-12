@@ -33,6 +33,14 @@ endif()
 configure_file(src/core/version.h.in ${CMAKE_CURRENT_BINARY_DIR}/generated/curia/version.h @ONLY)
 
 add_library(curia_core STATIC
+    src/advisor/chat_error_text.cpp
+    src/advisor/chat_session.cpp
+    src/advisor/freshness.cpp
+    src/advisor/log_silence_monitor.cpp
+    src/advisor/persona.cpp
+    src/advisor/prompt_builder.cpp
+    src/advisor/snapshot_renderer.cpp
+    src/advisor/snapshot_store.cpp
     src/bridge/bridge_pipeline.cpp
     src/bridge/frame_assembler.cpp
     src/bridge/frame_json.cpp
@@ -42,11 +50,14 @@ add_library(curia_core STATIC
     src/bridge/record.cpp
     src/bridge/text_hygiene.cpp
     src/core/build_info.cpp
+    src/core/app_controller.cpp
     src/core/app_log.cpp
     src/core/cli.cpp
     src/core/dev_config.cpp
     src/core/redact.cpp
     src/core/secret.cpp
+    src/core/ui_message.cpp
+    src/core/ui_pacing.cpp
     src/core/watch_log.cpp
     src/net/ca_bundle.cpp
     src/net/endpoint_policy.cpp
@@ -193,7 +204,13 @@ if(CURIA_BUILD_TESTS)
     find_package(doctest CONFIG REQUIRED)
     add_executable(curia_tests
         tests/test_main.cpp
+        tests/advisor_test_support.cpp
         tests/bridge_test_support.cpp
+        tests/test_advisor_monitor.cpp
+        tests/test_advisor_prompt.cpp
+        tests/test_advisor_renderer.cpp
+        tests/test_advisor_session.cpp
+        tests/test_app_controller.cpp
         tests/test_bridge_assembler.cpp
         tests/test_bridge_fixtures.cpp
         tests/test_bridge_hygiene.cpp
@@ -211,6 +228,7 @@ if(CURIA_BUILD_TESTS)
         tests/test_secret.cpp
         tests/test_log_tailer.cpp
         tests/test_log_watcher.cpp
+        tests/test_mailbox.cpp
         tests/test_platform.cpp
         tests/test_provider_types.cpp
         tests/test_sse_parser.cpp
@@ -230,7 +248,8 @@ if(CURIA_BUILD_TESTS)
     # The committed CURIA1 fixtures and their golden outputs (tests/fixtures/curia1/README.md).
     target_compile_definitions(curia_tests PRIVATE
         CURIA_FIXTURE_DIR="${PROJECT_SOURCE_DIR}/tests/fixtures"
-        CURIA_ANTHROPIC_FIXTURE_DIR="${PROJECT_SOURCE_DIR}/tests/fixtures/anthropic")
+        CURIA_ANTHROPIC_FIXTURE_DIR="${PROJECT_SOURCE_DIR}/tests/fixtures/anthropic"
+        CURIA_GOLDEN_DIR="${PROJECT_SOURCE_DIR}/tests/golden")
     curia_configure_target(curia_tests)
     include(doctest)
     doctest_discover_tests(curia_tests PROPERTIES LABELS unit)
