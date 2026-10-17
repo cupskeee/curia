@@ -15,8 +15,10 @@ Suite `chat` (ctest chat_e2e, labels e2e and chat):
     fixture's gold and heir (the `cite` scenario reads them out of the request's realm block), the
     second question reads the prompt cache (cache_read > 0); a question before any click sends the
     "nothing has been read" block;
-  * --effort and --thinking reach the request (and only when given), ready and done report them; a
-    thinking block gives one "thinking" status before the text and a thinking_started_ms;
+  * without flags the request carries Curia's default effort (low, D22) and no thinking setting;
+    --effort and --thinking reach the request, `--effort default` sends no effort setting, ready and
+    done report what was sent; a thinking block gives one "thinking" status before the text and a
+    thinking_started_ms;
   * the newest snapshot of an existing log is the default, --frame picks another, an unknown number
     is a setup error;
   * the log going silent: with `arm`, `restart_ck3` within the short test threshold; when the game
@@ -478,12 +480,12 @@ class ChatChainTest(ChatCase):
         self.assertIn("Treasury: 4321 gold", system[1]["text"])
         self.assertIn("Test Heir Quartz", system[1]["text"])
         self.assertIn("WHAT THE ADVISOR CAN SEE", system[0]["text"])  # the persona names the block
-        # No effort or thinking setting was given: none was sent.
-        self.assertEqual((first_record["thinking_type"], first_record["effort"]), (None, None))
+        # No flag was given: Curia's default (effort low, D22) was sent, and no thinking setting.
+        self.assertEqual((first_record["thinking_type"], first_record["effort"]), (None, "low"))
         self.assertNotIn("thinking", first_record["body_json"])
-        self.assertNotIn("output_config", first_record["body_json"])
-        self.assertEqual((child.of("ready")[0]["effort"], child.of("ready")[0]["thinking"]), ("default", "default"))
-        self.assertEqual((done["effort"], done["thinking"]), ("default", "default"))
+        self.assertEqual(first_record["body_json"]["output_config"], {"effort": "low"})
+        self.assertEqual((child.of("ready")[0]["effort"], child.of("ready")[0]["thinking"]), ("low", "default"))
+        self.assertEqual((done["effort"], done["thinking"]), ("low", "default"))
         self.assertNotIn("thinking_started_ms", done)
         self.assertEqual(first_record["headers"]["authorization"], ml.key_digest("Bearer " + key))
         self.assert_key_absent(key, mock.records_text(), "the mock's records")
@@ -519,23 +521,35 @@ class ChatChainTest(ChatCase):
         self.assertEqual(record["body_json"]["thinking"], {"type": "between_tools"})
         self.assertEqual(record["body_json"]["output_config"], {"effort": "low"})
 
-        # Each one alone sends only itself.
-        for args, expected in ((["--effort", "max"], (None, "max")), (["--thinking", "disabled"], ("disabled", None))):
+        # Each flag alone changes only its own setting; the effort is Curia's default (low) unless
+        # --effort says otherwise, and "--effort default" sends none (what rounds 1 and 2 called the
+        # default). The events say "default" for a setting that was not sent.
+        cases = (
+            (["--effort", "max"], (None, "max"), ("max", "default")),
+            (["--thinking", "disabled"], ("disabled", "low"), ("low", "disabled")),
+            (["--effort", "default"], (None, None), ("default", "default")),
+            (["--effort", "default", "--thinking", "disabled"], ("disabled", None), ("default", "disabled")),
+        )
+        for args, expected, reported in cases:
             alone = self.start_curia(mock, fake.log_path, fake_key(), args=["--from-start"] + args)
-            alone.wait_kind("ready")
+            ready = alone.wait_kind("ready")
             alone.send("ask again?")
-            alone.wait_kind("done")
+            done = alone.wait_kind("done")
             alone.close_stdin()
             self.assertEqual(alone.wait_exit(), 0)
+            self.assertEqual((ready["effort"], ready["thinking"]), reported, args)
+            self.assertEqual((done["effort"], done["thinking"]), reported, args)
             last = mock.wait_record(len(mock.records()) - 1)
-            self.assertEqual((last["thinking_type"], last["effort"]), expected)
+            self.assertEqual((last["thinking_type"], last["effort"]), expected, args)
+            self.assertEqual("output_config" in last["body_json"], expected[1] is not None, args)
+            self.assertEqual("thinking" in last["body_json"], expected[0] is not None, args)
             self.assertEqual(last["violations"], [])
 
         # A bad value is a usage error before anything is read or sent.
         bad = self.start_curia(mock, fake.log_path, fake_key(), args=["--from-start", "--effort", "extreme"])
         self.assertEqual(bad.wait_exit(), 2)
-        self.assertIn("--effort needs low, medium, high, xhigh or max", bad.stderr_text())
-        self.assertEqual(len(mock.records()), 3)
+        self.assertIn("--effort needs default, low, medium, high, xhigh or max", bad.stderr_text())
+        self.assertEqual(len(mock.records()), 1 + len(cases))
 
     def test_a_thinking_block_gives_one_thinking_status_before_the_text(self) -> None:
         mock = self.start_mock("--default", "thinking_blocks")
@@ -807,7 +821,11 @@ class CheckApiTest(ChatCase):
         self.assertEqual(summary["status"], "200")
         self.assertEqual(summary["auth"], "bearer")
         self.assertEqual(summary["cache_probe"], "hit")
-        self.assertEqual((summary["effort"], summary["thinking"]), ("default", "default"))
+        # Curia's default settings (D22): effort low, no thinking setting, in every request.
+        self.assertEqual((summary["effort"], summary["thinking"]), ("low", "default"))
+        # Whole lines (splitlines): the program's stdout ends its lines with CRLF on Windows.
+        self.assertIn("[info] Effort and thinking: every request of this check carries effort low (Curia's default)",
+                      done.stdout.decode().splitlines())
         self.assertGreater(int(summary["cache_write"]), 0)
         self.assertGreater(int(summary["cache_read"]), 0)
         text = done.stdout.decode() + done.stderr.decode()
@@ -817,6 +835,7 @@ class CheckApiTest(ChatCase):
         self.assertEqual(records[1]["body_sha256"], records[2]["body_sha256"])
         for record in records:
             self.assertEqual(record["violations"], [])
+            self.assertEqual((record["thinking_type"], record["effort"]), (None, "low"))
 
     def test_the_cache_probe_says_so_when_nothing_is_cached(self) -> None:
         mock = self.start_mock("--default", "cache_demo", "--min-cacheable-tokens", "100000")
@@ -833,25 +852,42 @@ class CheckApiTest(ChatCase):
         summary = self.summary(done)
         self.assertEqual((summary["effort"], summary["thinking"]), ("medium", "adaptive"))
         self.assertIn("[info] Effort and thinking: every request of this check carries --effort medium "
-                      "--thinking adaptive", text)
+                      "and --thinking adaptive", text)
         records = mock.records()
         self.assertEqual(len(records), 3)
         for record in records:
             self.assertEqual((record["thinking_type"], record["effort"]), ("adaptive", "medium"))
             self.assertEqual(record["violations"], [])
-        # Refused (HTTP 400) with a setting: the advice names the setting.
+        # Refused (HTTP 400) with a setting: the advice names the settings sent and how to drop them.
         refused = self.start_mock("--default", "http_400")
         done = self.run_check(refused, fake_key(), ["--thinking", "disabled"])
         text = done.stdout.decode()
         self.assertEqual(done.returncode, 1, text[-1500:])
-        self.assertIn("The request carried --thinking disabled.", text)
+        self.assertIn("The request carried effort low (Curia's default) and --thinking disabled.", text)
         self.assertIn("only at effort high or below", text)
-        # Without one, no such line; and the default check sends neither key.
+        self.assertIn("Run the same check with --effort default and without --thinking", text)
+        only_thinking = self.start_mock("--default", "http_400")
+        done = self.run_check(only_thinking, fake_key(), ["--effort", "default", "--thinking", "disabled"])
+        text = done.stdout.decode()
+        self.assertIn("The request carried --thinking disabled.", text)
+        self.assertIn("Run the same check without --thinking (then no thinking setting is sent)", text)
+        # The default check carries Curia's default effort, and says so.
+        default = self.start_mock("--default", "http_400")
+        done = self.run_check(default, fake_key())
+        text = done.stdout.decode()
+        self.assertIn("[info] Effort and thinking: every request of this check carries effort low (Curia's default)", text)
+        self.assertIn("The request carried effort low (Curia's default). The model may not support that effort setting.",
+                      text)
+        self.assertIn("Run the same check with --effort default (then no effort setting is sent)", text)
+        self.assertEqual((default.wait_record(0)["thinking_type"], default.wait_record(0)["effort"]), (None, "low"))
+        # With --effort default nothing is sent, so no such line.
         plain = self.start_mock("--default", "http_400")
-        done = self.run_check(plain, fake_key())
-        self.assertNotIn("effort or thinking setting", done.stdout.decode())
+        done = self.run_check(plain, fake_key(), ["--effort", "default"])
+        self.assertNotIn("The request carried", done.stdout.decode())
         self.assertNotIn("Effort and thinking", done.stdout.decode())
+        self.assertIn(" effort=default thinking=default ", done.stdout.decode())
         self.assertEqual((plain.wait_record(0)["thinking_type"], plain.wait_record(0)["effort"]), (None, None))
+        self.assertNotIn("output_config", plain.wait_record(0)["body_json"])
         # A bad value is a usage error.
         bad = subprocess.run([CURIA, "--check-api", "--thinking", "enabled"], stdin=subprocess.DEVNULL,
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=self.env(fake_key(), "mock-model-1"),
@@ -865,14 +901,20 @@ class CheckApiTest(ChatCase):
         scenario.write_text(json.dumps({"steps": [{"gen": "answer", "thinking": True, "text_parts": [],
                                                    "stop_reason": "max_tokens",
                                                    "usage": {"input_tokens": 25, "output_tokens": 256}}]}))
-        for args, named in ((["--effort", "max"], True), ([], False)):
+        # Without up-front thinking (--thinking disabled) the note would not fit, so it is left out.
+        cases = ((["--effort", "max"], "--effort max"), ([], "effort low (Curia's default)"), (["--effort", "default"], None),
+                 (["--thinking", "disabled"], None))
+        for args, named in cases:
             mock = self.start_mock("--scenario", str(scenario))
             done = self.run_check(mock, fake_key(), args)
             text = done.stdout.decode()
             self.assertEqual(done.returncode, 0, text[-1500:])
             self.assertIn("no text came back", text)
-            line = "The request carried --effort max. Thinking counts toward the check's 256-token answer limit"
-            self.assertEqual(line in text, named, text[-1500:])
+            tail = ". Thinking counts toward the check's 256-token answer limit"
+            if named is None:
+                self.assertNotIn(tail, text, text[-1500:])
+            else:
+                self.assertIn("The request carried " + named + tail, text, text[-1500:])
 
     def test_the_other_sign_in_header(self) -> None:
         mock = self.start_mock()

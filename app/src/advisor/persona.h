@@ -8,8 +8,10 @@ namespace curia::advisor {
 // Bumped whenever the persona text changes in meaning (the app log records it, so a quality
 // comparison between two runs says which text was used). 2 was the text of the first quality
 // check; 3 is the revision after it (plain words, about 120 words, bold only, general mechanics,
-// "probably" when inferring).
-inline constexpr int kPersonaVersion = 3;
+// "probably" when inferring); 4 is the revision after the second check (under 120 words with an
+// optional one-line offer, names without quotation marks, "from what I can see" at most once per
+// conversation, no opening with the date unless a "[Context:" line asks for it).
+inline constexpr int kPersonaVersion = 4;
 
 // The persona: the first system block of every request. It is the same bytes for the whole life of
 // the process, so the provider can cache it. The text speaks as "the advisor"; it names no product

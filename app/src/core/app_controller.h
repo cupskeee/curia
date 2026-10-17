@@ -88,9 +88,10 @@ public:
         UiMailbox::Wake wake;
         advisor::LogSilenceConfig silence;
         // What every request asks for: the answer limit, and the effort and thinking settings
-        // (Default sends nothing; decision D22).
+        // (Curia's default effort, kDefaultEffort, and no thinking setting: decision D22; Default
+        // sends nothing).
         int maxTokens = 4096;
-        providers::Effort effort = providers::Effort::Default;
+        providers::Effort effort = providers::kDefaultEffort;
         providers::Thinking thinking = providers::Thinking::Default;
         // Ask the provider to report the model's reasoning as it happens (the session shows only
         // that the model is thinking, never the reasoning text).

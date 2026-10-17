@@ -116,8 +116,7 @@ bool validate(const CliOptions& out, std::string& error) {
     }
     if (!out.headlessChat && !out.checkApi &&
         (!out.testEndpoint.empty() || out.auth != AuthMode::Bearer || !out.appLogDir.empty() ||
-         out.effort != providers::Effort::Default ||
-         out.thinking != providers::Thinking::Default)) {
+         out.effortGiven || out.thinkingGiven)) {
         error = "--test-endpoint, --auth, --log-dir, --effort and --thinking need --headless-chat "
                 "or --check-api";
         return false;
@@ -203,13 +202,19 @@ bool parseCli(int argc, const char* const* argv, CliOptions& out, std::string& e
                 return false;
             }
         } else if (arg == "--effort") {
-            const std::optional<providers::Effort> effort =
-                i + 1 < argc ? providers::parseEffort(argv[i + 1]) : std::nullopt;
+            // "default" is a word of the command line only: it sends no effort setting.
+            std::optional<providers::Effort> effort;
+            if (i + 1 < argc) {
+                effort = std::string_view(argv[i + 1]) == "default"
+                             ? std::optional<providers::Effort>(providers::Effort::Default)
+                             : providers::parseEffort(argv[i + 1]);
+            }
             if (!effort.has_value()) {
-                error = "--effort needs low, medium, high, xhigh or max";
+                error = "--effort needs default, low, medium, high, xhigh or max";
                 return false;
             }
             out.effort = *effort;
+            out.effortGiven = true;
             ++i;
         } else if (arg == "--thinking") {
             const std::optional<providers::Thinking> thinking =
@@ -219,6 +224,7 @@ bool parseCli(int argc, const char* const* argv, CliOptions& out, std::string& e
                 return false;
             }
             out.thinking = *thinking;
+            out.thinkingGiven = true;
             ++i;
         } else if (arg == "--log-dir") {
             if (!textFlag(argc, argv, i, arg, out.appLogDir, error)) {
@@ -254,6 +260,10 @@ bool parseCli(int argc, const char* const* argv, CliOptions& out, std::string& e
     return validate(out, error);
 }
 
+// The usage text names the default effort.
+static_assert(providers::kDefaultEffort == providers::Effort::Low,
+              "update the --effort line of cliUsage()");
+
 std::string_view cliUsage() {
     return "Usage: curia [--smoke | --idle-test <seconds> | --watch-log <path> [--from-start]\n"
            "             [--max-frames <n>] [--timeout-seconds <s>]] [--version] [--help]\n"
@@ -287,9 +297,9 @@ std::string_view cliUsage() {
            "                       the real service (key, model, TLS, sign-in header, one tiny\n"
            "                       answer; --cache-probe also tests the prompt cache). Exit 0 ok,\n"
            "                       1 a step failed, 2 not configured, 3 timeout\n"
-           "  --effort <level>     with --headless-chat or --check-api: send the effort\n"
-           "                       setting low, medium, high, xhigh or max (not given: none is\n"
-           "                       sent and the model's default applies)\n"
+           "  --effort <level>     with --headless-chat or --check-api: the effort setting low,\n"
+           "                       medium, high, xhigh or max. Without it Curia sends low;\n"
+           "                       --effort default sends none (the model's default applies)\n"
            "  --thinking <mode>    likewise the thinking setting: adaptive, between_tools or\n"
            "                       disabled (not given: none is sent). A model that does not\n"
            "                       support a value answers HTTP 400\n"

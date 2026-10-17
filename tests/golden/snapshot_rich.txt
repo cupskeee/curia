@@ -23,10 +23,10 @@ Claims: 3 explicit (all listed); implicit claims: 2 (a count only, not listed)
   2. "Test Duchy Of Epsilon" (duchy): unpressed
   3. "Test Barony Of Zeta" (barony): unpressed
 Factions (Factions window): 1 against you; you are in a faction: yes
-  Power and threshold are the Factions window's figures: power is approximate (about +-1) and can be above the threshold, and a threshold of 0 can occur. Not shown: how close a faction is to acting (its discontent), and who the members are (only their number), so whether a claimant is a member is not known.
+  Power and threshold are the Factions window's figures: power is approximate (about +-1) and can be above the threshold, and a threshold of 0 can occur. Not shown here: how close a faction is to acting (its discontent) and who the members are (only their number), so whether a claimant is a member is not known. The player can see each faction's members in the Factions window.
   1. against you, claimant faction: power 33, threshold 100, 2 members
-     leader: "Test Vassal Two" (your vassal #2 by strength); claimant: "Test Claimant Eta"; wants the title "Test Duchy Of Epsilon" (duchy); target: you
+     leader: "Test Vassal Two" (your vassal #2 by strength); claimant: "Test Claimant Eta" (not among the listed vassals); wants the title "Test Duchy Of Epsilon" (duchy); target: you
   2. you are a member, independence faction: power 12, threshold 60, 3 members
-     leader: "Test Vassal Five" (your vassal #5 by strength); target: "Test Liege Theta"
+     leader: "Test Vassal Five" (your vassal #5 by strength); target: "Test Liege Theta" (not among the listed vassals)
 Not shown at all: your skills, traits and stress, your court and family beyond the heir, the titles and land you hold, your own armies, buildings, schemes and plots, other realms, war score and enemy strength in your wars, faction discontent, and anything that happened before or after this moment.
 === END OF WHAT THE ADVISOR CAN SEE ===

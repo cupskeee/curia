@@ -91,6 +91,17 @@ class SettingTests(unittest.TestCase):
         self.assertEqual(qt.setting_of({}), "default")
         self.assertEqual(qt.setting_of({"effort": 3, "thinking": None}), "default")
 
+    def test_curias_default_and_no_setting_at_all(self):
+        # Since D22 a run without flags sends effort low and no thinking setting; a run with
+        # --effort default (rounds 1 and 2's "default") sends neither.
+        for effort, thinking, expected in (("low", "default", "effort low"), ("default", "default", "default")):
+            with self.subTest(effort=effort, thinking=thinking):
+                ready = dict(READY, effort=effort, thinking=thinking)
+                done = dict(DONE, effort=effort, thinking=thinking)
+                rows = qt.rows_from_events([ready, {"event": "ask", "text": "q1"}, done])
+                self.assertEqual(rows[0]["setting"], expected)
+                self.assertEqual(qt.summary_rows(rows)[0][1], expected)
+
     def test_labels_come_from_the_file_names(self):
         self.assertEqual(qt.label_of("sonnet2-low-q3.jsonl"), "sonnet2-low")
         self.assertEqual(qt.label_of("/x/y/haiku-q12.jsonl"), "haiku")

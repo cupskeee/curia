@@ -51,12 +51,17 @@ struct CliOptions {
     bool cacheProbe = false;
 
     // Shared by headless chat and --check-api.
-    // --effort low|medium|high|xhigh|max and --thinking adaptive|between_tools|disabled: sent as
-    // the request's output_config.effort and thinking.type; not given = not sent (Default). No
-    // secret in them, so they work in every build. A model that does not support a value answers
-    // HTTP 400.
-    providers::Effort effort = providers::Effort::Default;
+    // --effort default|low|medium|high|xhigh|max and --thinking adaptive|between_tools|disabled:
+    // sent as the request's output_config.effort and thinking.type. Without --effort the effort is
+    // Curia's default (providers::kDefaultEffort, D22); "--effort default" sends none (Default),
+    // so the model's own default applies. Without --thinking none is sent (Default). No secret in
+    // them, so they work in every build. A model that does not support a value answers HTTP 400.
+    providers::Effort effort = providers::kDefaultEffort;
     providers::Thinking thinking = providers::Thinking::Default;
+    // Whether --effort / --thinking was given (the reports say whether a setting is Curia's
+    // default or the flag's, and the flags need a mode that sends requests).
+    bool effortGiven = false;
+    bool thinkingGiven = false;
     // --test-endpoint http://127.0.0.1:PORT: a mock server (development builds only; the rules
     // are net/endpoint_policy.h). Empty = the real service.
     std::string testEndpoint;

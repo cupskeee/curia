@@ -44,8 +44,9 @@ inline constexpr int kDefaultHeadlessTickMs = 500;
 //   ready          the log is read up to its end at the start (or attached, when it is tailed
 //                  from its end): {from_start, snapshot (snap or null), date, frames, model,
 //                  effort, thinking, persona_version, transcripts (folder or null)}; effort and
-//                  thinking are the wire words of --effort / --thinking, "default" when not given
-//                  (then nothing is sent)
+//                  thinking are the wire words the requests carry, "default" for none sent: the
+//                  effort is Curia's default ("low", D22) unless --effort is given ("--effort
+//                  default" sends none), the thinking "default" unless --thinking is given
 //   snapshot       a frame was stored or the export became unreadable: {sequence, snap, date,
 //                  complete, unreadable, probe}
 //   overlay_open   the game's Advisor button was clicked (source game_click), or `arm` / `refresh`

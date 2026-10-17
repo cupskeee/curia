@@ -486,9 +486,11 @@ TEST_CASE("snapshot: the factions show the limits of power and threshold") {
     const std::string text = renderSnapshot(richFrame());
     CHECK(contains(text, "power is approximate (about +-1)"));
     CHECK(contains(text, "a threshold of 0 can occur"));
-    CHECK(contains(text, "Not shown: how close a faction is to acting (its discontent), and who "
-                         "the members are (only their number), so whether a claimant is a member "
-                         "is not known."));
+    CHECK(contains(text, "Not shown here: how close a faction is to acting (its discontent) and "
+                         "who the members are (only their number), so whether a claimant is a "
+                         "member is not known."));
+    // Where the player can see the members (owner, round 2: answers called the faction secret).
+    CHECK(contains(text, "The player can see each faction's members in the Factions window."));
     // No faction listed: no note.
     CHECK_FALSE(contains(renderSnapshot(emptyFrame()), "threshold"));
 }
@@ -559,6 +561,84 @@ TEST_CASE("snapshot: every game string goes through the hygiene") {
     const std::string marked = renderSnapshot(frame);
     CHECK(count(lower(marked), "advisor can see") == 2);
     CHECK(count(marked, "End of what the advisor can_see") >= 8);
+}
+
+TEST_CASE("snapshot: people who are not among the listed vassals say so") {
+    // The rich frame lists 10 of 14 vassals: the claimant and the target of the ruler's own faction
+    // are not among them; the leaders are listed vassals and keep their rank; the ruler is "you".
+    std::string text = renderSnapshot(richFrame());
+    CHECK(contains(text, "claimant: \"Test Claimant Eta\" (not among the listed vassals);"));
+    CHECK(contains(text, "target: \"Test Liege Theta\" (not among the listed vassals)\n"));
+    CHECK(contains(text, "leader: \"Test Vassal Two\" (your vassal #2 by strength);"));
+    CHECK(contains(text, "leader: \"Test Vassal Five\" (your vassal #5 by strength);"));
+    CHECK(contains(text, "target: you\n"));
+    CHECK(count(text, "(not among the listed vassals)") == 2);
+
+    // A leader who is not a listed vassal (round 2: a model took one for a strong vassal).
+    curia::bridge::Frame frame = richFrame();
+    mustRef(mustRef(frame.factions).listed[0].leader) =
+        curia::bridge::CharacterRef{5001, "Test Outsider Iota"};
+    text = renderSnapshot(frame);
+    CHECK(contains(text, "leader: \"Test Outsider Iota\" (not among the listed vassals); "));
+
+    // The heir keeps the heir's label, even when the vassals are shown.
+    frame = richFrame();
+    mustRef(mustRef(frame.factions).listed[0].leader) =
+        curia::bridge::CharacterRef{mustRef(frame.heir).id, "Test Heir Two"};
+    text = renderSnapshot(frame);
+    CHECK(contains(text, "leader: \"Test Heir Two\" (your heir); "));
+
+    // A vassals section that lists nobody still says it, and there is nobody else to be.
+    frame = richFrame();
+    mustRef(frame.vassals).total = 0;
+    mustRef(frame.vassals).listed.clear();
+    text = renderSnapshot(frame);
+    CHECK(contains(text, "Vassals (Vassals window): none"));
+    CHECK(contains(text, "leader: \"Test Vassal Two\" (not among the listed vassals); "));
+    CHECK(count(text, "(not among the listed vassals)") == 4);
+
+    // A faction against the ruler, led by `leaderId`, in a frame with these vassals.
+    const auto withLeader = [](curia::bridge::Frame base, std::int32_t leaderId) {
+        curia::bridge::FactionsSection section;
+        section.against = 1;
+        curia::bridge::Faction faction;
+        faction.role = curia::bridge::FactionRole::Against;
+        faction.type = 1;
+        faction.leader = curia::bridge::CharacterRef{leaderId, "Test Leader"};
+        faction.target = curia::bridge::CharacterRef{base.rulerId, "Test Ruler One"};
+        section.listed.push_back(faction);
+        base.factions = section;
+        return renderSnapshot(base);
+    };
+
+    // Every vassal listed, or one not listed (the owner's realm in the quality check: 10 of 11):
+    // the label is the same, since the ids do not tell whether the person is the vassal not listed.
+    CHECK(contains(withLeader(frameWithVassals(10, 10), 5001),
+                   "leader: \"Test Leader\" (not among the listed vassals); target: you"));
+    CHECK(contains(withLeader(frameWithVassals(11, 10), 5001),
+                   "leader: \"Test Leader\" (not among the listed vassals); target: you"));
+
+    // A vassal past the renderer's cap is not listed, so it is not among the listed vassals.
+    frame = frameWithVassals(12, 10);
+    for (int rank = 11; rank <= 12; ++rank) {
+        curia::bridge::Vassal vassal;
+        vassal.rank = rank;
+        vassal.id = 2000 + rank;
+        vassal.name = "Test Extra";
+        mustRef(frame.vassals).listed.push_back(vassal);
+    }
+    CHECK(contains(withLeader(frame, 2011),
+                   "leader: \"Test Leader\" (not among the listed vassals); target: you"));
+
+    // No vassals section: whether they are vassals is not known, so nothing is said.
+    frame = richFrame();
+    frame.vassals.reset();
+    text = renderSnapshot(frame);
+    CHECK(contains(text, "Vassals (Vassals window): not shown"));
+    CHECK_FALSE(contains(text, "not among the listed vassals"));
+    CHECK_FALSE(contains(text, "by strength"));
+    CHECK(contains(text, "leader: \"Test Vassal Two\"; claimant: \"Test Claimant Eta\"; "));
+    CHECK(contains(text, "target: \"Test Liege Theta\"\n"));
 }
 
 TEST_CASE("snapshot: a claimant in a faction of another type is not shown") {

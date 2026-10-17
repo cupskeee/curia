@@ -35,6 +35,16 @@ struct CacheHints {
 // rules in the app).
 enum class Effort { Default, Low, Medium, High, XHigh, Max };
 
+// The effort Curia asks for unless told otherwise (D22, owner, 2026-10-17, from the M4 quality
+// check round 2: the first word after about 1 s instead of 6 s and about 60% fewer output tokens,
+// rated as good as the default by the owner, average 4.4 against 4.6; the model can still think on
+// harder questions, as it did on one question of five). The thinking setting
+// stays Thinking::Default (not sent: the model's own adaptive thinking). The data types below keep
+// Default as their own default, so a request built without a setting sends none; the places that
+// stand for the app's choice (the controller's options, the prompt settings and the command
+// line's options) start from this.
+inline constexpr Effort kDefaultEffort = Effort::Low;
+
 // The thinking mode (the Messages API's thinking.type). Default sends nothing (current models then
 // think adaptively); "between_tools" and "disabled" are accepted only by some models, and only at
 // some efforts (the API answers 400 otherwise).
@@ -74,8 +84,8 @@ constexpr const char* toString(Thinking thinking) noexcept {
     return "default";
 }
 
-// The value of a wire word; nullopt for anything else ("default" included: leaving the setting
-// out is how Default is chosen).
+// The value of a wire word; nullopt for anything else ("default" included: it is no wire word.
+// The command line maps "--effort default" to Effort::Default itself).
 constexpr std::optional<Effort> parseEffort(std::string_view word) noexcept {
     for (const Effort effort :
          {Effort::Low, Effort::Medium, Effort::High, Effort::XHigh, Effort::Max}) {
@@ -107,7 +117,8 @@ struct ChatRequest {
     std::vector<Message> conversation;
     // Thinking tokens count toward it on current models.
     int maxTokens = 4096;
-    // Sent only when not Default (D22: the default stays unset until the owner has measured).
+    // Sent only when not Default. The app's own choice is kDefaultEffort (D22); this member stays
+    // Default, so a request that sets nothing sends nothing.
     Effort effort = Effort::Default;
     Thinking thinking = Thinking::Default;
     // Deliver the model's reasoning text as Thinking tokens (a display matter, not a request key).
