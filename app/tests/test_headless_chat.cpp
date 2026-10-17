@@ -16,6 +16,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include "advisor/persona.h"
 #include "advisor_test_support.h"
 #include "bridge_test_support.h"
 #include "core/headless_chat.h"
@@ -135,6 +136,9 @@ TEST_CASE("headless chat: the newest snapshot, a question, a streamed answer") {
     CHECK(ready["frames"] == 3);
     CHECK(ready["from_start"] == true);
     CHECK(ready["model"] == "mock-model-1");
+    CHECK(ready["effort"] == "default");
+    CHECK(ready["thinking"] == "default");
+    CHECK(ready["persona_version"] == curia::advisor::kPersonaVersion);
     CHECK(ready["transcripts"].is_null());
     // Catching up with the log does not report every old frame: one snapshot, then ready.
     CHECK(run.of("snapshot").size() == 1);
@@ -153,6 +157,10 @@ TEST_CASE("headless chat: the newest snapshot, a question, a streamed answer") {
     CHECK(done["generation"] == 1);
     CHECK(done["max_tokens"] == false);
     CHECK(done["total_ms"].is_number());
+    CHECK(done["effort"] == "default");
+    CHECK(done["thinking"] == "default");
+    CHECK_FALSE(done.contains("thinking_started_ms"));  // no thinking block came
+    CHECK(run.of("status").size() == 2);                // waiting, streaming; no "thinking"
     std::string joined;
     for (const json& token : run.of("token")) {
         joined += token["text"].get<std::string>();
@@ -163,6 +171,51 @@ TEST_CASE("headless chat: the newest snapshot, a question, a streamed answer") {
     REQUIRE(rig.provider->callCount() == 1);
     CHECK(rig.provider->call(0).request.snapshotText.find("Test Heir Two") != std::string::npos);
     CHECK(run.of("ask")[0]["text"] == "is my heir safe?");
+}
+
+TEST_CASE("headless chat: the effort and thinking settings reach the request and the events") {
+    Rig rig;
+    rig.config.options.effort = curia::providers::Effort::Low;
+    rig.config.options.thinking = curia::providers::Thinking::BetweenTools;
+    FakeProvider::Script script;
+    script.tokens = {"Think ", "less."};
+    script.onThread = true;
+    script.thinkingFirst = true;
+    script.gap = std::chrono::milliseconds(20);
+    rig.provider->setScript(script);
+    const Run run = rig.run("ask one\nask two\n");
+    CHECK(run.result.exitCode == curia::kHeadlessExitOk);
+    REQUIRE(rig.provider->callCount() == 2);
+    CHECK((rig.provider->call(0).request.effort == curia::providers::Effort::Low));
+    CHECK((rig.provider->call(0).request.thinking == curia::providers::Thinking::BetweenTools));
+    REQUIRE(run.of("ready").size() == 1);
+    CHECK(run.of("ready")[0]["effort"] == "low");
+    CHECK(run.of("ready")[0]["thinking"] == "between_tools");
+    REQUIRE(run.of("done").size() == 2);
+    for (const json& done : run.of("done")) {
+        CHECK(done["effort"] == "low");
+        CHECK(done["thinking"] == "between_tools");
+        REQUIRE(done.contains("thinking_started_ms"));
+        CHECK(done["thinking_started_ms"].get<long long>() >= 0);
+        CHECK(done["thinking_started_ms"].get<long long>() <=
+              done["first_token_ms"].get<long long>());
+    }
+    // "thinking" once per answer, after "waiting" and before the answer's first token.
+    const std::vector<std::string> names = run.names();
+    std::vector<std::string> states;
+    for (const json& status : run.of("status")) {
+        states.push_back(status["state"].get<std::string>());
+    }
+    CHECK((states == std::vector<std::string>{"waiting", "thinking", "streaming", "waiting",
+                                              "thinking", "streaming"}));
+    std::size_t thinkingAt = names.size();
+    for (std::size_t i = 0; i < run.events.size(); ++i) {
+        if (run.events[i]["event"] == "status" && run.events[i]["state"] == "thinking") {
+            thinkingAt = i;
+            break;
+        }
+    }
+    CHECK(thinkingAt < indexOf(names, "token"));
 }
 
 TEST_CASE("headless chat: --frame selects a snapshot, an unknown number ends the run") {

@@ -177,6 +177,14 @@ TEST_CASE("transcript: the text has the question, the answer, the usage and the 
     CHECK(text.find("--- answer ---\nYour heir \"Test Heir Two\" likes you.\n") !=
           std::string::npos);
     CHECK(text.find("error:") == std::string::npos);
+    // The settings sit next to the model and the persona version; "default" when not sent.
+    CHECK(text.find("persona_version: 2\neffort: default\nthinking: default\n") !=
+          std::string::npos);
+    TranscriptRecord tuned = sampleRecord();
+    tuned.effort = "low";
+    tuned.thinking = "between_tools";
+    const std::string tunedText = curia::formatTranscript(tuned, std::chrono::system_clock::now());
+    CHECK(tunedText.find("effort: low\nthinking: between_tools\n") != std::string::npos);
 }
 
 TEST_CASE("transcript: game text is kept, keys are scrubbed everywhere") {

@@ -43,18 +43,22 @@ inline constexpr int kDefaultHeadlessTickMs = 500;
 // Events (all on stdout, key "event"; the text values are redacted):
 //   ready          the log is read up to its end at the start (or attached, when it is tailed
 //                  from its end): {from_start, snapshot (snap or null), date, frames, model,
-//                  persona_version, transcripts (folder or null)}
+//                  effort, thinking, persona_version, transcripts (folder or null)}; effort and
+//                  thinking are the wire words of --effort / --thinking, "default" when not given
+//                  (then nothing is sent)
 //   snapshot       a frame was stored or the export became unreadable: {sequence, snap, date,
 //                  complete, unreadable, probe}
 //   overlay_open   the game's Advisor button was clicked (source game_click), or `arm` / `refresh`
 //                  (source hotkey / refresh): {source, probe}
 //   ask            a question was accepted: {generation, text}
-//   status         {state: waiting | streaming | thinking}
+//   status         {state: waiting | streaming | thinking}; "thinking" at most once per answer,
+//                  when the model starts a thinking block before the first text
 //   token          the next piece of the answer text: {text}
 //   text_reset     rare: redaction changed text that was already sent; the whole text: {text}
 //   done           the answer is complete: {generation, text, first_token_ms, total_ms, usage:
 //                  {input, output, cache_read, cache_write}, stop_reason, max_tokens (the limit
-//                  cut it off)}
+//                  cut it off), effort, thinking (as in ready), thinking_started_ms (from the ask
+//                  to the first thinking block; absent when none came before the text)}
 //   cancelled      the answer was stopped: {generation, text (what was received), total_ms}
 //   error          the question failed: {generation, code, message, detail, retryable, http_status,
 //                  retry_after, request_id, partial_len, partial_text, total_ms}

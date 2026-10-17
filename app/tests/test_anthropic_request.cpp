@@ -5,6 +5,7 @@
 #include <set>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include <nlohmann/json.hpp>
@@ -21,8 +22,10 @@ using curia::providers::buildAnthropicRequest;
 using curia::providers::buildAnthropicRequestJson;
 using curia::providers::BuiltRequest;
 using curia::providers::ChatRequest;
+using curia::providers::Effort;
 using curia::providers::Message;
 using curia::providers::Role;
+using curia::providers::Thinking;
 using nlohmann::json;
 
 namespace {
@@ -379,10 +382,11 @@ TEST_CASE("request: invalid UTF-8 in the model name does not throw either") {
     CHECK((body["model"] == "mock\xEF\xBF\xBD"));
 }
 
-TEST_CASE("request: no thinking, sampling, tool or metadata keys, anywhere") {
-    const std::set<std::string> forbidden = {
-        "thinking",    "budget_tokens", "temperature", "top_p",          "top_k",
-        "tool_choice", "tools",         "metadata",    "stop_sequences", "service_tier"};
+TEST_CASE("request: by default no thinking, effort, sampling, tool or metadata keys, anywhere") {
+    const std::set<std::string> forbidden = {"thinking",     "budget_tokens", "temperature",
+                                             "top_p",        "top_k",         "tool_choice",
+                                             "tools",        "metadata",      "stop_sequences",
+                                             "service_tier", "output_config", "effort"};
     std::vector<ChatRequest> requests;
     requests.push_back(basicRequest());
     ChatRequest noSystem = basicRequest();
@@ -416,6 +420,62 @@ TEST_CASE("request: no thinking, sampling, tool or metadata keys, anywhere") {
             CHECK(allowed.count(key) == 1);
         }
     }
+}
+
+TEST_CASE("request: the effort and thinking settings, each alone and together") {
+    const std::vector<std::pair<Effort, std::string>> efforts = {{Effort::Low, "low"},
+                                                                 {Effort::Medium, "medium"},
+                                                                 {Effort::High, "high"},
+                                                                 {Effort::XHigh, "xhigh"},
+                                                                 {Effort::Max, "max"}};
+    for (const auto& entry : efforts) {
+        const std::string& word = entry.second;
+        CAPTURE(word);
+        ChatRequest request = basicRequest();
+        request.effort = entry.first;
+        const json body = parsed(buildAnthropicRequestJson(request));
+        CHECK((body["output_config"] == json{{"effort", word}}));
+        CHECK_FALSE(body.contains("thinking"));
+    }
+    const std::vector<std::pair<Thinking, std::string>> modes = {
+        {Thinking::Adaptive, "adaptive"},
+        {Thinking::BetweenTools, "between_tools"},
+        {Thinking::Disabled, "disabled"}};
+    for (const auto& entry : modes) {
+        const std::string& word = entry.second;
+        CAPTURE(word);
+        ChatRequest request = basicRequest();
+        request.thinking = entry.first;
+        const json body = parsed(buildAnthropicRequestJson(request));
+        // Only the type: no budget, no display, nothing else next to it.
+        CHECK((body["thinking"] == json{{"type", word}}));
+        CHECK_FALSE(body.contains("output_config"));
+    }
+
+    ChatRequest both = basicRequest();
+    both.effort = Effort::Low;
+    both.thinking = Thinking::BetweenTools;
+    const std::string bytes = buildAnthropicRequestJson(both);
+    CHECK((bytes == buildAnthropicRequestJson(both)));  // deterministic
+    // Sorted keys: max_tokens, messages, model, output_config, stream, system, thinking.
+    CHECK(bytes.find("\"output_config\":{\"effort\":\"low\"}") != std::string::npos);
+    CHECK(bytes.find("\"thinking\":{\"type\":\"between_tools\"}") != std::string::npos);
+    CHECK(bytes.find("\"model\"") < bytes.find("\"output_config\""));
+    CHECK(bytes.find("\"output_config\"") < bytes.find("\"stream\""));
+    CHECK(bytes.find("\"system\"") < bytes.find("\"thinking\""));
+    std::set<std::string> keys;
+    collectKeys(parsed(bytes), keys);
+    CHECK(keys.count("budget_tokens") == 0);
+    CHECK(keys.count("display") == 0);
+
+    // Default for both: the bytes of a request that never had the settings (the goldens).
+    ChatRequest plain = basicRequest();
+    plain.effort = Effort::Default;
+    plain.thinking = Thinking::Default;
+    CHECK((buildAnthropicRequestJson(plain) == buildAnthropicRequestJson(basicRequest())));
+    const json body = parsed(buildAnthropicRequestJson(plain));
+    CHECK_FALSE(body.contains("output_config"));
+    CHECK_FALSE(body.contains("thinking"));
 }
 
 TEST_CASE("request: the system array does not depend on the conversation") {

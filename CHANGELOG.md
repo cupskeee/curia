@@ -11,6 +11,13 @@ at `0.y.z` and anything may change between minor versions.
 
 ### Added
 
+- `--effort low|medium|high|xhigh|max` and `--thinking adaptive|between_tools|disabled` for
+  `--headless-chat` and `--check-api`: sent as the request's effort and thinking settings, and only
+  when given (by default neither is sent). The headless `ready` and `done` events, the transcripts and
+  the `CHECK_API_RESULT` line report them; `done` also gives `thinking_started_ms`, and the `status`
+  event `thinking` comes once per answer, before its first word.
+- The quality table (`tools/m4/quality_table.py`) has the columns Run (the file's label), Setting
+  and Words, and its summary gives the median times and words per run label and setting.
 - Headless modes of the `curia` executable (no window): `--headless-chat` reads the game's log, keeps
   the newest snapshot (or `--frame <snap>`) and answers questions typed on stdin, printing one JSON
   object per event; `--check-api [--cache-probe]` is the connection check for the owner (key, model,
@@ -38,6 +45,13 @@ at `0.y.z` and anything may change between minor versions.
 
 ### Changed
 
+- The advisor's wording, after the owner's first quality check (`docs/spikes/m4-quality-results.md`):
+  plain words for the player ("from what I can see", never "snapshot" or "export"), about 120 words
+  unless the player asks for more, a numbered list and `**bold**` as the only formatting, general CK3
+  mechanics allowed
+  when marked as general, and "probably" when inferring. The block the model reads about the realm is
+  headed "WHAT THE ADVISOR CAN SEE" and uses the same plain words, as do the freshness note and the
+  chat divider ("Updated from the game: DATE").
 - The Curia mod (`mod/curia/`, now 0.2.1) writes the approved `CURIA1` export
   format of `docs/wire-format.md` instead of the spike layout: records with
   ids, section headers with totals, numeric date and mod version in `BEGIN`,

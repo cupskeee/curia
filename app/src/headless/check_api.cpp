@@ -144,26 +144,34 @@ std::string number(long long value) {
     return std::to_string(value);
 }
 
-providers::ChatRequest tinyRequest(const std::string& model) {
+// The answer limit of the check's requests: room for "OK" and a little thinking. Thinking counts
+// toward it, so a high --effort can use it up (the check then says so).
+constexpr int kCheckMaxTokens = 256;
+
+providers::ChatRequest tinyRequest(const std::string& model, const CliOptions& options) {
     providers::ChatRequest request;
     request.model = model;
+    request.effort = options.effort;
+    request.thinking = options.thinking;
     request.systemPersona =
         "This is a connection check from a developer tool. Reply with the single word OK.";
     request.cache.cacheSystem = false;
     request.cache.cacheSnapshot = false;
     request.conversation.push_back({providers::Role::User, "Please reply with OK."});
-    request.maxTokens = 256;
+    request.maxTokens = kCheckMaxTokens;
     return request;
 }
 
-providers::ChatRequest cacheRequest(const std::string& model) {
+providers::ChatRequest cacheRequest(const std::string& model, const CliOptions& options) {
     providers::ChatRequest request;
     request.model = model;
+    request.effort = options.effort;
+    request.thinking = options.thinking;
     request.systemPersona = cacheProbeText();
     request.cache.cacheSystem = true;
     request.cache.cacheSnapshot = false;
     request.conversation.push_back({providers::Role::User, "Please reply with OK."});
-    request.maxTokens = 256;
+    request.maxTokens = kCheckMaxTokens;
     return request;
 }
 
@@ -207,8 +215,18 @@ int runCheckApiMode(const CliOptions& options, std::ostream& out, std::ostream& 
         }
         report.add(std::move(step));
     }
+    const std::string flags = settingsFlags(options.effort, options.thinking);
+    if (!flags.empty()) {
+        CheckStep step;
+        step.name = "Effort and thinking";
+        step.state = CheckStep::State::Info;
+        step.detail = "every request of this check carries " + flags;
+        report.add(std::move(step));
+    }
     report.set("key", keyOk ? "present" : "missing");
     report.set("model", modelOk ? "set" : "missing");
+    report.set("effort", providers::toString(options.effort));
+    report.set("thinking", providers::toString(options.thinking));
     if (!keyOk || !modelOk) {
         report.set("tls", "skipped");
         report.set("auth", authName(options.auth));
@@ -254,10 +272,12 @@ int runCheckApiMode(const CliOptions& options, std::ostream& out, std::ostream& 
         std::move(endpoint), std::move(*config.apiKey), providerOptions);
 
     out << "Sending one tiny request (usually a few seconds)..." << '\n' << std::flush;
-    const Outcome first = runRequest(*provider, tinyRequest(model), *collector);
+    const Outcome first = runRequest(*provider, tinyRequest(model, options), *collector);
     if (first.timedOut) {
         out << "No answer within " << kRequestTimeoutSeconds << " seconds. The check was stopped.\n"
-            << "CHECK_API_RESULT ok=false timeout=true\n"
+            << "CHECK_API_RESULT ok=false timeout=true effort="
+            << providers::toString(options.effort)
+            << " thinking=" << providers::toString(options.thinking) << '\n'
             << std::flush;
         return kExitTimeout;
     }
@@ -282,7 +302,8 @@ int runCheckApiMode(const CliOptions& options, std::ostream& out, std::ostream& 
         } else {
             step.state = CheckStep::State::Failed;
             step.detail = "could not connect";
-            step.advice = adviceForError(first.error, options.auth);
+            step.advice =
+                adviceForError(first.error, options.auth, options.effort, options.thinking);
         }
         report.add(std::move(step));
     }
@@ -300,7 +321,8 @@ int runCheckApiMode(const CliOptions& options, std::ostream& out, std::ostream& 
         } else if (status == 401 || status == 403) {
             step.state = CheckStep::State::Failed;
             step.detail = "rejected (HTTP " + number(status) + ")";
-            step.advice = adviceForError(first.error, options.auth);
+            step.advice =
+                adviceForError(first.error, options.auth, options.effort, options.thinking);
         } else if (status >= 200 && status < 300) {
             step.state = CheckStep::State::Ok;
             step.detail = "accepted (HTTP " + number(status) + ")";
@@ -326,12 +348,19 @@ int runCheckApiMode(const CliOptions& options, std::ostream& out, std::ostream& 
             if (first.textBytes == 0) {
                 step.detail += " (no text came back: the small test budget may have been used up "
                                "before the answer; not a problem for the connection)";
+                if (!flags.empty()) {
+                    step.advice.push_back(
+                        "The request carried " + flags + ". Thinking counts toward the check's " +
+                        number(kCheckMaxTokens) +
+                        "-token answer limit, so a high effort can use it up before the answer.");
+                }
             }
         } else {
             step.state = CheckStep::State::Failed;
             step.detail = "no answer";
             if (step.advice.empty()) {
-                step.advice = adviceForError(first.error, options.auth);
+                step.advice =
+                    adviceForError(first.error, options.auth, options.effort, options.thinking);
             }
         }
         report.add(std::move(step));
@@ -354,7 +383,7 @@ int runCheckApiMode(const CliOptions& options, std::ostream& out, std::ostream& 
         } else {
             out << "Cache probe: two identical requests with a long shared start..." << '\n'
                 << std::flush;
-            const providers::ChatRequest probe = cacheRequest(model);
+            const providers::ChatRequest probe = cacheRequest(model, options);
             const Outcome a = runRequest(*provider, probe, *collector);
             Outcome b;
             if (a.succeeded) {
@@ -370,7 +399,8 @@ int runCheckApiMode(const CliOptions& options, std::ostream& out, std::ostream& 
             } else if (!a.succeeded || !b.succeeded) {
                 step.state = CheckStep::State::Failed;
                 step.detail = "a probe request failed";
-                step.advice = adviceForError(!a.succeeded ? a.error : b.error, options.auth);
+                step.advice = adviceForError(!a.succeeded ? a.error : b.error, options.auth,
+                                             options.effort, options.thinking);
                 exitCode = kExitFailed;
                 report.set("cache_probe", "failed");
             } else {

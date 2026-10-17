@@ -42,9 +42,15 @@ advisor::ChatSession::Options sessionOptions(const AppController::Options& optio
     return session;
 }
 
-constexpr std::string_view kDefaultNotConfigured = "Curia is not set up to talk to a service yet.";
-
 }  // namespace
+
+std::string dividerLabel(const bridge::Date& date, bool dateWentBack) {
+    std::string label = "Updated from the game: " + advisor::formatGameDate(date);
+    if (dateWentBack) {
+        label += " (a save may have been loaded)";
+    }
+    return label;
+}
 
 AppController::AppController(Options options)
     : options_(withClock(std::move(options))), mailbox_(makeUiMailbox(options_.wake)),
@@ -93,7 +99,10 @@ bool AppController::setProvider(std::shared_ptr<providers::Provider> provider, s
     model_ = std::move(model);
     notConfigured_.clear();
     session_.setProvider(provider_.get());
-    log(AppLog::Level::Info, "provider_set", {{"persona_version", advisor::kPersonaVersion}});
+    log(AppLog::Level::Info, "provider_set",
+        {{"persona_version", advisor::kPersonaVersion},
+         {"effort", providers::toString(options_.effort)},
+         {"thinking", providers::toString(options_.thinking)}});
     return true;
 }
 
@@ -186,12 +195,7 @@ void AppController::handleFrame(const bridge::FrameComplete& complete) {
     const advisor::SnapshotStore::Update update = store_.onFrameComplete(complete.frame);
     monitor_.frameArrived();
     if (!session_.transcript().empty()) {
-        std::string label =
-            "New snapshot, game date " + advisor::formatGameDate(store_.frame()->date);
-        if (update.dateWentBack) {
-            label += " (a save may have been loaded)";
-        }
-        session_.addDivider(std::move(label));
+        session_.addDivider(dividerLabel(store_.frame()->date, update.dateWentBack));
     }
     log(AppLog::Level::Info, "frame_complete",
         {{"snap", snap},
@@ -231,6 +235,8 @@ advisor::AskContext AppController::makeContext() const {
     advisor::AskContext context;
     context.settings.model = model_;
     context.settings.maxTokens = options_.maxTokens;
+    context.settings.effort = options_.effort;
+    context.settings.thinking = options_.thinking;
     context.settings.showThinking = options_.showThinking;
     context.snapshotText = store_.hasSnapshot() ? store_.text() : std::string();
     context.freshness = store_.freshness(now, monitor_.secondsSinceLogGrew(now).value_or(0));

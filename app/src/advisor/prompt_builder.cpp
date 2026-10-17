@@ -57,6 +57,8 @@ std::optional<providers::ChatRequest> buildChatRequest(const PromptInput& input)
     providers::ChatRequest request;
     request.model = input.settings.model;
     request.maxTokens = input.settings.maxTokens;
+    request.effort = input.settings.effort;
+    request.thinking = input.settings.thinking;
     request.showThinking = input.settings.showThinking;
     request.cache = input.settings.cache;
     request.systemPersona = std::string(persona());

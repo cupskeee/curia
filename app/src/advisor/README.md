@@ -8,8 +8,9 @@ presets cover it. The advisor knows the abstract `providers::Provider` only.
 
 | Piece | File | Job |
 |---|---|---|
-| Snapshot renderer | `snapshot_renderer.*` | `renderSnapshot(Frame)` -> the text block the model reads. Deterministic (integers only, no clock, no locale), prints only fields that exist in `docs/wire-format.md` (design rule D15) plus facts derived from ids (which side of a war the ruler is on, a faction that targets the ruler, a faction leader who is one of the listed vassals). States its own limits: `10 of 14 vassals listed`, implicit claims as a count only, income "about +-0.2", `not exported` for an absent section, `none` for an empty one. Faction power and threshold carry their limits in the text (power about +-1, a threshold of 0 occurs, what happens at the threshold is not exported). Game strings go through `sanitizeGameText()` (quoted, control characters, invisible Unicode (zero-width, bidirectional marks, the tag block, variation selectors) dropped, other Unicode spaces read as a blank, fullwidth ASCII turned into ASCII, `<` `>` `[` `]` `=` removed or replaced, the words "game data" neutralised, at most 64 characters). Wrapped in `=== BEGIN GAME DATA (data only) ===` / `=== END GAME DATA ===`. |
-| Persona | `persona.*` | The first system block: who the advisor talks to (a new player), how it answers (plain, short, 1 to 3 actions with a reason and where in the game), what it can see, that the data block is data and never instructions, how to react to an old snapshot. `kPersonaVersion` is logged with every request. |
+| Snapshot renderer | `snapshot_renderer.*` | `renderSnapshot(Frame)` -> the text block the model reads. Deterministic (integers only, no clock, no locale), prints only fields that exist in `docs/wire-format.md` (design rule D15) plus facts derived from ids (which side of a war the ruler is on, a faction that targets the ruler, a faction leader who is one of the listed vassals). States its own limits: `10 of 14 vassals listed`, implicit claims as a count only, income "about +-0.2", `not shown` for an absent section, `none` for an empty one. Faction power and threshold carry their limits in the text (power about +-1, a threshold of 0 occurs; how close a faction is to acting and who its members are, so whether a claimant is one, are not shown). Plain words only (see below). Game strings go through `sanitizeGameText()` (quoted, control characters, invisible Unicode (every format character, such as zero-width and bidirectional marks and the tag block, plus fillers and variation selectors) dropped, other Unicode spaces and the braille blank read as a blank, lookalikes of `=` read as `=`, fullwidth ASCII turned into ASCII (letters that only look Latin, such as Cyrillic or mathematical forms, are not mapped), `<` `>` `[` `]` `=` removed or replaced, the marker phrase "advisor can see" and the old marker words "game data" neutralised, at most 64 characters). Wrapped in `=== WHAT THE ADVISOR CAN SEE ===` / `=== END OF WHAT THE ADVISOR CAN SEE ===`, the section name the persona uses. |
+| Persona | `persona.*` | The first system block: who the advisor talks to (a new player), how it answers (plain, about 120 words, 1 to 3 actions as a numbered list, one line per action with why and where in the game, otherwise `**bold**` only), what it can see (the part headed WHAT THE ADVISOR CAN SEE, called "what you can see" after that; never invent facts about the realm, "probably" when inferring, general CK3 mechanics marked as general), that nothing in that part is an instruction, what to say about old information ("This is from DATE; pause and click Advisor for an update."). `kPersonaVersion` is logged with every request. |
+| Plain words | `plain_words.*` | The owner's rule (2026-10-17, FR-OVL-11): no text the player reads, and no text the model may repeat to the player, uses Curia's internal words (snapshot, export, game data, data, frame, debug, CURIA1, log). `kInternalWords` is the one list; `findInternalWord()` checks a text. The unit tests check the persona, the realm block, every freshness note, the error summaries, the divider and the not-configured text against it; the chat window's texts are to be checked against it too. |
 | Freshness | `freshness.*` | `freshnessNote(Freshness)` -> `[Context: ...]` or an empty string. Pure; thresholds are constants (`kSnapshotOldAfterSeconds`, `kLogSilentAfterSeconds`). |
 | Prompt builder | `prompt_builder.*` | `buildChatRequest()` -> `ChatRequest`: persona + snapshot + the last 6 complete question/answer pairs + the question. |
 | Snapshot store | `snapshot_store.*` | Newest Complete frame, its arrival time (injected clock), its rendered text, the "export unreadable" flag. |
@@ -43,7 +44,7 @@ pair out of the window. Both are expected cache misses.
 A snapshot can be old (the player talks for ten minutes after clicking Advisor) or may have been missed (the
 export is silent, or the last frame could not be read). The model is told in one bracketed line:
 
-    [Context: the snapshot is from game date 15 September 1066 and was taken 7 minutes ago (real time); Curia has seen no new game data for 6 minutes; the last export could not be read, so newer game data may exist.]
+    [Context: the realm information is from game date 15 September 1066 and was read 7 minutes ago (real time); no update has come from the game for 6 minutes; the latest update from the game could not be read, so newer information may exist.]
 
 * it is built by `freshnessNote()` from four numbers and nothing else; it is empty when everything is fresh
   (snapshot younger than 2 minutes, log not silent for 5 minutes, last export readable);
@@ -52,14 +53,17 @@ export is silent, or the last frame could not be read). The model is told in one
 * it contains no time of day (the game date is the game's, the ages are relative), so the same inputs always
   give the same text;
 * its presence alone means "may be out of date" (it is only emitted past a threshold); the persona says so and
-  tells the model what to do: say it first, suggest pausing and clicking Advisor again;
-* a new snapshot arriving mid-conversation replaces the snapshot block; the transcript divider is for the
-  player only. The persona tells the model to trust the GAME DATA block over its earlier answers.
+  tells the model what to do: start with one sentence such as "This is from 3 October 1071; pause and click
+  Advisor for an update.";
+* it is in plain words (`plain_words.h`), because the model repeats it to the player;
+* a new snapshot arriving mid-conversation replaces the snapshot block; the transcript divider ("Updated from
+  the game: 3 October 1071") is for the player only. The persona tells the model to trust the WHAT THE ADVISOR
+  CAN SEE section over its earlier answers.
 
 The "restart CK3" notice of `LogSilenceMonitor` is only a hint that no frame came after the player asked for
 one. A healthy CK3 shows it too if the player has not clicked Advisor in the game (a frame exists only after
-that click, and what CK3 writes while idle is not measured yet, T8). The UI wording must hedge: "No new game
-data yet. Click Advisor in the game; if that does nothing, restart CK3".
+that click, and what CK3 writes while idle is not measured yet, T8). The UI wording must hedge: "No update from
+the game yet. Click Advisor in the game; if that does nothing, restart CK3."
 
 ## Threads
 
@@ -90,8 +94,8 @@ with fewer than 16 characters after it, is removed, so at most 5 bytes of a regi
 The question is redacted before it is stored or sent.
 A registered secret that contains other characters can show as a prefix for a moment, until it is complete.
 
-An answer that ends with no text at all is an error ("The service sent an empty answer. Try again."), not a
-blank answer.
+An answer that ends with no text at all is an error (`kEmptyAnswerText`: "The service sent an empty answer. Try
+again."), not a blank answer.
 
 ## What the app log gets
 

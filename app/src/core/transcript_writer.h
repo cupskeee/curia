@@ -46,6 +46,9 @@ bool prepareTranscriptDir(const std::filesystem::path& directory, std::string& e
 // One question and what came of it.
 struct TranscriptRecord {
     std::string model;
+    // The request's effort and thinking settings as wire words, "default" when not sent.
+    std::string effort = "default";
+    std::string thinking = "default";
     // The snapshot's number and game date text; snap 0 = no snapshot.
     std::int32_t snap = 0;
     std::string gameDate;

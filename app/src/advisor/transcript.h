@@ -28,7 +28,8 @@ enum class EntryKind { User, Assistant, Divider };
 // How an answer ended. Pending = still being produced.
 enum class AnswerEnd { Pending, Complete, Stopped, Failed };
 
-// One row of the chat as the player sees it. A Divider has only text ("New snapshot: ...").
+// One row of the chat as the player sees it. A Divider has only text ("Updated from the game:
+// ...").
 struct TranscriptEntry {
     EntryKind kind = EntryKind::User;
     std::string text;
@@ -42,6 +43,9 @@ struct TranscriptEntry {
     // them; -1 while unknown.
     long long firstTokenMs = -1;
     long long totalMs = -1;
+    // Milliseconds from the ask to the start of the model's first thinking block, before any
+    // answer text; -1 if no thinking block came (or it came only after the text had started).
+    long long thinkingStartedMs = -1;
 };
 
 }  // namespace curia::advisor

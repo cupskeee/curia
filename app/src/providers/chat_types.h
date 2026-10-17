@@ -2,6 +2,7 @@
 #pragma once
 
 #include <functional>
+#include <initializer_list>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -28,6 +29,73 @@ struct CacheHints {
     bool longTtl = false;
 };
 
+// How much the model may think before it answers (the Messages API's output_config.effort).
+// Default sends nothing, so the model's own default applies. Which values a model accepts is the
+// API's business: an unsupported one is a 400, never a choice made here (D4: no model-specific
+// rules in the app).
+enum class Effort { Default, Low, Medium, High, XHigh, Max };
+
+// The thinking mode (the Messages API's thinking.type). Default sends nothing (current models then
+// think adaptively); "between_tools" and "disabled" are accepted only by some models, and only at
+// some efforts (the API answers 400 otherwise).
+enum class Thinking { Default, Adaptive, BetweenTools, Disabled };
+
+// The wire words ("low", "medium", "high", "xhigh", "max"; "adaptive", "between_tools",
+// "disabled"), and "default" for Default (a word for reports; it is never sent).
+constexpr const char* toString(Effort effort) noexcept {
+    switch (effort) {
+    case Effort::Default:
+        return "default";
+    case Effort::Low:
+        return "low";
+    case Effort::Medium:
+        return "medium";
+    case Effort::High:
+        return "high";
+    case Effort::XHigh:
+        return "xhigh";
+    case Effort::Max:
+        return "max";
+    }
+    return "default";
+}
+
+constexpr const char* toString(Thinking thinking) noexcept {
+    switch (thinking) {
+    case Thinking::Default:
+        return "default";
+    case Thinking::Adaptive:
+        return "adaptive";
+    case Thinking::BetweenTools:
+        return "between_tools";
+    case Thinking::Disabled:
+        return "disabled";
+    }
+    return "default";
+}
+
+// The value of a wire word; nullopt for anything else ("default" included: leaving the setting
+// out is how Default is chosen).
+constexpr std::optional<Effort> parseEffort(std::string_view word) noexcept {
+    for (const Effort effort :
+         {Effort::Low, Effort::Medium, Effort::High, Effort::XHigh, Effort::Max}) {
+        if (word == toString(effort)) {
+            return effort;
+        }
+    }
+    return std::nullopt;
+}
+
+constexpr std::optional<Thinking> parseThinking(std::string_view word) noexcept {
+    for (const Thinking thinking :
+         {Thinking::Adaptive, Thinking::BetweenTools, Thinking::Disabled}) {
+        if (word == toString(thinking)) {
+            return thinking;
+        }
+    }
+    return std::nullopt;
+}
+
 struct ChatRequest {
     // From the provider's models endpoint or free text (D4); never a built-in literal.
     std::string model;
@@ -39,6 +107,10 @@ struct ChatRequest {
     std::vector<Message> conversation;
     // Thinking tokens count toward it on current models.
     int maxTokens = 4096;
+    // Sent only when not Default (D22: the default stays unset until the owner has measured).
+    Effort effort = Effort::Default;
+    Thinking thinking = Thinking::Default;
+    // Deliver the model's reasoning text as Thinking tokens (a display matter, not a request key).
     bool showThinking = false;
     CacheHints cache;
 };

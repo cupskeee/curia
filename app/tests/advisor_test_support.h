@@ -50,7 +50,8 @@ bridge::Frame richFrame();
 bridge::Frame minimalFrame();
 // Every section present but empty, a debt and a negative income.
 bridge::Frame emptyFrame();
-// Game strings made to look like instructions and markers.
+// Game strings made to look like instructions and markers (the block's own end marker among
+// them, plain and in lookalike forms).
 bridge::Frame hostileFrame();
 // Vassals total/listed for the boundary tests (listed vassals are named "Test Vassal <rank>").
 bridge::Frame frameWithVassals(int total, int listed);
@@ -81,6 +82,8 @@ public:
         bool onThread = false;
         // Pause between tokens when on a thread.
         std::chrono::milliseconds gap{0};
+        // Report a thinking block (ThinkingStarted, then TextStarted) before the first token.
+        bool thinkingFirst = false;
     };
 
     FakeProvider() = default;

@@ -12,8 +12,11 @@ what the client really sent.
 
 Suite `chat` (ctest chat_e2e, labels e2e and chat):
   * a click in the fake game opens the overlay, a question gets a streamed answer that quotes the
-    fixture's gold and heir (the `cite` scenario reads them out of the request), the second question
-    reads the prompt cache (cache_read > 0);
+    fixture's gold and heir (the `cite` scenario reads them out of the request's realm block), the
+    second question reads the prompt cache (cache_read > 0); a question before any click sends the
+    "nothing has been read" block;
+  * --effort and --thinking reach the request (and only when given), ready and done report them; a
+    thinking block gives one "thinking" status before the text and a thinking_started_ms;
   * the newest snapshot of an existing log is the default, --frame picks another, an unknown number
     is a setup error;
   * the log going silent: with `arm`, `restart_ck3` within the short test threshold; when the game
@@ -470,11 +473,103 @@ class ChatChainTest(ChatCase):
         first_record = mock.wait_record(0)
         self.assertEqual(first_record["violations"], [])
         system = first_record["body_json"]["system"]
+        self.assertTrue(system[1]["text"].startswith("=== WHAT THE ADVISOR CAN SEE ===\n"))
+        self.assertTrue(system[1]["text"].endswith("\n=== END OF WHAT THE ADVISOR CAN SEE ==="))
         self.assertIn("Treasury: 4321 gold", system[1]["text"])
         self.assertIn("Test Heir Quartz", system[1]["text"])
+        self.assertIn("WHAT THE ADVISOR CAN SEE", system[0]["text"])  # the persona names the block
+        # No effort or thinking setting was given: none was sent.
+        self.assertEqual((first_record["thinking_type"], first_record["effort"]), (None, None))
+        self.assertNotIn("thinking", first_record["body_json"])
+        self.assertNotIn("output_config", first_record["body_json"])
+        self.assertEqual((child.of("ready")[0]["effort"], child.of("ready")[0]["thinking"]), ("default", "default"))
+        self.assertEqual((done["effort"], done["thinking"]), ("default", "default"))
+        self.assertNotIn("thinking_started_ms", done)
         self.assertEqual(first_record["headers"]["authorization"], ml.key_digest("Bearer " + key))
         self.assert_key_absent(key, mock.records_text(), "the mock's records")
         self.assertEqual(mock.wait_record(1)["violations"], [])
+
+    def test_a_question_before_any_click_sends_the_nothing_read_block(self) -> None:
+        mock = self.start_mock("--default", "cite")
+        fake = self.new_fake()
+        child = self.start_curia(mock, fake.log_path, fake_key())
+        self.assertIsNone(child.wait_kind("ready")["snapshot"])
+        child.send("ask what now?")
+        self.assertEqual(child.wait_kind("done")["text"], "Nothing has been read yet.")
+        child.close_stdin()
+        self.assertEqual(child.wait_exit(), 0)
+        self.assertEqual(mock.wait_record(0)["violations"], [])
+
+    def test_effort_and_thinking_reach_the_request_and_the_events(self) -> None:
+        mock = self.start_mock("--default", "basic")
+        fake = self.new_fake()
+        fake.append_frame(snap=1)
+        child = self.start_curia(mock, fake.log_path, fake_key(),
+                                 args=["--from-start", "--effort", "low", "--thinking", "between_tools"])
+        ready = child.wait_kind("ready")
+        self.assertEqual((ready["effort"], ready["thinking"]), ("low", "between_tools"))
+        child.send("ask what now?")
+        done = child.wait_kind("done")
+        self.assertEqual((done["effort"], done["thinking"]), ("low", "between_tools"))
+        child.close_stdin()
+        self.assertEqual(child.wait_exit(), 0)
+        record = mock.wait_record(0)
+        self.assertEqual(record["violations"], [])
+        self.assertEqual((record["thinking_type"], record["effort"]), ("between_tools", "low"))
+        self.assertEqual(record["body_json"]["thinking"], {"type": "between_tools"})
+        self.assertEqual(record["body_json"]["output_config"], {"effort": "low"})
+
+        # Each one alone sends only itself.
+        for args, expected in ((["--effort", "max"], (None, "max")), (["--thinking", "disabled"], ("disabled", None))):
+            alone = self.start_curia(mock, fake.log_path, fake_key(), args=["--from-start"] + args)
+            alone.wait_kind("ready")
+            alone.send("ask again?")
+            alone.wait_kind("done")
+            alone.close_stdin()
+            self.assertEqual(alone.wait_exit(), 0)
+            last = mock.wait_record(len(mock.records()) - 1)
+            self.assertEqual((last["thinking_type"], last["effort"]), expected)
+            self.assertEqual(last["violations"], [])
+
+        # A bad value is a usage error before anything is read or sent.
+        bad = self.start_curia(mock, fake.log_path, fake_key(), args=["--from-start", "--effort", "extreme"])
+        self.assertEqual(bad.wait_exit(), 2)
+        self.assertIn("--effort needs low, medium, high, xhigh or max", bad.stderr_text())
+        self.assertEqual(len(mock.records()), 3)
+
+    def test_a_thinking_block_gives_one_thinking_status_before_the_text(self) -> None:
+        mock = self.start_mock("--default", "thinking_blocks")
+        fake = self.new_fake()
+        fake.append_frame(snap=1)
+        child = self.start_curia(mock, fake.log_path, fake_key(), args=["--from-start"])
+        child.wait_kind("ready")
+        child.send("ask think first")
+        done = child.wait_kind("done")
+        child.send("ask and again")
+        second = child.wait_event(lambda e: e.get("event") == "done" and e["generation"] == 2)
+        child.close_stdin()
+        self.assertEqual(child.wait_exit(), 0)
+        events = child.snapshot_events()
+        for answer in (done, second):
+            self.assertIn("thinking_started_ms", answer)
+            self.assertGreaterEqual(answer["thinking_started_ms"], 0)
+            self.assertLessEqual(answer["thinking_started_ms"], answer["first_token_ms"])
+        self.assertEqual(done["text"], "Test answer from the mock server.")  # the thinking is not shown
+        states = [e["state"] for e in events if e.get("event") == "status"]
+        self.assertEqual(states, ["waiting", "thinking", "streaming"] * 2)
+        first_thinking = next(i for i, e in enumerate(events) if e.get("event") == "status" and e["state"] == "thinking")
+        first_token = next(i for i, e in enumerate(events) if e.get("event") == "token")
+        self.assertLess(first_thinking, first_token)
+        # Without a thinking block: no "thinking" status and no thinking_started_ms.
+        plain_mock = self.start_mock("--default", "basic")
+        plain = self.start_curia(plain_mock, fake.log_path, fake_key(), args=["--from-start"])
+        plain.wait_kind("ready")
+        plain.send("ask hello")
+        plain_done = plain.wait_kind("done")
+        plain.close_stdin()
+        self.assertEqual(plain.wait_exit(), 0)
+        self.assertNotIn("thinking_started_ms", plain_done)
+        self.assertEqual([e["state"] for e in plain.of("status")], ["waiting", "streaming"])
 
     def test_the_newest_snapshot_is_the_default_and_frame_picks_another(self) -> None:
         mock = self.start_mock("--default", "cite")
@@ -712,6 +807,7 @@ class CheckApiTest(ChatCase):
         self.assertEqual(summary["status"], "200")
         self.assertEqual(summary["auth"], "bearer")
         self.assertEqual(summary["cache_probe"], "hit")
+        self.assertEqual((summary["effort"], summary["thinking"]), ("default", "default"))
         self.assertGreater(int(summary["cache_write"]), 0)
         self.assertGreater(int(summary["cache_read"]), 0)
         text = done.stdout.decode() + done.stderr.decode()
@@ -728,6 +824,55 @@ class CheckApiTest(ChatCase):
         self.assertEqual(done.returncode, 0)
         self.assertEqual(self.summary(done)["cache_probe"], "miss")
         self.assertIn("no cache hit: prefix below the model minimum or caching not applied", done.stdout.decode())
+
+    def test_effort_and_thinking_go_into_every_check_request(self) -> None:
+        mock = self.start_mock("--default", "cache_demo")
+        done = self.run_check(mock, fake_key(), ["--cache-probe", "--effort", "medium", "--thinking", "adaptive"])
+        text = done.stdout.decode()
+        self.assertEqual(done.returncode, 0, text[-2000:])
+        summary = self.summary(done)
+        self.assertEqual((summary["effort"], summary["thinking"]), ("medium", "adaptive"))
+        self.assertIn("[info] Effort and thinking: every request of this check carries --effort medium "
+                      "--thinking adaptive", text)
+        records = mock.records()
+        self.assertEqual(len(records), 3)
+        for record in records:
+            self.assertEqual((record["thinking_type"], record["effort"]), ("adaptive", "medium"))
+            self.assertEqual(record["violations"], [])
+        # Refused (HTTP 400) with a setting: the advice names the setting.
+        refused = self.start_mock("--default", "http_400")
+        done = self.run_check(refused, fake_key(), ["--thinking", "disabled"])
+        text = done.stdout.decode()
+        self.assertEqual(done.returncode, 1, text[-1500:])
+        self.assertIn("The request carried --thinking disabled.", text)
+        self.assertIn("only at effort high or below", text)
+        # Without one, no such line; and the default check sends neither key.
+        plain = self.start_mock("--default", "http_400")
+        done = self.run_check(plain, fake_key())
+        self.assertNotIn("effort or thinking setting", done.stdout.decode())
+        self.assertNotIn("Effort and thinking", done.stdout.decode())
+        self.assertEqual((plain.wait_record(0)["thinking_type"], plain.wait_record(0)["effort"]), (None, None))
+        # A bad value is a usage error.
+        bad = subprocess.run([CURIA, "--check-api", "--thinking", "enabled"], stdin=subprocess.DEVNULL,
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=self.env(fake_key(), "mock-model-1"),
+                             cwd=str(self.work), timeout=60)
+        self.assertEqual(bad.returncode, 2)
+        self.assertIn("--thinking needs adaptive, between_tools or disabled", bad.stderr.decode())
+
+    def test_an_answer_used_up_by_thinking_names_the_setting(self) -> None:
+        # The thinking fills the check's small answer limit and no text comes back.
+        scenario = self.root / "thinking_only.json"
+        scenario.write_text(json.dumps({"steps": [{"gen": "answer", "thinking": True, "text_parts": [],
+                                                   "stop_reason": "max_tokens",
+                                                   "usage": {"input_tokens": 25, "output_tokens": 256}}]}))
+        for args, named in ((["--effort", "max"], True), ([], False)):
+            mock = self.start_mock("--scenario", str(scenario))
+            done = self.run_check(mock, fake_key(), args)
+            text = done.stdout.decode()
+            self.assertEqual(done.returncode, 0, text[-1500:])
+            self.assertIn("no text came back", text)
+            line = "The request carried --effort max. Thinking counts toward the check's 256-token answer limit"
+            self.assertEqual(line in text, named, text[-1500:])
 
     def test_the_other_sign_in_header(self) -> None:
         mock = self.start_mock()

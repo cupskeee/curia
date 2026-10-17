@@ -19,14 +19,18 @@ inline constexpr std::size_t kMaxHistoryPairs = 6;
 struct PromptSettings {
     // From configuration or the provider's models endpoint; never a literal in source (D4).
     std::string model;
+    // The answer limit and the thinking settings, passed to the request as they are (Default
+    // effort and thinking send nothing).
     int maxTokens = 4096;
+    providers::Effort effort = providers::Effort::Default;
+    providers::Thinking thinking = providers::Thinking::Default;
     bool showThinking = false;
     providers::CacheHints cache;
 };
 
 struct PromptInput {
     PromptSettings settings;
-    // The rendered snapshot block; empty means "no snapshot yet" (renderNoSnapshot()).
+    // The rendered snapshot block; empty means nothing has been read yet (renderNoSnapshot()).
     std::string_view snapshotText;
     // The chat so far. transcript[questionIndex] is the user turn to answer; entries after it
     // (a failed answer being retried, dividers) are ignored.

@@ -38,6 +38,11 @@ enum class AskOutcome {
 
 const char* toString(AskOutcome outcome) noexcept;
 
+// The error summaries of an answer that ended with no text at all (plain words, plain_words.h).
+inline constexpr std::string_view kEmptyAnswerText = "The service sent an empty answer. Try again.";
+inline constexpr std::string_view kNoRoomForAnswerText =
+    "The answer ran out of room before any text appeared. Try again, or ask a shorter question.";
+
 // Told, on the UI thread, when the session changes. Every method has an empty default.
 class ChatObserver {
 public:
@@ -144,6 +149,8 @@ private:
 
     void onToken(const ProviderToken& token);
     void onStatus(const ProviderStatus& status);
+    // The model is thinking: the spinner is on, and the first time before any text, the time.
+    void noteThinking();
     void onDone(const ProviderDone& done);
     void onError(const ProviderError& error);
 

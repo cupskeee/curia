@@ -62,6 +62,15 @@ BuiltRequest buildAnthropicRequest(const ChatRequest& request) {
     body["model"] = request.model;
     body["max_tokens"] = request.maxTokens;
     body["stream"] = true;
+    // Only when set: a request with both settings at Default is byte for byte what it was before
+    // they existed. Each object has exactly one member (the API refuses any other field next to
+    // thinking.type, for example a budget).
+    if (request.effort != Effort::Default) {
+        body["output_config"] = {{"effort", toString(request.effort)}};
+    }
+    if (request.thinking != Thinking::Default) {
+        body["thinking"] = {{"type", toString(request.thinking)}};
+    }
 
     json system = json::array();
     if (!isBlank(request.systemPersona)) {

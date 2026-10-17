@@ -246,6 +246,8 @@ private:
         const std::shared_ptr<Signal> signal = signal_;
         controllerOptions.wake = [signal] { signal->notifyWake(); };
         controllerOptions.maxTokens = options.maxTokens > 0 ? options.maxTokens : 4096;
+        controllerOptions.effort = options.effort;
+        controllerOptions.thinking = options.thinking;
         controllerOptions.showThinking = options.showThinking;
         if (options.armedWaitMs.has_value()) {
             controllerOptions.silence.armWait = std::chrono::milliseconds(*options.armedWaitMs);
@@ -405,6 +407,8 @@ private:
             {"date", frame != nullptr ? json(advisor::formatGameDate(frame->date)) : json(nullptr)},
             {"frames", controller.snapshot().sequence()},
             {"model", config_.model},
+            {"effort", providers::toString(config_.options.effort)},
+            {"thinking", providers::toString(config_.options.thinking)},
             {"persona_version", advisor::kPersonaVersion},
             {"transcripts",
              transcriptDir_.has_value() ? json(transcriptDir_->string()) : json(nullptr)}};
@@ -578,12 +582,13 @@ private:
             return;
         }
         flushText();
-        const bool thinking = controller_->session().thinking();
-        if (thinking != thinking_) {
-            thinking_ = thinking;
-            if (thinking) {
-                writer_.write({{"event", "status"}, {"state", "thinking"}});
-            }
+        // Once per answer, and only before its first text: the basis of the chat view's
+        // "thinking..." state.
+        const advisor::TranscriptEntry* current = answer();
+        if (!thinkingAnnounced_ && controller_->session().thinking() && current != nullptr &&
+            current->firstTokenMs < 0) {
+            thinkingAnnounced_ = true;
+            writer_.write({{"event", "status"}, {"state", "thinking"}});
         }
     }
 
@@ -599,7 +604,7 @@ private:
             requestSnap_ = held != nullptr ? held->snap : 0;
             requestDate_ = held != nullptr ? advisor::formatGameDate(held->date) : std::string();
             emitted_.clear();
-            thinking_ = false;
+            thinkingAnnounced_ = false;
             const advisor::TranscriptEntry* asked = question();
             writer_.write({{"event", "ask"},
                            {"generation", controller_->session().lastRequest().generation},
@@ -633,14 +638,20 @@ private:
                       {"cache_write", entry.usage.cacheWrite}};
         TranscriptRecord record;
         if (state == advisor::ChatState::Done) {
-            writer_.write({{"event", "done"},
-                           {"generation", generation},
-                           {"text", entry.text},
-                           {"first_token_ms", nullableMs(entry.firstTokenMs)},
-                           {"total_ms", nullableMs(entry.totalMs)},
-                           {"usage", usage},
-                           {"stop_reason", entry.usage.stopReason},
-                           {"max_tokens", entry.hitTokenLimit}});
+            json done = {{"event", "done"},
+                         {"generation", generation},
+                         {"text", entry.text},
+                         {"first_token_ms", nullableMs(entry.firstTokenMs)},
+                         {"total_ms", nullableMs(entry.totalMs)},
+                         {"usage", usage},
+                         {"stop_reason", entry.usage.stopReason},
+                         {"max_tokens", entry.hitTokenLimit},
+                         {"effort", providers::toString(config_.options.effort)},
+                         {"thinking", providers::toString(config_.options.thinking)}};
+            if (entry.thinkingStartedMs >= 0) {
+                done["thinking_started_ms"] = entry.thinkingStartedMs;
+            }
+            writer_.write(std::move(done));
             record.end = "complete";
         } else if (state == advisor::ChatState::Cancelled) {
             writer_.write({{"event", "cancelled"},
@@ -679,6 +690,8 @@ private:
         }
         const advisor::TranscriptEntry* asked = question();
         record.model = config_.model;
+        record.effort = providers::toString(config_.options.effort);
+        record.thinking = providers::toString(config_.options.thinking);
         record.snap = requestSnap_;
         record.gameDate = requestDate_;
         record.generation = generation;
@@ -719,7 +732,7 @@ private:
     bool inputEnded_ = false;
     bool anyFailed_ = false;
     bool requestActive_ = false;
-    bool thinking_ = false;
+    bool thinkingAnnounced_ = false;
     std::int32_t requestSnap_ = 0;
     std::string requestDate_;
     std::string emitted_;

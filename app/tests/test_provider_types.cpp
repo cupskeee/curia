@@ -25,6 +25,8 @@ using curia::providers::Usage;
 TEST_CASE("provider types: defaults") {
     const ChatRequest request;
     CHECK(request.maxTokens == 4096);
+    CHECK((request.effort == curia::providers::Effort::Default));
+    CHECK((request.thinking == curia::providers::Thinking::Default));
     CHECK_FALSE(request.showThinking);
     CHECK(request.cache.cacheSystem);
     CHECK(request.cache.cacheSnapshot);
@@ -61,6 +63,36 @@ TEST_CASE("provider types: every error code has its own name") {
     }
     CHECK(names.size() == codes.size());
     CHECK(std::string(curia::providers::toString(Code::RateLimit)) == "RateLimit");
+}
+
+TEST_CASE("provider types: effort and thinking words, both ways") {
+    using curia::providers::Effort;
+    using curia::providers::parseEffort;
+    using curia::providers::parseThinking;
+    using curia::providers::Thinking;
+    for (const Effort effort :
+         {Effort::Low, Effort::Medium, Effort::High, Effort::XHigh, Effort::Max}) {
+        const std::string word = curia::providers::toString(effort);
+        CAPTURE(word);
+        CHECK((parseEffort(word) == effort));
+    }
+    for (const Thinking thinking :
+         {Thinking::Adaptive, Thinking::BetweenTools, Thinking::Disabled}) {
+        const std::string word = curia::providers::toString(thinking);
+        CAPTURE(word);
+        CHECK((parseThinking(word) == thinking));
+    }
+    CHECK(std::string(curia::providers::toString(Effort::XHigh)) == "xhigh");
+    CHECK(std::string(curia::providers::toString(Thinking::BetweenTools)) == "between_tools");
+    CHECK(std::string(curia::providers::toString(Effort::Default)) == "default");
+    CHECK(std::string(curia::providers::toString(Thinking::Default)) == "default");
+    // Only the wire words: no "default", no other case, no budget-style values.
+    for (const char* bad : {"default", "LOW", "Low", "", " low", "enabled", "minimal", "none",
+                            "between-tools", "1024"}) {
+        CAPTURE(bad);
+        CHECK_FALSE(parseEffort(bad).has_value());
+        CHECK_FALSE(parseThinking(bad).has_value());
+    }
 }
 
 TEST_CASE("provider types: the handlers are callable and start empty") {
