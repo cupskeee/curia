@@ -126,7 +126,7 @@ jobs:
         run: ctest --preset ${{ matrix.preset }}-netinfo || true
       - name: Upload the macOS binary for the universal build
         if: runner.os == 'macOS'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: curia-${{ matrix.name }}
           path: build/${{ matrix.preset }}/app/curia
@@ -138,7 +138,7 @@ jobs:
     needs: build
     runs-on: macos-26
     steps:
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: curia-macos-*
           path: parts
@@ -153,7 +153,7 @@ jobs:
           arch -arm64 ./curia-universal --version
           arch -x86_64 ./curia-universal --version
           arch -x86_64 ./curia-universal --smoke
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: curia-macos-universal-unsigned
           path: curia-universal
@@ -243,7 +243,7 @@ jobs:
             -dict=app/fuzz/sse.dict -artifact_prefix="$RUNNER_TEMP/crashes/sse-" "$RUNNER_TEMP/corpus_sse"
       - name: Keep the crashing input
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: fuzz-crashes
           path: ${{ runner.temp }}/crashes
