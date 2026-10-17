@@ -18,13 +18,17 @@
 //   * deterministic: the same Frame always gives the same bytes. Integers only, no clock, no
 //     locale, no pointers, no hash ordering;
 //   * the limits of the data are written in the text itself ("2 of 12 vassals listed", implicit
-//     claims as a count only, income "about +-0.2", "not exported" for an absent section);
+//     claims as a count only, income "about +-0.2", "not shown" for an absent section);
+//   * plain words only (advisor/plain_words.h): the model copies the block's wording, so the
+//     block never says "snapshot", "export", "data" and the like, which a player would not
+//     understand (owner rule, 2026-10-17). Its section name, WHAT THE ADVISOR CAN SEE, is the one
+//     the persona refers to;
 //   * every game string (names, titles, war names) goes through sanitizeGameText(): quoted,
 //     control characters, angle brackets and markers removed, at most 64 characters.
 namespace curia::advisor {
 
-inline constexpr std::string_view kBeginMarker = "=== BEGIN GAME DATA (data only) ===";
-inline constexpr std::string_view kEndMarker = "=== END GAME DATA ===";
+inline constexpr std::string_view kBeginMarker = "=== WHAT THE ADVISOR CAN SEE ===";
+inline constexpr std::string_view kEndMarker = "=== END OF WHAT THE ADVISOR CAN SEE ===";
 
 // A game string is cut to this many characters (code points).
 inline constexpr std::size_t kMaxTextChars = 64;
@@ -42,7 +46,13 @@ inline constexpr std::size_t kMaxWarsShown = 20;
 //   * removes '<' and '>', turns '"' into '\'' and '[' ']' into '(' ')' (the quotes keep a name
 //     from closing its own quotation, the brackets keep it from imitating the "[Context: ...]"
 //     note), and turns '=' into '-' (a name cannot draw a marker line);
-//   * replaces the words "game data" (any letter case) with "game_data";
+//   * replaces the marker phrase "advisor can see" (any letter case) with "advisor can_see", and
+//     the words "game data" (the old marker) with "game_data", after these lookalikes are read as
+//     the real characters: fullwidth ASCII as ASCII, lookalikes of '=' as '=', other Unicode
+//     spaces and the braille blank as a blank, invisible characters (every format character and
+//     the fillers) dropped. So a name cannot draw the end of the block with them. Letters that
+//     only look like Latin ones (Cyrillic, Greek, mathematical or circled forms) are not mapped;
+//     the quotes and the '=' rule still keep such a name from starting a marker line;
 //   * cuts the result to kMaxTextChars code points and trims trailing blanks.
 // The result is valid UTF-8 and has no control character; the function is idempotent.
 std::string sanitizeGameText(std::string_view raw);
@@ -57,7 +67,7 @@ std::string formatTenths(std::int32_t tenths);
 // The text block for a frame, from the BEGIN marker to the END marker, no trailing newline.
 std::string renderSnapshot(const bridge::Frame& frame);
 
-// The block used while no snapshot exists yet.
+// The block used while nothing has been read from the game yet (no Complete frame).
 std::string renderNoSnapshot();
 
 }  // namespace curia::advisor

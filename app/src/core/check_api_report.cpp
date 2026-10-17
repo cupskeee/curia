@@ -101,7 +101,20 @@ std::vector<std::string> adviceForMissing(const std::vector<std::string>& missin
     return advice;
 }
 
-std::vector<std::string> adviceForError(const providers::ChatError& error, AuthMode auth) {
+std::string settingsFlags(providers::Effort effort, providers::Thinking thinking) {
+    std::string flags;
+    if (effort != providers::Effort::Default) {
+        flags += std::string("--effort ") + providers::toString(effort);
+    }
+    if (thinking != providers::Thinking::Default) {
+        flags +=
+            std::string(flags.empty() ? "" : " ") + "--thinking " + providers::toString(thinking);
+    }
+    return flags;
+}
+
+std::vector<std::string> adviceForError(const providers::ChatError& error, AuthMode auth,
+                                        providers::Effort effort, providers::Thinking thinking) {
     using Code = providers::ChatError::Code;
     std::vector<std::string> advice;
     const std::string status =
@@ -126,6 +139,17 @@ std::vector<std::string> adviceForError(const providers::ChatError& error, AuthM
             advice.emplace_back(status + (status.empty() ? "" : ": ") +
                                 "the service refused the request. The first thing to check is " +
                                 quoted(modelVariableName()) + ".");
+            const std::string flags = settingsFlags(effort, thinking);
+            if (!flags.empty() && error.httpStatus == 400) {
+                const bool both = effort != providers::Effort::Default &&
+                                  thinking != providers::Thinking::Default;
+                advice.emplace_back(
+                    "The request carried " + flags +
+                    ". The model may not support that effort or thinking setting (thinking "
+                    "disabled or between_tools works only on some models, and only at effort high "
+                    "or below). Run the same check without " +
+                    std::string(both ? "them" : "it") + " to see whether that is the cause.");
+            }
         }
         if (!error.message.empty()) {
             advice.emplace_back("The service said: " + error.message);

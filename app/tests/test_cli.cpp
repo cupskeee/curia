@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 #include <doctest/doctest.h>
 
+#include <string>
+#include <string_view>
 #include <vector>
 
 #include "core/cli.h"
@@ -181,6 +183,51 @@ TEST_CASE("--check-api and --cache-probe") {
     CHECK_FALSE(parse({"--check-api", "--smoke"}, options, error));
     CHECK_FALSE(parse({"--check-api", "--max-tokens", "5"}, options, error));
     CHECK_FALSE(parse({"--check-api", "--from-start"}, options, error));
+}
+
+TEST_CASE("--effort and --thinking, with --headless-chat and with --check-api") {
+    using curia::providers::Effort;
+    using curia::providers::Thinking;
+    curia::CliOptions options;
+    std::string error;
+    CHECK(parse({"--headless-chat", "--log", "d.log"}, options, error));
+    CHECK((options.effort == Effort::Default));
+    CHECK((options.thinking == Thinking::Default));
+    CHECK(parse(
+        {"--headless-chat", "--log", "d.log", "--effort", "low", "--thinking", "between_tools"},
+        options, error));
+    CHECK((options.effort == Effort::Low));
+    CHECK((options.thinking == Thinking::BetweenTools));
+    CHECK_FALSE(options.hasTestOnlyOptions());  // no secret in them: any build takes them
+    CHECK(parse({"--check-api", "--effort", "xhigh"}, options, error));
+    CHECK((options.effort == Effort::XHigh));
+    CHECK(parse({"--check-api", "--cache-probe", "--thinking", "disabled", "--effort", "max"},
+                options, error));
+    CHECK((options.thinking == Thinking::Disabled));
+    CHECK((options.effort == Effort::Max));
+    for (const char* word : {"medium", "high"}) {
+        CHECK(parse({"--check-api", "--effort", word}, options, error));
+    }
+    CHECK(parse({"--check-api", "--thinking", "adaptive"}, options, error));
+    CHECK((options.thinking == Thinking::Adaptive));
+
+    // Bad or missing values are usage errors that name the choices.
+    CHECK_FALSE(parse({"--check-api", "--effort", "extreme"}, options, error));
+    CHECK(error.find("low, medium, high, xhigh or max") != std::string::npos);
+    CHECK_FALSE(parse({"--check-api", "--effort"}, options, error));
+    CHECK_FALSE(parse({"--check-api", "--effort", "default"}, options, error));
+    CHECK_FALSE(parse({"--check-api", "--thinking", "enabled"}, options, error));
+    CHECK(error.find("adaptive, between_tools or disabled") != std::string::npos);
+    CHECK_FALSE(parse({"--check-api", "--thinking"}, options, error));
+    CHECK_FALSE(parse({"--check-api", "--thinking", "--effort", "low"}, options, error));
+    // They belong to the two modes that send requests.
+    CHECK_FALSE(parse({"--effort", "low"}, options, error));
+    CHECK_FALSE(parse({"--thinking", "disabled"}, options, error));
+    CHECK_FALSE(parse({"--watch-log", "a.log", "--effort", "low"}, options, error));
+    CHECK(error.find("--effort") != std::string::npos);
+    // The usage text names them.
+    CHECK(curia::cliUsage().find("--effort <level>") != std::string_view::npos);
+    CHECK(curia::cliUsage().find("--thinking <mode>") != std::string_view::npos);
 }
 
 TEST_CASE("an unknown positional word is never repeated in the error") {

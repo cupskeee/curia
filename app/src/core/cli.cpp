@@ -2,6 +2,7 @@
 #include "core/cli.h"
 
 #include <charconv>
+#include <optional>
 #include <string_view>
 
 #include "core/redact.h"
@@ -114,8 +115,11 @@ bool validate(const CliOptions& out, std::string& error) {
         return false;
     }
     if (!out.headlessChat && !out.checkApi &&
-        (!out.testEndpoint.empty() || out.auth != AuthMode::Bearer || !out.appLogDir.empty())) {
-        error = "--test-endpoint, --auth and --log-dir need --headless-chat or --check-api";
+        (!out.testEndpoint.empty() || out.auth != AuthMode::Bearer || !out.appLogDir.empty() ||
+         out.effort != providers::Effort::Default ||
+         out.thinking != providers::Thinking::Default)) {
+        error = "--test-endpoint, --auth, --log-dir, --effort and --thinking need --headless-chat "
+                "or --check-api";
         return false;
     }
     return true;
@@ -198,6 +202,24 @@ bool parseCli(int argc, const char* const* argv, CliOptions& out, std::string& e
                 error = "--auth needs bearer or x-api-key";
                 return false;
             }
+        } else if (arg == "--effort") {
+            const std::optional<providers::Effort> effort =
+                i + 1 < argc ? providers::parseEffort(argv[i + 1]) : std::nullopt;
+            if (!effort.has_value()) {
+                error = "--effort needs low, medium, high, xhigh or max";
+                return false;
+            }
+            out.effort = *effort;
+            ++i;
+        } else if (arg == "--thinking") {
+            const std::optional<providers::Thinking> thinking =
+                i + 1 < argc ? providers::parseThinking(argv[i + 1]) : std::nullopt;
+            if (!thinking.has_value()) {
+                error = "--thinking needs adaptive, between_tools or disabled";
+                return false;
+            }
+            out.thinking = *thinking;
+            ++i;
         } else if (arg == "--log-dir") {
             if (!textFlag(argc, argv, i, arg, out.appLogDir, error)) {
                 return false;
@@ -237,9 +259,11 @@ std::string_view cliUsage() {
            "             [--max-frames <n>] [--timeout-seconds <s>]] [--version] [--help]\n"
            "       curia --headless-chat --log <path> [--from-start] [--frame <snap>]\n"
            "             [--test-endpoint <url>] [--auth bearer|x-api-key] [--max-tokens <n>]\n"
-           "             [--show-thinking] [--log-dir <dir>] [--timeout-seconds <s>]\n"
+           "             [--effort <level>] [--thinking <mode>] [--show-thinking]\n"
+           "             [--log-dir <dir>] [--timeout-seconds <s>]\n"
            "       curia --check-api [--cache-probe] [--auth bearer|x-api-key]\n"
-           "             [--test-endpoint <url>] [--log-dir <dir>]\n"
+           "             [--effort <level>] [--thinking <mode>] [--test-endpoint <url>]\n"
+           "             [--log-dir <dir>]\n"
            "  --smoke              open a window, render 3 frames, exit (CI smoke test)\n"
            "  --idle-test <sec>    run the event loop and check that nothing renders while idle\n"
            "  --watch-log <path>   no window: tail a log file and print one JSON object per\n"
@@ -263,6 +287,12 @@ std::string_view cliUsage() {
            "                       the real service (key, model, TLS, sign-in header, one tiny\n"
            "                       answer; --cache-probe also tests the prompt cache). Exit 0 ok,\n"
            "                       1 a step failed, 2 not configured, 3 timeout\n"
+           "  --effort <level>     with --headless-chat or --check-api: send the effort\n"
+           "                       setting low, medium, high, xhigh or max (not given: none is\n"
+           "                       sent and the model's default applies)\n"
+           "  --thinking <mode>    likewise the thinking setting: adaptive, between_tools or\n"
+           "                       disabled (not given: none is sent). A model that does not\n"
+           "                       support a value answers HTTP 400\n"
            "  --version            print build information as JSON\n";
 }
 

@@ -43,7 +43,15 @@ LOOPBACK_HOSTS = ("127.0.0.1", "::1")
 DEFAULT_DECOY_URL = "http://127.0.0.1:9/decoy"
 MAX_HEAD_BYTES = 64 * 1024
 MAX_BODY_BYTES = 32 * 1024 * 1024  # the real API's request limit
-FORBIDDEN_KEYS = ("budget_tokens", "thinking", "temperature", "top_p", "top_k", "tool_choice")
+FORBIDDEN_KEYS = ("budget_tokens", "temperature", "top_p", "top_k", "tool_choice")
+# The optional settings Curia may send, only at the top level and only in this shape:
+# "thinking": {"type": <one of THINKING_TYPES>} and "output_config": {"effort": <one of EFFORTS>}.
+THINKING_TYPES = ("adaptive", "between_tools", "disabled")
+EFFORTS = ("low", "medium", "high", "xhigh", "max")
+# The markers of the realm block the app renders (app/src/advisor/snapshot_renderer.h).
+REALM_BEGIN = "=== WHAT THE ADVISOR CAN SEE ==="
+REALM_END = "=== END OF WHAT THE ADVISOR CAN SEE ==="
+REALM_NONE_YET = "Nothing has been read from the game yet"
 SENSITIVE_HEADERS = ("authorization", "x-api-key", "proxy-authorization")
 STEP_KINDS = ("sse", "raw", "b64", "text", "gen", "hold_ms", "close", "stall", "loop")
 STEP_OPTIONS = ("chunks", "every", "delay_ms", "piece_delay_ms", "split_mid_utf8", "eol")
@@ -198,19 +206,36 @@ _FULL_USAGE = {"input_tokens": 21, "cache_creation_input_tokens": 340, "cache_re
                "output_tokens": 15}
 
 
+def realm_block(text: str) -> Optional[str]:
+    """The text between the app's realm markers (REALM_BEGIN, REALM_END), or None."""
+    start = text.find(REALM_BEGIN)
+    if start < 0:
+        return None
+    end = text.find(REALM_END, start + len(REALM_BEGIN))
+    return text[start + len(REALM_BEGIN):end] if end >= 0 else None
+
+
 def _b_cite(ctx: RenderContext) -> Dict[str, Any]:
     """Quotes the gold figure and the heir's name found in the system blocks. It understands the
-    rendered snapshot of the app ("Treasury: 312 gold; ..." and 'Heir: "Name"; ...') and, as a
-    fallback, plain "gold: N" / "heir: Name" lines. The usage numbers come from the cache emulator,
-    so a second request with the same system prefix reports cache_read_input_tokens."""
-    text = ctx.system_text()
+    app's rendered realm block (between "=== WHAT THE ADVISOR CAN SEE ===" and "=== END OF WHAT
+    THE ADVISOR CAN SEE ===": "Treasury: 312 gold; ..." and 'Heir: "Name"; ...', looked for inside
+    the markers only), answers "Nothing has been read yet." to the block that says nothing has
+    been read, and, without the markers, reads plain "gold: N" / "heir: Name" lines. The usage
+    numbers come from the cache emulator, so a second request with the same system prefix reports
+    cache_read_input_tokens."""
+    whole = ctx.system_text()
+    block = realm_block(whole)
+    usage = dict(ctx.cache_usage(), output_tokens=12)
+    if block is not None and REALM_NONE_YET in block:
+        return {"steps": [_gen(text_parts=["Nothing has been read yet."], usage=usage)]}
+    text = block if block is not None else whole
     gold = (re.search(r"(?m)^Treasury:[ \t]*(-?\d+) gold", text)
             or re.search(r"(?im)^[ \t]*gold:[ \t]*(-?\d+)", text))
     heir = (re.search(r'(?m)^Heir:[ \t]*"([^"]*)"', text)
             or re.search(r"(?im)^[ \t]*heir:[ \t]*(.+?)[ \t]*$", text))
     parts = ["Gold is ", gold.group(1) if gold else "unknown", ". Heir is ",
              heir.group(1) if heir else "unknown", "."]
-    return {"steps": [_gen(text_parts=parts, usage=dict(ctx.cache_usage(), output_tokens=12))]}
+    return {"steps": [_gen(text_parts=parts, usage=usage)]}
 
 
 def _b_echo_key_split(ctx: RenderContext) -> Dict[str, Any]:
@@ -654,6 +679,13 @@ def _walk_dicts(obj: Any) -> Iterable[Dict[str, Any]]:
                 yield inner
 
 
+def request_setting(body: Any, outer: str, inner: str) -> Optional[str]:
+    """body[outer][inner] when it is a string (the request's thinking type or effort), else None."""
+    value = body.get(outer) if isinstance(body, dict) else None
+    word = value.get(inner) if isinstance(value, dict) else None
+    return word if isinstance(word, str) else None
+
+
 def validate_request(method: str, target: str, headers: Dict[str, List[str]], body: Any) -> List[str]:
     """The list of violations of the Messages request contract Curia's client must keep."""
     found: List[str] = []
@@ -698,6 +730,18 @@ def validate_request(method: str, target: str, headers: Dict[str, List[str]], bo
         found.append("too_many_cache_breakpoints")
     for key in sorted(set(_walk_keys(body)) & set(FORBIDDEN_KEYS)):
         found.append("forbidden_key:%s" % key)
+    # The optional settings: at the top level, one member each, a known word.
+    if "thinking" in body:
+        thinking = body["thinking"]
+        if not (isinstance(thinking, dict) and list(thinking) == ["type"]
+                and thinking["type"] in THINKING_TYPES):
+            found.append("bad_thinking")
+    if any("thinking" in d for d in _walk_dicts(body) if d is not body):
+        found.append("forbidden_key:thinking")
+    if "output_config" in body:
+        config = body["output_config"]
+        if not (isinstance(config, dict) and list(config) == ["effort"] and config["effort"] in EFFORTS):
+            found.append("bad_output_config")
     messages = body.get("messages")
     if not isinstance(messages, list) or not messages:
         found.append("missing_messages")
@@ -1214,6 +1258,8 @@ class MockLlm:
             "client_closed_early": False, "events_sent": 0,
             "violations": validate_request(req.method, req.target, req.headers, body_json),
             "response_status": None, "cache": None, "expect_100_sent": req.expect_100_sent,
+            "thinking_type": self._scrub_obj(request_setting(body_json, "thinking", "type")),
+            "effort": self._scrub_obj(request_setting(body_json, "output_config", "effort")),
         }
         with self._cond:
             rec["index"] = len(self._records)

@@ -202,6 +202,8 @@ std::string formatTranscript(const TranscriptRecord& record,
     line(out, "game_date", scrubbed(record.gameDate, registry));
     line(out, "generation", std::to_string(record.generation));
     line(out, "persona_version", std::to_string(record.personaVersion));
+    line(out, "effort", scrubbed(record.effort, registry));
+    line(out, "thinking", scrubbed(record.thinking, registry));
     line(out, "end", scrubbed(record.end, registry));
     if (!record.errorCode.empty() || !record.errorSummary.empty()) {
         line(out, "error",

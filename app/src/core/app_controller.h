@@ -27,6 +27,15 @@ enum class OverlaySource { GameClick, Hotkey, Tray, Refresh };
 
 const char* toString(OverlaySource source) noexcept;
 
+// What the chat view shows while no provider is set up, unless setNotConfigured() gave a message.
+inline constexpr std::string_view kDefaultNotConfigured =
+    "Curia is not set up to talk to a service yet.";
+
+// The divider row added to a conversation when a newer reading of the realm arrives: "Updated
+// from the game: 3 October 1071", plus " (a save may have been loaded)" when the game date went
+// back. Plain words (advisor/plain_words.h).
+std::string dividerLabel(const bridge::Date& date, bool dateWentBack);
+
 // What the UI needs to know about the snapshot after a frame event.
 struct SnapshotInfo {
     // Complete frames received so far.
@@ -78,7 +87,11 @@ public:
         // Called (on a producer's thread) when the mailbox goes from empty to non-empty.
         UiMailbox::Wake wake;
         advisor::LogSilenceConfig silence;
+        // What every request asks for: the answer limit, and the effort and thinking settings
+        // (Default sends nothing; decision D22).
         int maxTokens = 4096;
+        providers::Effort effort = providers::Effort::Default;
+        providers::Thinking thinking = providers::Thinking::Default;
         // Ask the provider to report the model's reasoning as it happens (the session shows only
         // that the model is thinking, never the reasoning text).
         bool showThinking = false;

@@ -10,6 +10,7 @@
 #include <variant>
 #include <vector>
 
+#include "advisor/snapshot_renderer.h"
 #include "advisor_test_support.h"
 #include "bridge/log_watcher.h"
 #include "bridge_test_support.h"
@@ -316,7 +317,7 @@ TEST_CASE("controller: a new frame adds a divider and keeps the chat") {
     const auto& transcript = rig.controller.session().transcript();
     REQUIRE(transcript.size() == 3);
     CHECK((transcript[2].kind == EntryKind::Divider));
-    CHECK(contains(transcript[2].text, "1 October 1066"));
+    CHECK((transcript[2].text == "Updated from the game: 1 October 1066"));
     CHECK_FALSE(contains(transcript[2].text, "save"));
 
     // The next question carries the new snapshot and the old exchange.
@@ -329,8 +330,8 @@ TEST_CASE("controller: a new frame adds a divider and keeps the chat") {
     // A date that goes back is mentioned.
     rig.controller.pump();
     rig.frame(frameWithGoldAndHeir(1066, 9, 1, 250, "Test Heir Two"));
-    CHECK(
-        contains(rig.controller.session().transcript().back().text, "a save may have been loaded"));
+    CHECK((rig.controller.session().transcript().back().text ==
+           "Updated from the game: 1 September 1066 (a save may have been loaded)"));
     CHECK(rig.recorder.snapshots.back().dateWentBack);
     CHECK(rig.recorder.overlays.size() == 3);
 }
@@ -369,8 +370,8 @@ TEST_CASE("controller: freshness reaches the request as a note on the latest mes
     const std::string note = rig.lastUserText(1);
     CHECK(note.rfind("Q2\n\n[Context: ", 0) == 0);
     CHECK(contains(note, "game date 15 September 1066"));
-    CHECK(contains(note, "taken 7 minutes ago"));
-    CHECK(contains(note, "no new game data for 7 minutes"));
+    CHECK(contains(note, "was read 7 minutes ago"));
+    CHECK(contains(note, "no update has come from the game for 7 minutes"));
     // The first question went to the history without a note.
     CHECK((rig.provider->call(1).request.conversation[0].text == "Q1"));
     rig.controller.pump();
@@ -392,7 +393,33 @@ TEST_CASE("controller: freshness reaches the request as a note on the latest mes
 TEST_CASE("controller: with no snapshot the question goes out with the none-yet block") {
     Rig rig;
     rig.controller.onUserAsk("How do I start?");
-    CHECK(contains(rig.provider->call(0).request.snapshotText, "No snapshot yet"));
+    CHECK(contains(rig.provider->call(0).request.snapshotText,
+                   "Nothing has been read from the game yet"));
+}
+
+TEST_CASE("controller: an unreadable first update: the none-yet block and the note agree") {
+    // The player clicked Advisor, but the update could not be read (a damaged frame, then an
+    // unsupported one) before any complete frame arrived. The block says nothing was read, not
+    // that the player never clicked; the note says the update could not be read.
+    for (const bool unsupported : {false, true}) {
+        CAPTURE(unsupported);
+        Rig rig;
+        if (unsupported) {
+            rig.controller.onMessage(
+                UiMessage{makeWatcherEvent(bridge::UnsupportedFormat{9, "0|LEADING-FIELD|x"})});
+        } else {
+            rig.damaged();
+        }
+        CHECK_FALSE(rig.controller.snapshot().hasSnapshot());
+        rig.controller.onUserAsk("What should I do?");
+        const std::string block = rig.provider->call(0).request.snapshotText;
+        CHECK((block == renderNoSnapshot()));
+        CHECK(contains(block, "Nothing has been read from the game yet"));
+        CHECK_FALSE(contains(block, "clicked"));
+        const std::string note = rig.lastUserText(0);
+        CHECK(contains(note, "[Context: the latest update from the game could not be read"));
+        CHECK_FALSE(contains(note, "game date"));
+    }
 }
 
 TEST_CASE("controller: a damaged frame keeps the old snapshot and flags it") {

@@ -291,7 +291,7 @@ void ChatSession::onToken(const ProviderToken& token) {
     }
     if (token.kind == providers::TokenKind::Thinking) {
         // The model's reasoning is not shown (showThinking is off); it only keeps the spinner on.
-        thinking_ = true;
+        noteThinking();
         notify(answerIndex_);
         return;
     }
@@ -313,8 +313,20 @@ void ChatSession::onStatus(const ProviderStatus& status) {
     if (status.generation != generation_) {
         return;
     }
-    thinking_ = status.status == providers::StreamStatus::ThinkingStarted;
+    if (status.status == providers::StreamStatus::ThinkingStarted) {
+        noteThinking();
+    } else {
+        thinking_ = false;
+    }
     notify(answerIndex_);
+}
+
+void ChatSession::noteThinking() {
+    thinking_ = true;
+    TranscriptEntry& answer = transcript_[answerIndex_];
+    if (answer.thinkingStartedMs < 0 && answer.firstTokenMs < 0) {
+        answer.thinkingStartedMs = msSinceAsk();
+    }
 }
 
 void ChatSession::onDone(const ProviderDone& done) {
@@ -331,10 +343,7 @@ void ChatSession::onDone(const ProviderDone& done) {
         answer.end = AnswerEnd::Failed;
         ErrorInfo info;
         info.code = providers::ChatError::Code::Other;
-        info.summary = answer.hitTokenLimit
-                           ? "The answer ran out of room before any text appeared. Try again, or "
-                             "ask a shorter question."
-                           : "The service sent an empty answer. Try again.";
+        info.summary = std::string(answer.hitTokenLimit ? kNoRoomForAnswerText : kEmptyAnswerText);
         info.retryable = true;
         answer.error = std::move(info);
         setState(ChatState::Error);

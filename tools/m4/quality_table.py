@@ -4,9 +4,12 @@
 
 The owner's quality sitting (docs/spikes/m4-quality-check.md) saves the output of each run into a
 file. This reads those files (or folders of *.jsonl files) and prints one row per question: the
-model, the question, the snapshot number, the time to the first token, the total time, the tokens, the cache numbers and
-how the answer ended, plus empty columns to fill in (rating 1 to 5, notes), and a short summary per
-model (median times). It needs only the numbers and the question text; it never prints an answer.
+run label, the model, the effort and thinking setting, the question, the snapshot number, the time to the first
+token, the total time, the tokens, the number of words in the answer, the cache numbers and how the
+answer ended, plus empty columns to fill in (rating 1 to 5, notes), and a short summary per run
+label and setting (median times and words). The label is the file name without "-q<n>" and the
+extension (the sheet names its files $LABEL-q1.jsonl ...). It needs only the numbers, the question
+text and a word count; it never prints an answer.
 
     python3 tools/m4/quality_table.py ~/curia_m4_results/runs
     python3 tools/m4/quality_table.py run1.jsonl run2.jsonl --csv
@@ -19,6 +22,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import statistics
 import sys
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
@@ -61,9 +65,26 @@ def number(value: Any) -> Optional[int]:
     return int(value)
 
 
+def setting_of(event: Dict[str, Any]) -> str:
+    """ "default", or the settings that were sent: "effort low", "thinking disabled", or both."""
+    parts = []
+    for name in ("effort", "thinking"):
+        value = event.get(name)
+        if isinstance(value, str) and value and value != "default":
+            parts.append("%s %s" % (name, value))
+    return ", ".join(parts) or "default"
+
+
+def label_of(source: str) -> str:
+    """The run label in a file name: "sonnet2-low-q3.jsonl" -> "sonnet2-low"; "" if no file."""
+    stem = os.path.splitext(os.path.basename(source))[0]
+    return re.sub(r"-q\d+$", "", stem)
+
+
 def rows_from_events(events: Iterable[Dict[str, Any]], source: str = "") -> List[Dict[str, Any]]:
     """One row per question that was asked in a run."""
     model = "-"
+    setting = "default"
     snap: Optional[int] = None
     rows: List[Dict[str, Any]] = []
     current: Optional[Dict[str, Any]] = None
@@ -73,9 +94,12 @@ def rows_from_events(events: Iterable[Dict[str, Any]], source: str = "") -> List
         kind = event.get("event")
         if kind == "ready":
             model = str(event.get("model") or "-")
+            setting = setting_of(event)
             snap = number(event.get("snapshot"))
         elif kind == "ask":
-            current = {"source": source, "model": model, "snap": snap, "question": str(event.get("text") or "-"),
+            current = {"source": source, "label": label_of(source) or model, "model": model,
+                       "setting": setting, "words": None, "snap": snap,
+                       "question": str(event.get("text") or "-"),
                        "generation": number(event.get("generation")), "first_token_ms": None,
                        "total_ms": None, "input": None, "output": None, "cache_read": None,
                        "cache_write": None, "result": "no result", "stop_reason": "", "chars": None}
@@ -90,6 +114,9 @@ def rows_from_events(events: Iterable[Dict[str, Any]], source: str = "") -> List
                 current["stop_reason"] = str(event.get("stop_reason") or "")
                 current["result"] = "cut off (max_tokens)" if event.get("max_tokens") else "ok"
                 current["chars"] = len(event["text"]) if isinstance(event.get("text"), str) else None
+                current["words"] = len(event["text"].split()) if isinstance(event.get("text"), str) else None
+                if "effort" in event or "thinking" in event:
+                    current["setting"] = setting_of(event)
             elif kind == "cancelled":
                 current["result"] = "stopped"
             else:
@@ -103,34 +130,39 @@ def show(value: Any) -> str:
     return "-" if value is None else str(value)
 
 
-COLUMNS = ("Model", "Question", "Snap", "First token (ms)", "Total (ms)", "In", "Out", "Cache read",
-           "Cache write", "Result", "Rating 1-5", "Notes")
+COLUMNS = ("Run", "Model", "Setting", "Question", "Snap", "First token (ms)", "Total (ms)", "In",
+           "Out", "Words", "Cache read", "Cache write", "Result", "Rating 1-5", "Notes")
 
 
 def row_cells(row: Dict[str, Any]) -> List[str]:
-    return [row["model"], row["question"].replace("|", "/"), show(row["snap"]),
+    return [row["label"], row["model"], row["setting"], row["question"].replace("|", "/"), show(row["snap"]),
             show(row["first_token_ms"]),
-            show(row["total_ms"]), show(row["input"]), show(row["output"]), show(row["cache_read"]),
-            show(row["cache_write"]), row["result"], "", ""]
+            show(row["total_ms"]), show(row["input"]), show(row["output"]), show(row["words"]),
+            show(row["cache_read"]), show(row["cache_write"]), row["result"], "", ""]
 
 
 def median(values: List[int]) -> Optional[int]:
     return int(statistics.median(values)) if values else None
 
 
-def summary_rows(rows: List[Dict[str, Any]]) -> List[Tuple[str, int, Optional[int], Optional[int], int]]:
-    """(model, questions, median first token, median total, answers that failed) per model."""
-    order: List[str] = []
+Summary = Tuple[str, str, int, Optional[int], Optional[int], Optional[int], int]
+
+
+def summary_rows(rows: List[Dict[str, Any]]) -> List[Summary]:
+    """(label, setting, questions, median first token, median total, median words, answers that
+    failed) per run label and setting, in the order they first appear."""
+    order: List[Tuple[str, str]] = []
     for row in rows:
-        if row["model"] not in order:
-            order.append(row["model"])
+        if (row["label"], row["setting"]) not in order:
+            order.append((row["label"], row["setting"]))
     out = []
-    for model in order:
-        mine = [r for r in rows if r["model"] == model]
+    for label, setting in order:
+        mine = [r for r in rows if r["label"] == label and r["setting"] == setting]
         firsts = [r["first_token_ms"] for r in mine if r["first_token_ms"] is not None]
         totals = [r["total_ms"] for r in mine if r["total_ms"] is not None and r["result"].startswith(("ok", "cut"))]
+        words = [r["words"] for r in mine if r["words"] is not None]
         failed = sum(1 for r in mine if r["result"] not in ("ok",) and not r["result"].startswith("cut"))
-        out.append((model, len(mine), median(firsts), median(totals), failed))
+        out.append((label, setting, len(mine), median(firsts), median(totals), median(words), failed))
     return out
 
 
@@ -139,10 +171,12 @@ def markdown(rows: List[Dict[str, Any]]) -> str:
     for row in rows:
         lines.append("| " + " | ".join(row_cells(row)) + " |")
     lines.append("")
-    lines.append("| Model | Questions | Median first token (ms) | Median total (ms) | Not ok |")
-    lines.append("|---|---|---|---|---|")
-    for model, count, first, total, failed in summary_rows(rows):
-        lines.append("| %s | %d | %s | %s | %d |" % (model, count, show(first), show(total), failed))
+    lines.append("| Run | Setting | Questions | Median first token (ms) | Median total (ms) | Median words "
+                 "| Not ok |")
+    lines.append("|---|---|---|---|---|---|---|")
+    for label, setting, count, first, total, words, failed in summary_rows(rows):
+        lines.append("| %s | %s | %d | %s | %s | %s | %d |"
+                     % (label, setting, count, show(first), show(total), show(words), failed))
     return "\n".join(lines) + "\n"
 
 

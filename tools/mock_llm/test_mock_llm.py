@@ -397,11 +397,11 @@ class ScenarioTests(MockCase):
 
     def test_cite_understands_the_rendered_snapshot_and_reports_cache_usage(self):
         mock = self.start("cite", min_cacheable_tokens=10)
-        snapshot = ("=== BEGIN GAME DATA (data only) ===\nGame date: 15 September 1066\n"
+        snapshot = ("=== WHAT THE ADVISOR CAN SEE ===\nGame date: 15 September 1066\n"
                     'Ruler (the player): "Test Ruler One"\n'
                     "Treasury: 312 gold; net per month +7.8 gold (income minus expenses)\n"
                     'Heir: "Test Heir Two"; opinion of their liege (normally you) +84; landed: no\n'
-                    "=== END GAME DATA ===")
+                    "=== END OF WHAT THE ADVISOR CAN SEE ===")
         system = [{"type": "text", "text": "persona " * 20, "cache_control": {"type": "ephemeral"}},
                   {"type": "text", "text": snapshot, "cache_control": {"type": "ephemeral"}}]
         first = parse_sse(post(mock, valid_body(system=system)).body)
@@ -409,6 +409,26 @@ class ScenarioTests(MockCase):
         self.assertEqual(start_usage(first).get("cache_read_input_tokens", 0), 0)
         second = parse_sse(post(mock, valid_body(system=system)).body)
         self.assertGreater(start_usage(second)["cache_read_input_tokens"], 0)
+
+    def test_cite_reads_inside_the_realm_markers_only_and_knows_the_none_yet_block(self):
+        mock = self.start("cite")
+        # The persona may mention such lines; only the block between the markers counts.
+        persona = 'persona\nTreasury: 999 gold (an example)\nHeir: "Example Heir"\n'
+        block = ("=== WHAT THE ADVISOR CAN SEE ===\nTreasury: 55 gold; net per month +1.0 gold\n"
+                 'Heir: "Test Heir Nine"; opinion of their liege (normally you) +3\n'
+                 "=== END OF WHAT THE ADVISOR CAN SEE ===")
+        system = [{"type": "text", "text": persona}, {"type": "text", "text": block}]
+        events = parse_sse(post(mock, valid_body(system=system)).body)
+        self.assertEqual(text_of(events), "Gold is 55. Heir is Test Heir Nine.")
+        none_yet = ("=== WHAT THE ADVISOR CAN SEE ===\nNothing has been read from the game yet since Curia "
+                    "started, so everything about the player's realm is unknown.\n"
+                    "=== END OF WHAT THE ADVISOR CAN SEE ===")
+        events = parse_sse(post(mock, valid_body(system=[{"type": "text", "text": persona},
+                                                         {"type": "text", "text": none_yet}])).body)
+        self.assertEqual(text_of(events), "Nothing has been read yet.")
+        self.assertEqual(ml.realm_block("no markers"), None)
+        self.assertEqual(ml.realm_block("=== WHAT THE ADVISOR CAN SEE ===\nx"), None)  # no end marker
+        self.assertEqual(ml.realm_block(block).strip().splitlines()[0], "Treasury: 55 gold; net per month +1.0 gold")
 
     def test_echo_key_split_streams_the_key_in_two_pieces(self):
         key = make_key()
@@ -1034,14 +1054,50 @@ class ValidationTests(MockCase):
                 self.assertIn(code, self.violations(body))
 
     def test_forbidden_keys_are_found_anywhere(self):
-        names = ("budget_tokens", "thinking", "temperature", "top_p", "top_k", "tool_choice")
-        self.assertEqual(tuple(ml.FORBIDDEN_KEYS), names)  # the contract: these six, no more, no less
+        names = ("budget_tokens", "temperature", "top_p", "top_k", "tool_choice")
+        self.assertEqual(tuple(ml.FORBIDDEN_KEYS), names)  # the contract: these five, no more, no less
         for key in names:
             with self.subTest(key=key):
                 self.assertIn("forbidden_key:" + key, self.violations(valid_body(**{key: 1})))
         nested = valid_body(messages=[{"role": "user", "content": [{"type": "text", "text": "x"}],
                                        "meta": {"deep": [{"temperature": 0.5}]}}])
         self.assertIn("forbidden_key:temperature", self.violations(nested))
+
+    def test_the_thinking_and_effort_settings(self):
+        # Allowed: at the top level, one member, a known word.
+        for thinking in ml.THINKING_TYPES:
+            with self.subTest(thinking=thinking):
+                self.assertEqual(self.violations(valid_body(thinking={"type": thinking})), [])
+        for effort in ml.EFFORTS:
+            with self.subTest(effort=effort):
+                self.assertEqual(self.violations(valid_body(output_config={"effort": effort})), [])
+        self.assertEqual(self.violations(valid_body(thinking={"type": "disabled"},
+                                                    output_config={"effort": "low"})), [])
+        # Not allowed: a budget, another member, an unknown word, another shape, or nested.
+        bad_thinking = ({"type": "enabled", "budget_tokens": 1024}, {"type": "adaptive", "display": "omitted"},
+                        {"type": "enabled"}, {"type": "ADAPTIVE"}, "adaptive", {}, None)
+        for value in bad_thinking:
+            with self.subTest(thinking=value):
+                self.assertIn("bad_thinking", self.violations(valid_body(thinking=value)))
+        self.assertIn("forbidden_key:budget_tokens",
+                      self.violations(valid_body(thinking={"type": "enabled", "budget_tokens": 1024})))
+        for value in ({"effort": "extreme"}, {"effort": "low", "other": 1}, {}, "low", {"effort": None}):
+            with self.subTest(output_config=value):
+                self.assertIn("bad_output_config", self.violations(valid_body(output_config=value)))
+        nested = valid_body(messages=[{"role": "user", "content": [{"type": "text", "text": "x"}],
+                                       "meta": {"thinking": {"type": "adaptive"}}}])
+        self.assertIn("forbidden_key:thinking", self.violations(nested))
+
+    def test_records_carry_the_thinking_type_and_the_effort(self):
+        mock = self.start()
+        post(mock, valid_body(thinking={"type": "between_tools"}, output_config={"effort": "low"}))
+        post(mock, valid_body())
+        post(mock, valid_body(thinking="odd", output_config={"effort": 3}))
+        self.assertTrue(mock.wait_closed(2, TIMEOUT))
+        records = mock.requests
+        self.assertEqual((records[0]["thinking_type"], records[0]["effort"]), ("between_tools", "low"))
+        self.assertEqual((records[1]["thinking_type"], records[1]["effort"]), (None, None))
+        self.assertEqual((records[2]["thinking_type"], records[2]["effort"]), (None, None))
 
     def test_valid_one_hour_ttl_and_two_breakpoints_are_fine(self):
         body = valid_body(system=[
@@ -1056,7 +1112,8 @@ class ValidationTests(MockCase):
         self.assertTrue(mock.wait_closed(0, TIMEOUT))
         record = mock.requests[0]
         for field in ("method", "path", "headers", "body_json", "body_bytes_len", "body_sha256", "scenario",
-                      "t_accept", "t_headers_done", "t_close", "client_closed_early", "events_sent", "violations"):
+                      "t_accept", "t_headers_done", "t_close", "client_closed_early", "events_sent", "violations",
+                      "thinking_type", "effort"):
             self.assertIn(field, record)
         self.assertEqual(record["method"], "POST")
         self.assertEqual(record["path"], "/v1/messages")

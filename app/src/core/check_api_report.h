@@ -45,8 +45,16 @@ std::string formatCheckApiReport(const CheckApiReport& report);
 std::string checkApiSummaryLine(const CheckApiReport& report);
 
 // What to tell the owner when a request failed. `auth` is the sign-in header that was used (the
-// advice for a rejected key suggests the other one).
-std::vector<std::string> adviceForError(const providers::ChatError& error, AuthMode auth);
+// advice for a rejected key suggests the other one). `effort` and `thinking` are the settings the
+// request carried: a refused request (HTTP 400) that carried one gets a line saying that the
+// model may not support it.
+std::vector<std::string>
+adviceForError(const providers::ChatError& error, AuthMode auth,
+               providers::Effort effort = providers::Effort::Default,
+               providers::Thinking thinking = providers::Thinking::Default);
+
+// "--effort low --thinking disabled" for the settings that are not Default; empty if none is.
+std::string settingsFlags(providers::Effort effort, providers::Thinking thinking);
 
 // The same for a failure before a request could be made: the key or the model is missing.
 std::vector<std::string> adviceForMissing(const std::vector<std::string>& missingVariables);

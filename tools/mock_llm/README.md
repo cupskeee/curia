@@ -90,7 +90,7 @@ chunk sizes.
 | `crlf` | CRLF line endings |
 | `midstream_error` | three tokens, then `event: error` `overloaded_error` after HTTP 200 |
 | `truncated` | two tokens, then the connection ends without `message_stop` and without the chunk terminator |
-| `thinking_blocks` | `thinking_delta` and `signature_delta`, then the text block |
+| `thinking_blocks` | a thinking block first (`thinking_delta` and `signature_delta`), then the text block: the client reports "thinking" before the first text |
 | `refusal`, `max_tokens` | `stop_reason` `refusal` / `max_tokens` |
 | `bad_json` | one `data:` line that is not JSON |
 | `usage_start_only`, `usage_delta_only`, `usage_both` | where usage and the cache fields appear |
@@ -102,7 +102,7 @@ chunk sizes.
 | `echo_key` | reflects the received key into a text delta and into an SSE `error` event (HTTP 200) |
 | `echo_key_http` | reflects the received key into the message of an HTTP 401 error body |
 | `redirect_307` | `307` with `Location: <decoy url>` |
-| `cite` | reads the `system` text blocks for the gold figure and the heir's name and quotes them ("Gold is 312. Heir is Test Heir Two."), proving the snapshot reached the request. It understands the app's rendered snapshot (`Treasury: 312 gold ...`, `Heir: "Name"; ...`) and, as a fallback, plain `gold: N` / `heir: Name` lines. Its usage numbers come from the cache emulator, so a second request with the same system prefix reports `cache_read_input_tokens` |
+| `cite` | reads the `system` text blocks for the gold figure and the heir's name and quotes them ("Gold is 312. Heir is Test Heir Two."), proving the realm block reached the request. It understands the app's rendered block, looking only between its markers `=== WHAT THE ADVISOR CAN SEE ===` and `=== END OF WHAT THE ADVISOR CAN SEE ===` (`Treasury: 312 gold ...`, `Heir: "Name"; ...`), answers `Nothing has been read yet.` to the block that says nothing has been read from the game yet, and, when there are no markers, reads plain `gold: N` / `heir: Name` lines. Its usage numbers come from the cache emulator, so a second request with the same system prefix reports `cache_read_input_tokens` |
 | `echo_key_split` (`echo_key_split:N`) | streams the received key back in two `text_delta` events, cut after N characters of the key (default 12), and the first event's bytes also end on a TCP piece boundary right after the key's first part. Neither event holds the whole key: a client must redact the joined text. (The cut is found in the wire bytes, so a key with a quote or backslash, which JSON escapes, is not supported.) |
 | `echo_key_half` (`echo_key_half:N`) | one `text_delta` with the first N characters of the received key (default 20), then silence until the client closes: a cancel leaves the key cut in two |
 | `echo_key_half_close` (`echo_key_half_close:N`) | the same first part, then the connection is cut: a network error whose partial text holds half a key |
@@ -135,15 +135,20 @@ conflicting `Content-Length`, a bad chunk size or chunk data not followed by CRL
 (not recorded), and a body over 32 MiB a `413`, before it is read. A record holds `index`, `method`, `path`, `headers` (lowercased; a duplicated header is a list),
 `body_json` (parsed, or null), `body_bytes_len`, `body_sha256`, `scenario`, `t_accept`,
 `t_headers_done`, `t_close` (seconds since the server started), `client_closed_early`,
-`events_sent`, `violations`, `response_status`, `cache` and `expect_100_sent`.
+`events_sent`, `violations`, `response_status`, `cache`, `expect_100_sent`, and the request's
+optional settings `thinking_type` (`thinking.type`) and `effort` (`output_config.effort`), each a
+string or null.
 
 `violations` lists the broken rules of the request contract Curia's client must keep:
 `wrong_method`, `wrong_path`, `missing_anthropic_version`, `missing_content_type`,
 `bad_content_type`, `body_not_json`, `body_not_object`, `missing_model`, `missing_max_tokens`,
 `stream_not_true`, `system_not_text_blocks`, `bad_cache_control` (anything but
 `{"type":"ephemeral"}` or the same with `"ttl":"1h"`), `too_many_cache_breakpoints` (over four),
-`forbidden_key:<name>` (`budget_tokens`, `thinking`, `temperature`, `top_p`, `top_k`,
-`tool_choice`, anywhere in the body), `missing_messages`, `bad_role`,
+`forbidden_key:<name>` (`budget_tokens`, `temperature`, `top_p`, `top_k`, `tool_choice`,
+anywhere in the body; `thinking` anywhere but at the top level), `bad_thinking` (a top-level
+`thinking` that is not exactly `{"type": "adaptive" | "between_tools" | "disabled"}`),
+`bad_output_config` (a top-level `output_config` that is not exactly `{"effort": "low" |
+"medium" | "high" | "xhigh" | "max"}`), `missing_messages`, `bad_role`,
 `messages_not_starting_with_user`, `messages_not_alternating`, `empty_text_block`.
 
 `GET /__mock/requests` returns the records as JSON; `POST /__mock/quit` stops the server.

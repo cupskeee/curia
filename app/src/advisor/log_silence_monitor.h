@@ -14,8 +14,9 @@ enum class Notice {
     // The player asked for fresh data (opened the overlay by hot key, tray or Refresh while the
     // snapshot was old) and no frame arrived in time: the export may be dead until CK3 restarts.
     // Only a hint: a frame exists only after the player clicks Advisor in the game, so a healthy
-    // CK3 gets this too if the player has not clicked yet. The wording shown must hedge ("No new
-    // game data yet. Click Advisor in the game; if that does nothing, restart CK3").
+    // CK3 gets this too if the player has not clicked yet. The wording shown must hedge, in plain
+    // words ("No update from the game yet. Click Advisor in the game; if that does nothing,
+    // restart CK3.").
     RestartCk3,
     // The log grew earlier and has been silent for a long time while CK3 runs: a soft notice.
     SilentSoft,

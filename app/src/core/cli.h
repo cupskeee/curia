@@ -5,6 +5,8 @@
 #include <string>
 #include <string_view>
 
+#include "providers/chat_types.h"
+
 namespace curia {
 
 // Which header carries the API key (research-notes C11). The HTTP layer maps it to its own enum.
@@ -49,6 +51,12 @@ struct CliOptions {
     bool cacheProbe = false;
 
     // Shared by headless chat and --check-api.
+    // --effort low|medium|high|xhigh|max and --thinking adaptive|between_tools|disabled: sent as
+    // the request's output_config.effort and thinking.type; not given = not sent (Default). No
+    // secret in them, so they work in every build. A model that does not support a value answers
+    // HTTP 400.
+    providers::Effort effort = providers::Effort::Default;
+    providers::Thinking thinking = providers::Thinking::Default;
     // --test-endpoint http://127.0.0.1:PORT: a mock server (development builds only; the rules
     // are net/endpoint_policy.h). Empty = the real service.
     std::string testEndpoint;

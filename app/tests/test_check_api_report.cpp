@@ -109,6 +109,43 @@ TEST_CASE("check-api advice: each kind of failure has plain wording") {
                         "service side"));
 }
 
+TEST_CASE("check-api advice: a refused request that carried effort or thinking says so") {
+    using curia::providers::Effort;
+    using curia::providers::Thinking;
+    const ChatError refused =
+        error(ChatError::Code::BadRequest, 400, "thinking.type: value not supported");
+    // Without a setting: the usual advice only.
+    const std::vector<std::string> plain = curia::adviceForError(refused, AuthMode::Bearer);
+    CHECK(anyLineContains(plain, "refused the request"));
+    CHECK_FALSE(anyLineContains(plain, "effort or thinking"));
+    // With one: the line names the flags and the likely cause.
+    const std::vector<std::string> tuned =
+        curia::adviceForError(refused, AuthMode::Bearer, Effort::Low, Thinking::Disabled);
+    CHECK(anyLineContains(tuned, "refused the request"));
+    CHECK(anyLineContains(tuned, "--effort low --thinking disabled"));
+    CHECK(anyLineContains(tuned, "may not support that effort or thinking setting"));
+    CHECK(anyLineContains(tuned, "only at effort high or below"));
+    CHECK(anyLineContains(tuned, "thinking.type: value not supported"));
+    // Two flags are "them", one is "it".
+    CHECK(anyLineContains(tuned, "Run the same check without them to see"));
+    const std::vector<std::string> one =
+        curia::adviceForError(refused, AuthMode::Bearer, Effort::Low, Thinking::Default);
+    CHECK(anyLineContains(one, "The request carried --effort low."));
+    CHECK(anyLineContains(one, "Run the same check without it to see"));
+    // A model that is not found, or a request that is too large, is not about the settings.
+    const std::vector<std::string> notFound = curia::adviceForError(
+        error(ChatError::Code::BadRequest, 404), AuthMode::Bearer, Effort::High);
+    CHECK_FALSE(anyLineContains(notFound, "effort or thinking"));
+    const std::vector<std::string> tooLarge = curia::adviceForError(
+        error(ChatError::Code::BadRequest, 413), AuthMode::Bearer, Effort::High);
+    CHECK_FALSE(anyLineContains(tooLarge, "effort or thinking"));
+
+    CHECK(curia::settingsFlags(Effort::Default, Thinking::Default).empty());
+    CHECK((curia::settingsFlags(Effort::Max, Thinking::Default) == "--effort max"));
+    CHECK((curia::settingsFlags(Effort::Default, Thinking::BetweenTools) ==
+           "--thinking between_tools"));
+}
+
 TEST_CASE("check-api advice: missing variables are named without values") {
     const std::vector<std::string> advice = curia::adviceForMissing(
         {std::string(curia::keyVariableName()), std::string(curia::modelVariableName())});

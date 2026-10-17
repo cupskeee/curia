@@ -20,8 +20,12 @@ struct BuiltRequest {
 // C13). Pure: no I/O, no clock, no randomness; the same request gives the same bytes.
 //
 // Keys: model, max_tokens, stream (true), and system when there is any system text, and messages.
-// Never any of thinking, temperature, top_p, top_k, tool_choice, metadata (the current models
-// answer 400 to forced or non-default values, and the defaults are what Curia wants).
+// output_config {effort: <word>} only when request.effort is set, and thinking {type: <word>}
+// only when request.thinking is set, each with that one member and nothing else (no budget:
+// budget_tokens is a 400 on the current models). Never any of temperature, top_p, top_k,
+// tool_choice, metadata (the current models answer 400 to forced or non-default values, and the
+// defaults are what Curia wants). With both settings at Default the bytes are those of a request
+// without them (decision D22 keeps the default unset until the owner's measurement).
 //
 // system is an array of text blocks in a fixed order: block 1 the persona, block 2 the realm
 // snapshot. A block carries cache_control {type: ephemeral} (plus ttl "1h" when cache.longTtl)

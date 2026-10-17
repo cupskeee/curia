@@ -34,9 +34,11 @@ struct Freshness {
 std::string describeDuration(long long seconds);
 
 // The note, or an empty string when everything is fresh (young snapshot, log not silent, export
-// readable). Example:
-//   [Context: the snapshot is from game date 15 September 1066 and was taken 7 minutes ago (real
-//   time); Curia has seen no new game data for 6 minutes; the last export could not be read.]
+// readable). It is in plain words (plain_words.h), because the model repeats it to the player.
+// Example:
+//   [Context: the realm information is from game date 15 September 1066 and was read 7 minutes
+//   ago (real time); no update has come from the game for 6 minutes; the latest update from the
+//   game could not be read, so newer information may exist.]
 std::string freshnessNote(const Freshness& freshness);
 
 }  // namespace curia::advisor

@@ -38,6 +38,7 @@ add_library(curia_core STATIC
     src/advisor/freshness.cpp
     src/advisor/log_silence_monitor.cpp
     src/advisor/persona.cpp
+    src/advisor/plain_words.cpp
     src/advisor/prompt_builder.cpp
     src/advisor/snapshot_renderer.cpp
     src/advisor/snapshot_store.cpp
@@ -220,6 +221,7 @@ if(CURIA_BUILD_TESTS)
         tests/advisor_test_support.cpp
         tests/bridge_test_support.cpp
         tests/test_advisor_monitor.cpp
+        tests/test_advisor_plain_words.cpp
         tests/test_advisor_prompt.cpp
         tests/test_advisor_renderer.cpp
         tests/test_advisor_session.cpp

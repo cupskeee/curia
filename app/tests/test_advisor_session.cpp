@@ -445,8 +445,8 @@ TEST_CASE("session: dividers keep the history and a second one replaces the firs
     rig.handlers(0).onToken(TokenKind::Text, "A1");
     rig.handlers(0).onDone(usageWith());
     rig.pump();
-    rig.session.addDivider("New snapshot, game date 1 January 1067");
-    rig.session.addDivider("New snapshot, game date 1 February 1067");
+    rig.session.addDivider("Updated from the game: 1 January 1067");
+    rig.session.addDivider("Updated from the game: 1 February 1067");
     REQUIRE(rig.session.transcript().size() == 3);
     CHECK((rig.session.transcript()[2].kind == EntryKind::Divider));
     CHECK(contains(rig.session.transcript()[2].text, "1 February"));
@@ -466,7 +466,7 @@ TEST_CASE("session: a divider added while streaming does not disturb the answer"
     rig.ask("Q1");
     rig.handlers(0).onToken(TokenKind::Text, "part one ");
     rig.pump();
-    rig.session.addDivider("New snapshot");
+    rig.session.addDivider("Updated from the game: 1 January 1067");
     rig.handlers(0).onToken(TokenKind::Text, "part two");
     rig.handlers(0).onDone(usageWith());
     rig.pump();
@@ -495,6 +495,50 @@ TEST_CASE("session: thinking keeps the spinner on until text starts") {
     handlers.onDone(usageWith());
     rig.pump();
     CHECK((rig.session.transcript()[1].text == "Answer"));
+}
+
+TEST_CASE("session: the time to the first thinking block, before any text only") {
+    Rig rig;
+    rig.ask("Q");
+    const auto handlers = rig.handlers(0);
+    rig.clock.advance(std::chrono::seconds(1));
+    handlers.onStatus(StreamStatus::ThinkingStarted);
+    rig.pump();
+    CHECK(rig.session.transcript()[1].thinkingStartedMs == 1000);
+    // A second thinking block (or thinking text) does not move it.
+    rig.clock.advance(std::chrono::seconds(2));
+    handlers.onToken(TokenKind::Thinking, "more");
+    handlers.onStatus(StreamStatus::ThinkingStarted);
+    rig.pump();
+    CHECK(rig.session.transcript()[1].thinkingStartedMs == 1000);
+    handlers.onStatus(StreamStatus::TextStarted);
+    handlers.onToken(TokenKind::Text, "Answer.");
+    handlers.onDone(usageWith());
+    rig.pump();
+    CHECK(rig.session.transcript()[1].firstTokenMs == 3000);
+    CHECK(rig.session.transcript()[1].thinkingStartedMs == 1000);
+
+    // No thinking block: -1. Thinking that starts only after the text: -1 too.
+    rig.ask("Q2");
+    const auto second = rig.handlers(1);
+    second.onToken(TokenKind::Text, "Text first.");
+    second.onStatus(StreamStatus::ThinkingStarted);
+    second.onDone(usageWith());
+    rig.pump();
+    CHECK(rig.session.transcript()[3].thinkingStartedMs == -1);
+    CHECK(rig.session.transcript()[3].firstTokenMs >= 0);
+}
+
+TEST_CASE("session: the empty-answer texts are the named constants") {
+    Rig rig;
+    rig.ask("Q");
+    rig.handlers(0).onDone(usageWith());
+    rig.pump();
+    CHECK((bridge::test::must(rig.session.transcript()[1].error).summary == kEmptyAnswerText));
+    rig.ask("Q2");
+    rig.handlers(1).onDone(usageWith("max_tokens"));
+    rig.pump();
+    CHECK((bridge::test::must(rig.session.transcript()[3].error).summary == kNoRoomForAnswerText));
 }
 
 TEST_CASE("session: a key split over two tokens is redacted in the joined text") {

@@ -32,24 +32,26 @@ std::string freshnessNote(const Freshness& freshness) {
     }
     std::vector<std::string> parts;
 
-    std::string snapshot;
+    // Plain words only (plain_words.h): the model repeats them to the player.
+    std::string realm;
     if (freshness.gameDateOfSnapshot.has_value()) {
-        snapshot =
-            "the snapshot is from game date " + formatGameDate(*freshness.gameDateOfSnapshot);
+        realm = "the realm information is from game date " +
+                formatGameDate(*freshness.gameDateOfSnapshot);
     }
     if (old) {
-        snapshot += (snapshot.empty() ? "the snapshot was taken " : " and was taken ") +
-                    describeDuration(freshness.snapshotAgeSeconds) + " ago (real time)";
+        realm += (realm.empty() ? "the realm information was read " : " and was read ") +
+                 describeDuration(freshness.snapshotAgeSeconds) + " ago (real time)";
     }
-    if (!snapshot.empty()) {
-        parts.push_back(snapshot);
+    if (!realm.empty()) {
+        parts.push_back(realm);
     }
     if (silent) {
-        parts.push_back("Curia has seen no new game data for " +
+        parts.push_back("no update has come from the game for " +
                         describeDuration(freshness.logSilentSeconds));
     }
     if (freshness.exportUnreadable) {
-        parts.emplace_back("the last export could not be read, so newer game data may exist");
+        parts.emplace_back(
+            "the latest update from the game could not be read, so newer information may exist");
     }
 
     std::string note = "[Context: ";

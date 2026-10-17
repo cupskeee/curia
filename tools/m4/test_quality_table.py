@@ -38,6 +38,8 @@ class RowTests(unittest.TestCase):
         self.assertEqual(row["result"], "ok")
         self.assertEqual(row["snap"], 3)
         self.assertEqual(row["chars"], len("Check your heir."))
+        self.assertEqual(row["words"], 3)
+        self.assertEqual(row["setting"], "default")  # an older run: no settings in the events
 
     def test_other_endings(self):
         events = [READY,
@@ -57,8 +59,11 @@ class RowTests(unittest.TestCase):
         self.assertEqual(rows[0]["question"], "-")
         self.assertIsNone(rows[0]["first_token_ms"])
         cells = qt.row_cells(rows[0])
-        self.assertEqual(cells[2], "-")  # no snapshot number
-        self.assertEqual(cells[3], "-")  # no first-token time
+        self.assertEqual(cells[0], "-")  # no file name: the label is the model, here "-"
+        self.assertEqual(cells[2], "default")  # no setting
+        self.assertEqual(cells[4], "-")  # no snapshot number
+        self.assertEqual(cells[5], "-")  # no first-token time
+        self.assertEqual(cells[9], "-")  # no words
         self.assertEqual(len(cells), len(qt.COLUMNS))
 
     def test_several_questions_and_models_in_order(self):
@@ -66,9 +71,49 @@ class RowTests(unittest.TestCase):
         b = [dict(READY, model="mock-model-2"), {"event": "ask", "text": "one"}, dict(DONE, first_token_ms=100)]
         rows = qt.rows_from_events(a) + qt.rows_from_events(b)
         summary = qt.summary_rows(rows)
+        # Without a file name the label is the model.
         self.assertEqual([s[0] for s in summary], ["mock-model-1", "mock-model-2"])
-        self.assertEqual(summary[0][1:], (2, 812, 4050, 0))
-        self.assertEqual(summary[1][1:], (1, 100, 3100, 0))
+        self.assertEqual(summary[0][1:], ("default", 2, 812, 4050, 3, 0))
+        self.assertEqual(summary[1][1:], ("default", 1, 100, 3100, 3, 0))
+
+
+class SettingTests(unittest.TestCase):
+    def test_the_setting_comes_from_the_done_event_then_the_ready_event(self):
+        ready = dict(READY, effort="low", thinking="default")
+        done = dict(DONE, effort="low", thinking="between_tools", text="one two  three\nfour")
+        rows = qt.rows_from_events([ready, {"event": "ask", "text": "q1"}, done,
+                                    {"event": "ask", "text": "q2"}, {"event": "error", "code": "Other"}])
+        self.assertEqual(rows[0]["setting"], "effort low, thinking between_tools")
+        self.assertEqual(rows[0]["words"], 4)
+        self.assertEqual(rows[1]["setting"], "effort low")  # no done event: the ready event's
+        self.assertIsNone(rows[1]["words"])
+        self.assertEqual(qt.setting_of({"effort": "default", "thinking": "disabled"}), "thinking disabled")
+        self.assertEqual(qt.setting_of({}), "default")
+        self.assertEqual(qt.setting_of({"effort": 3, "thinking": None}), "default")
+
+    def test_labels_come_from_the_file_names(self):
+        self.assertEqual(qt.label_of("sonnet2-low-q3.jsonl"), "sonnet2-low")
+        self.assertEqual(qt.label_of("/x/y/haiku-q12.jsonl"), "haiku")
+        self.assertEqual(qt.label_of("run.jsonl"), "run")
+        self.assertEqual(qt.label_of(""), "")
+
+    def test_medians_per_label_and_setting(self):
+        def run(label: str, effort: str, totals: list) -> list:
+            rows = []
+            for n, total in enumerate(totals, 1):
+                rows += qt.rows_from_events(
+                    [dict(READY, effort=effort), {"event": "ask", "text": "q%d" % n},
+                     dict(DONE, total_ms=total, effort=effort, text="w " * (10 * n))],
+                    "%s-q%d.jsonl" % (label, n))
+            return rows
+        rows = run("sonnet2", "default", [3000, 5000, 4000]) + run("sonnet2-low", "low", [1000, 2000])
+        summary = qt.summary_rows(rows)
+        self.assertEqual(summary, [("sonnet2", "default", 3, 812, 4000, 20, 0),
+                                   ("sonnet2-low", "effort low", 2, 812, 1500, 15, 0)])
+        text = qt.markdown(rows)
+        self.assertIn("| Run | Setting | Questions | Median first token (ms) | Median total (ms) | Median words "
+                      "| Not ok |", text)
+        self.assertIn("| sonnet2-low | effort low | 2 | 812 | 1500 | 15 | 0 |", text)
 
 
 class OutputTests(unittest.TestCase):
@@ -76,9 +121,11 @@ class OutputTests(unittest.TestCase):
         rows = qt.rows_from_events([READY, {"event": "ask", "text": "a | b"}, DONE])
         text = qt.markdown(rows)
         lines = text.splitlines()
-        self.assertTrue(lines[0].startswith("| Model | Question | Snap | First token (ms)"))
-        self.assertIn("| mock-model-1 | a / b | 3 | 812 | 3100 | 4000 | 120 | 3500 | 0 | ok |  |  |", lines)
-        self.assertIn("| Model | Questions | Median first token (ms) | Median total (ms) | Not ok |", lines)
+        self.assertTrue(lines[0].startswith("| Run | Model | Setting | Question | Snap | First token (ms)"))
+        self.assertIn("| mock-model-1 | mock-model-1 | default | a / b | 3 | 812 | 3100 | 4000 | 120 | 3 | 3500 | 0 "
+                      "| ok |  |  |", lines)
+        self.assertIn("| Run | Setting | Questions | Median first token (ms) | Median total (ms) | Median words "
+                      "| Not ok |", lines)
         self.assertNotIn("Check your heir", text)  # answers are never printed
 
     def test_csv_quotes(self):
@@ -97,7 +144,10 @@ class OutputTests(unittest.TestCase):
             out = io.StringIO()
             with contextlib.redirect_stdout(out):
                 self.assertEqual(qt.main([folder]), 0)
-            self.assertEqual(out.getvalue().count("| mock-model-1 |"), 3)  # two rows and the summary
+            self.assertEqual(out.getvalue().count("| mock-model-1 |"), 2)  # the two rows
+            self.assertIn("| a | mock-model-1 | default | q |", out.getvalue())  # rows carry the file label
+            self.assertIn("| a | default | 1 |", out.getvalue())  # the summary, per file label
+            self.assertIn("| b | default | 1 |", out.getvalue())
             self.assertEqual(qt.read_events(os.path.join(folder, "missing.jsonl")), [])
 
     def test_no_questions_is_exit_1(self):
