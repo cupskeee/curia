@@ -178,7 +178,7 @@ Acceptance criteria:
 1. OpenAI-compatible provider passes mock-server tests (all reasoning keys, usage chunk variants, comment lines, mid-stream errors, `[DONE]`) **[CI]**, and is verified live against at least one local server and one hosted service the owner uses **[OWNER-MAC]** (candidates: Ollama/LM Studio, OpenRouter).
 2. Model dropdown is populated from each provider's models endpoint; on failure free text works; default selection: newest Sonnet-tier for Anthropic (name match), no default for other OpenAI-compatible providers; **no model ID literals in code** (CI grep check) (D4, A13 resolved).
 3. Key storage: macOS Keychain **[OWNER-MAC]** (including behaviour of an ad-hoc-signed app across updates, spike); Windows Credential Manager and Linux libsecret implemented, tested in CI where possible (libsecret in a CI container with a keyring provider), live checks [TESTER]. With no Secret Service provider on Linux, the key is session-only in memory (D11) and the UI says so. Keys never written to the settings file.
-4. Settings UI covers FR-SET-1; settings persist across restarts.
+4. Settings UI covers FR-SET-1; settings persist across restarts. The chat window's not-configured notice then points to the settings screen and no longer names the development variables (`CURIA_ANTHROPIC_API_KEY`, `CURIA_MODEL`; owner, 2026-10-18).
 5. Redaction tests: keys never appear in the app log, crash output or exported diagnostics.
 6. CA-bundle strategy (A16) verified against `api.openai.com` and `api.anthropic.com` on a clean machine/user for macOS **[OWNER-MAC]**; Windows/Linux [TESTER].
 

@@ -406,7 +406,7 @@ int runApp(const CliOptions& options) {
         uiScale = 1.0F;
     }
     const ui::FontSet fonts = ui::loadFonts();
-    ui::applyTheme(uiScale);
+    ui::applyTheme(uiScale, fonts);
 
     auto backend = ui::createSdlRendererBackend();
     if (!backend->init(window)) {
@@ -433,6 +433,7 @@ int runApp(const CliOptions& options) {
         smoke.uiScale = uiScale;
         smoke.wakeEvent = firstEvent;
         smoke.screenshotPath = options.screenshotPath;
+        smoke.scene = options.smokeScene;
         exitCode = ui::runSmoke(smoke);
     } else {
         exitCode = runWindow(options, setup, window, *backend, fonts, firstEvent, firstEvent + 1);

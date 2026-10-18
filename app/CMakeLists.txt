@@ -52,6 +52,7 @@ add_library(curia_core STATIC
     src/bridge/text_hygiene.cpp
     src/chatview/answer_text.cpp
     src/chatview/canned_conversation.cpp
+    src/chatview/font_metrics.cpp
     src/chatview/log_path.cpp
     src/chatview/text_layout.cpp
     src/chatview/utf8.cpp
@@ -195,6 +196,11 @@ if(CURIA_BUILD_APP)
     # BMP file; then exit (software renderer, no GPU needed). Pass/fail is the process exit code.
     add_test(NAME app_smoke COMMAND curia --smoke --screenshot ${CMAKE_CURRENT_BINARY_DIR}/app_smoke.bmp)
     set_tests_properties(app_smoke PROPERTIES LABELS smoke TIMEOUT 60)
+    # The same window with its notices over the conversation, and before anything came from the
+    # game (--smoke-scene): the layouts the screenshots of a UI change are taken from.
+    add_test(NAME app_smoke_notices COMMAND curia --smoke --smoke-scene notices)
+    add_test(NAME app_smoke_start COMMAND curia --smoke --smoke-scene start)
+    set_tests_properties(app_smoke_notices app_smoke_start PROPERTIES LABELS smoke TIMEOUT 60)
 
     # Idle test: the event loop must not draw frames while nothing happens (needs a display; the
     # software renderer avoids needing a GPU). Do not move the mouse over the window while it runs.
@@ -265,6 +271,7 @@ if(CURIA_BUILD_TESTS)
         tests/test_bridge_splitter.cpp
         tests/test_build_info.cpp
         tests/test_chatview_answer.cpp
+        tests/test_chatview_font_metrics.cpp
         tests/test_chatview_layout.cpp
         tests/test_chatview_model.cpp
         tests/test_chatview_text.cpp

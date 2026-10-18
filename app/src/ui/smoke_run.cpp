@@ -17,6 +17,7 @@
 #include "chatview/view_model.h"
 #include "chatview/view_text.h"
 #include "core/app_controller.h"
+#include "core/dev_config.h"
 #include "ui/chat_window.h"
 #include "ui/sdl_wake.h"
 
@@ -92,6 +93,9 @@ int runSmoke(const SmokeContext& context) {
     if (!context.fonts.bundled) {
         return fail("font=default (the bundled font did not load)");
     }
+    if (!context.fonts.metricsRead) {
+        return fail("font_metrics=unread (the bundled face's size per em is unknown)");
+    }
 
     SdlWake wake(context.wakeEvent);
     AppController::Options options;
@@ -139,18 +143,34 @@ int runSmoke(const SmokeContext& context) {
 
         frame();
         frame();
-        // As if the player had clicked Advisor in the game.
-        controller.onMessage(
-            UiMessage{makeWatcherEvent(bridge::FrameComplete{canned::firstFrame()})});
-        controller.onOverlayOpened(OverlaySource::GameClick);
-        if (!ask(canned::kFirstQuestion)) {
-            result = fail("the first question did not get its answer");
+        if (context.scene != SmokeScene::Start) {
+            // As if the player had clicked Advisor in the game.
+            controller.onMessage(
+                UiMessage{makeWatcherEvent(bridge::FrameComplete{canned::firstFrame()})});
+            controller.onOverlayOpened(OverlaySource::GameClick);
+            if (!ask(canned::kFirstQuestion)) {
+                result = fail("the first question did not get its answer");
+            }
+            // A later click: a divider row, then a question whose answer fails.
+            controller.onMessage(
+                UiMessage{makeWatcherEvent(bridge::FrameComplete{canned::secondFrame()})});
+            if (result == 0 && !ask(canned::kSecondQuestion)) {
+                result = fail("the second question did not end");
+            }
         }
-        // A later click: a divider row, then a question whose answer fails.
-        controller.onMessage(
-            UiMessage{makeWatcherEvent(bridge::FrameComplete{canned::secondFrame()})});
-        if (result == 0 && !ask(canned::kSecondQuestion)) {
-            result = fail("the second question did not end");
+        if (result == 0 && context.scene == SmokeScene::Notices) {
+            // A reading from the test button (an information and one more divider), then a
+            // damaged reading, then the key missing (the service is no longer set up): three
+            // notices over the conversation.
+            bridge::Frame probe = canned::secondFrame();
+            probe.mode = 1;
+            ++probe.snap;
+            controller.onMessage(UiMessage{makeWatcherEvent(bridge::FrameComplete{probe})});
+            controller.onMessage(UiMessage{makeWatcherEvent(
+                bridge::FrameDamaged{probe.snap + 1, bridge::DamageReason::Incomplete, "smoke"})});
+            DevConfig missingKey;
+            missingKey.model = "scripted-smoke-model";
+            controller.setNotConfigured(describeNotConfigured(missingKey));
         }
         for (int i = 0; i < kSettleFrames; ++i) {
             frame();
@@ -158,12 +178,23 @@ int runSmoke(const SmokeContext& context) {
 
         const std::vector<advisor::TranscriptEntry>& transcript = controller.session().transcript();
         const chatview::ChatView& view = chat.lastView();
-        if (result == 0 &&
-            (transcript.size() != 5 || transcript[1].end != advisor::AnswerEnd::Complete ||
+        if (result == 0 && context.scene == SmokeScene::Start &&
+            (!view.items.empty() || view.emptyState.empty() || !view.banners.empty())) {
+            result = fail("the start scene did not show the empty window");
+        }
+        if (result == 0 && context.scene != SmokeScene::Start &&
+            (transcript.size() < 5 || transcript[1].end != advisor::AnswerEnd::Complete ||
              transcript[2].kind != advisor::EntryKind::Divider ||
-             transcript[4].end != advisor::AnswerEnd::Failed || view.items.size() != 5 ||
-             !view.items[4].offerRetry || !view.items[1].offerCopy)) {
+             transcript[4].end != advisor::AnswerEnd::Failed || view.items.size() < 5 ||
+             !view.items[1].offerCopy)) {
             result = fail("the conversation did not end as scripted");
+        }
+        if (result == 0 && context.scene == SmokeScene::Conversation &&
+            (transcript.size() != 5 || view.items.size() != 5 || !view.items[4].offerRetry)) {
+            result = fail("the conversation did not end as scripted");
+        }
+        if (result == 0 && context.scene == SmokeScene::Notices && view.banners.size() != 3) {
+            result = fail("the notices scene did not show its three notices");
         }
 
         const std::set<char32_t> missing = missingGlyphs(context.fonts, shownTexts(view));

@@ -130,8 +130,8 @@ bool validate(const CliOptions& out, std::string& error) {
                 "--headless-chat";
         return false;
     }
-    if (!out.smoke && (!out.screenshotPath.empty() || out.windowWidth > 0)) {
-        error = "--screenshot and --window-size need --smoke";
+    if (!out.smoke && (!out.screenshotPath.empty() || out.windowWidth > 0 || out.smokeSceneGiven)) {
+        error = "--screenshot, --window-size and --smoke-scene need --smoke";
         return false;
     }
     if (out.frameSnap.has_value() && !out.fromStart) {
@@ -172,6 +172,20 @@ bool parseCli(int argc, const char* const* argv, CliOptions& out, std::string& e
             if (!textFlag(argc, argv, i, arg, out.screenshotPath, error)) {
                 return false;
             }
+        } else if (arg == "--smoke-scene") {
+            const std::string_view name = i + 1 < argc ? std::string_view(argv[i + 1]) : "";
+            if (name == "conversation") {
+                out.smokeScene = SmokeScene::Conversation;
+            } else if (name == "notices") {
+                out.smokeScene = SmokeScene::Notices;
+            } else if (name == "start") {
+                out.smokeScene = SmokeScene::Start;
+            } else {
+                error = "--smoke-scene needs conversation, notices or start";
+                return false;
+            }
+            out.smokeSceneGiven = true;
+            ++i;
         } else if (arg == "--window-size") {
             if (i + 1 >= argc || !parseWindowSize(argv[i + 1], out.windowWidth, out.windowHeight)) {
                 error = "--window-size needs WIDTHxHEIGHT, each a whole number between " +
@@ -310,7 +324,8 @@ static_assert(providers::kDefaultEffort == providers::Effort::Low,
 std::string_view cliUsage() {
     return "Usage: curia [--log <path>] [--test-endpoint <url>] [--auth bearer|x-api-key]\n"
            "             [--log-dir <dir>]\n"
-           "       curia [--smoke [--screenshot <file.bmp>] [--window-size <W>x<H>] |\n"
+           "       curia [--smoke [--screenshot <file.bmp>] [--window-size <W>x<H>]\n"
+           "             [--smoke-scene conversation|notices|start] |\n"
            "             --idle-test <seconds> | --watch-log <path> [--from-start]\n"
            "             [--max-frames <n>] [--timeout-seconds <s>]] [--version] [--help]\n"
            "       curia --headless-chat --log <path> [--from-start] [--frame <snap>]\n"
@@ -327,7 +342,8 @@ std::string_view cliUsage() {
            "  --smoke              open a window, draw a canned conversation with a scripted\n"
            "                       answer (no network, no key, no game), exit (CI smoke test);\n"
            "                       --screenshot saves the last frame, --window-size sets the\n"
-           "                       window's size in logical pixels\n"
+           "                       window's size in logical pixels, --smoke-scene notices adds\n"
+           "                       the notices, --smoke-scene start draws the empty window\n"
            "  --idle-test <sec>    run the event loop and check that nothing renders while idle\n"
            "  --watch-log <path>   no window: tail a log file and print one JSON object per\n"
            "                       bridge event (JSON Lines). Attaches at the end of an existing\n"

@@ -10,8 +10,9 @@
 // figures in docs/architecture.md stay true.
 namespace curia::ui {
 
-// The base text size in logical pixels, before the display's content scale.
-inline constexpr float kBaseFontSize = 18.0F;
+// The size of the letters: the em of the text, in logical pixels before the display's content
+// scale. ImGui is given the font size that makes the em this big (FontSet::heightPerEm).
+inline constexpr float kTextEm = 14.0F;
 
 struct FontSet {
     ImFont* regular = nullptr;
@@ -19,15 +20,24 @@ struct FontSet {
     // Both bundled faces were loaded. False = ImGui's own font stands in for both (the smoke test
     // fails then).
     bool bundled = false;
+    // ImGui's font size per em of the regular face, from the font's own metrics
+    // (chatview/font_metrics.h): ImGui fills the size it is given with the face's ascender-to-
+    // descender span, which is 1.46 em for the bundled face. 1 when the metrics could not be read
+    // (the smoke test fails then for the bundled face) and for ImGui's own font.
+    float heightPerEm = 1.0F;
+    bool metricsRead = false;
+
+    // The font size ImGui gets for the text (before the content scale).
+    [[nodiscard]] float baseSize() const { return kTextEm * heightPerEm; }
 };
 
 // Adds the two bundled faces to the font atlas (once, after ImGui::CreateContext()). ImGui does not
 // own or free the bytes: they are part of the executable.
 FontSet loadFonts();
 
-// Sets ImGui's colours and sizes. `uiScale` is the display's content scale only: the renderer
-// applies the pixel density through the framebuffer scale.
-void applyTheme(float uiScale);
+// Sets ImGui's colours and sizes, the text at fonts.baseSize(). `uiScale` is the display's
+// content scale only: the renderer applies the pixel density through the framebuffer scale.
+void applyTheme(float uiScale, const FontSet& fonts);
 
 // An sRGB colour.
 struct Rgb {

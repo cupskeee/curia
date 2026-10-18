@@ -15,19 +15,21 @@ at `0.y.z` and anything may change between minor versions.
   questions and read the answers as they arrive. It shows the date of what the advisor can see
   (before the first update from the game, what to do in the middle of the window), notices (the
   last update could not be read, the mod and app versions differ, no update from the game, CK3's
-  folder not found), a reminder to pause the game before asking, a "thinking..." state until the
-  first word and a pulsing dot while the answer arrives, **bold** in answers (other markdown is
-  removed; numbered lines stay as written), Stop (also Cmd+. on macOS), Retry after an error and
-  Copy on each answer (also on one that was stopped or failed part way). In a wide window the text
-  keeps a readable width. It reads CK3's own `debug.log` (or `--log <path>`) and shows the realm
-  once you click Advisor in the game. In this version it is a normal window; the overlay over the
+  folder not found; each as tall as its text), a reminder to press Space to pause before
+  asking, a "thinking..." state until the first word and a pulsing dot while the answer
+  arrives, **bold** in answers (other markdown is removed; numbered lines stay as written), Stop
+  (also Cmd+. on macOS), Retry after an error and Copy on each answer (also on one that was
+  stopped or failed part way). Lines are 1.4 em apart with short gaps between paragraphs, and in a
+  wide window the text keeps a readable width. It reads CK3's own `debug.log` (or `--log <path>`)
+  and shows the realm once you click Advisor in the game. In this version it is a normal window; the overlay over the
   game comes next. Development builds take the key and the model from the environment, as the
   headless chat does.
 - A parchment look with a bundled font, Gentium Book Plus 6.200 by SIL International (SIL Open
   Font License 1.1), embedded unmodified in the app; its licence is in the generated third-party
   notices.
 - `curia --smoke` draws a canned conversation (no network, no key, no game) and checks that the
-  font has every character shown; `--screenshot <file.bmp>` and `--window-size <W>x<H>` go with it.
+  font has every character shown; `--screenshot <file.bmp>`, `--window-size <W>x<H>` and
+  `--smoke-scene notices|start` (the notices over the conversation, or the empty window) go with it.
 - `--effort default|low|medium|high|xhigh|max` and `--thinking adaptive|between_tools|disabled` for
   `--headless-chat` and `--check-api`: the request's effort and thinking settings (what is sent
   without them is under "Changed"). The headless `ready` and `done` events, the transcripts and

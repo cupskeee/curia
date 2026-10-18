@@ -187,7 +187,13 @@ std::string describeNotConfigured(const DevConfig& config) {
             message += kModelVariable;
             message += " is not set.";
         }
-        message += " Set them in the environment that starts Curia, then start it again.";
+        // A missing or unusable variable is named above (at least one is: both present returned
+        // early).
+        const bool keyNamed = !config.apiKey.has_value() || hasProblemAbout(config, kKeyVariable);
+        const bool modelNamed =
+            !config.model.has_value() || hasProblemAbout(config, kModelVariable);
+        message += keyNamed && modelNamed ? " Set them" : " Set it";
+        message += " in the environment that starts Curia, then start it again.";
     }
     return message;
 }

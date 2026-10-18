@@ -201,6 +201,29 @@ TEST_CASE("dev config: only one of the two") {
     const std::string messageB = curia::describeNotConfigured(b);
     CHECK(messageB.find(kKeyName) != std::string::npos);
     CHECK(messageB.find(kModelName) == std::string::npos);
+
+    // One variable named: "Set it"; both: "Set them".
+    for (const std::string& message : {messageA, messageB}) {
+        CHECK(message.find(" Set it in the environment") != std::string::npos);
+        CHECK(message.find("Set them") == std::string::npos);
+    }
+    const FakeEnv nothing;
+    const std::string both =
+        curia::describeNotConfigured(curia::loadDevConfig(nothing.getter(), registry));
+    CHECK(both.find(" Set them in the environment") != std::string::npos);
+    // An unusable key and a missing model are two variables too.
+    FakeEnv badKey;
+    badKey.values = {{kKeyName, "short"}};
+    const std::string badKeyMessage =
+        curia::describeNotConfigured(curia::loadDevConfig(badKey.getter(), registry));
+    CHECK(badKeyMessage.find(" Set them in the environment") != std::string::npos);
+    // An unusable model with a usable key: one.
+    FakeEnv badModel;
+    badModel.values = {{kKeyName, fakeKey()}, {kModelName, "has space"}};
+    const std::string badModelMessage =
+        curia::describeNotConfigured(curia::loadDevConfig(badModel.getter(), registry));
+    CHECK(badModelMessage.find(kModelName) != std::string::npos);
+    CHECK(badModelMessage.find(" Set it in the environment") != std::string::npos);
 }
 
 TEST_CASE("dev config: model rules") {

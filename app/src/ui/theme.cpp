@@ -3,14 +3,16 @@
 
 #include <climits>
 #include <cstdio>
+#include <optional>
 
+#include "chatview/font_metrics.h"
 #include "ui/fonts.h"
 
 namespace curia::ui {
 
 namespace {
 
-ImFont* addBundledFace(const EmbeddedBytes& bytes, const char* name) {
+ImFont* addBundledFace(const EmbeddedBytes& bytes, const char* name, float size) {
     if (bytes.data == nullptr || bytes.size == 0 ||
         bytes.size > static_cast<std::size_t>(INT_MAX)) {
         return nullptr;
@@ -21,17 +23,24 @@ ImFont* addBundledFace(const EmbeddedBytes& bytes, const char* name) {
     std::snprintf(config.Name, sizeof(config.Name), "%s", name);
     // ImGui only reads the data, but its signature takes a non-const pointer.
     void* data = const_cast<unsigned char*>(bytes.data);
-    return ImGui::GetIO().Fonts->AddFontFromMemoryTTF(data, static_cast<int>(bytes.size),
-                                                      kBaseFontSize, &config);
+    return ImGui::GetIO().Fonts->AddFontFromMemoryTTF(data, static_cast<int>(bytes.size), size,
+                                                      &config);
 }
 
 }  // namespace
 
 FontSet loadFonts() {
     FontSet fonts;
-    ImFont* regular = addBundledFace(bundledRegularFont(), "Gentium Book Plus");
-    ImFont* bold =
-        regular != nullptr ? addBundledFace(bundledBoldFont(), "Gentium Book Plus Bold") : nullptr;
+    const EmbeddedBytes regularBytes = bundledRegularFont();
+    if (const std::optional<chatview::FontVerticalMetrics> metrics =
+            chatview::readVerticalMetrics(regularBytes.data, regularBytes.size)) {
+        fonts.heightPerEm = metrics->heightPerEm();
+        fonts.metricsRead = true;
+    }
+    ImFont* regular = addBundledFace(regularBytes, "Gentium Book Plus", fonts.baseSize());
+    ImFont* bold = regular != nullptr ? addBundledFace(bundledBoldFont(), "Gentium Book Plus Bold",
+                                                       fonts.baseSize())
+                                      : nullptr;
     if (regular != nullptr && bold != nullptr) {
         fonts.regular = regular;
         fonts.bold = bold;
@@ -44,10 +53,12 @@ FontSet loadFonts() {
     ImFont* fallback = atlas->AddFontDefault();
     fonts.regular = fallback;
     fonts.bold = fallback;
+    fonts.heightPerEm = 1.0F;
+    fonts.metricsRead = false;
     return fonts;
 }
 
-void applyTheme(float uiScale) {
+void applyTheme(float uiScale, const FontSet& fonts) {
     namespace p = palette;
     ImGuiStyle style;
     ImGui::StyleColorsLight(&style);
@@ -97,7 +108,7 @@ void applyTheme(float uiScale) {
     colors[ImGuiCol_NavCursor] = p::kAccent.vec4();
 
     style.ScaleAllSizes(uiScale);
-    style.FontSizeBase = kBaseFontSize;
+    style.FontSizeBase = fonts.baseSize();
     style.FontScaleDpi = uiScale;
     ImGui::GetStyle() = style;
 }

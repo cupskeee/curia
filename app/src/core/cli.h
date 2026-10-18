@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -11,6 +12,11 @@ namespace curia {
 
 // Which header carries the API key (research-notes C11). The HTTP layer maps it to its own enum.
 enum class AuthMode { Bearer, XApiKey };
+
+// What --smoke draws (--smoke-scene): the canned conversation (the default and the CI test), the
+// same conversation with the notices on top (not configured, unreadable, the test button), or the
+// window before anything has come from the game. The last frame is what --screenshot saves.
+enum class SmokeScene : std::uint8_t { Conversation, Notices, Start };
 
 struct CliOptions {
     bool showHelp = false;
@@ -23,6 +29,9 @@ struct CliOptions {
     // --smoke only: the window's size in logical pixels (--window-size WxH); 0 = the default.
     int windowWidth = 0;
     int windowHeight = 0;
+    // --smoke only: --smoke-scene conversation|notices|start.
+    SmokeScene smokeScene = SmokeScene::Conversation;
+    bool smokeSceneGiven = false;
     // Run the normal event loop for N seconds and verify that no frames are drawn while idle.
     int idleSeconds = 0;
     // Headless mode (no SDL, no window): tail this log file and print one JSON object per event.

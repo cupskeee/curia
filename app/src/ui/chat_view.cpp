@@ -22,9 +22,12 @@ using chatview::Tone;
 using chatview::ViewItem;
 namespace text = chatview::text;
 
-// The height of a line of text as a multiple of the font size (a book face reads better with
-// some air between the lines).
-constexpr float kLineSpacing = 1.28F;
+// The distance from one line of text to the next, in ems (the letters are sized by their em,
+// ui/theme.h): air between the lines without looking double-spaced.
+constexpr float kLinePitchEm = 1.4F;
+// A blank line of a text (between paragraphs, before a list) takes this much height, in ems: a
+// short gap rather than a whole empty line.
+constexpr float kParagraphGapEm = 0.6F;
 // The input box shows this many lines; more scroll inside it.
 constexpr float kInputLines = 3.0F;
 // One period of the thinking animation, in seconds.
@@ -35,9 +38,8 @@ constexpr double kPulseSeconds = 1.6;
 constexpr float kMaxColumnEm = 29.0F;
 // The text in the middle of an empty conversation wraps at this many font sizes.
 constexpr float kEmptyStateEm = 18.0F;
-// The status line and the notices take at most this share of the height left above the input
-// box (and at least three lines); more scroll in their own area.
-constexpr float kMaxTopShare = 0.35F;
+// The conversation keeps at least this many lines of height, however many notices there are.
+constexpr float kMinConversationLines = 2.0F;
 
 ImVec2 plus(ImVec2 a, ImVec2 b) {
     return {a.x + b.x, a.y + b.y};
@@ -112,12 +114,25 @@ TextLayout ChatViewUi::layout(const chatview::AnswerText& value, float width) co
         value, width, [this](std::string_view piece, bool bold) { return measure(piece, bold); });
 }
 
+float ChatViewUi::em() const {
+    return ImGui::GetFontSize() / fonts_.heightPerEm;
+}
+
 float ChatViewUi::lineHeight() const {
-    return std::floor(ImGui::GetFontSize() * kLineSpacing);
+    return std::round(em() * kLinePitchEm);
+}
+
+float ChatViewUi::rowHeight(const chatview::LayoutLine& line) const {
+    // A line without segments is a blank line of the text.
+    return line.segments.empty() ? std::round(em() * kParagraphGapEm) : lineHeight();
 }
 
 float ChatViewUi::blockHeight(const TextLayout& value) const {
-    return static_cast<float>(value.lines.size()) * lineHeight();
+    float height = 0;
+    for (const chatview::LayoutLine& line : value.lines) {
+        height += rowHeight(line);
+    }
+    return height;
 }
 
 void ChatViewUi::drawText(const TextLayout& value, ImVec2 origin, ImU32 color,
@@ -125,13 +140,17 @@ void ChatViewUi::drawText(const TextLayout& value, ImVec2 origin, ImU32 color,
     ImDrawList* list = ImGui::GetWindowDrawList();
     const float size = ImGui::GetFontSize();
     const float line = lineHeight();
+    // The face's glyph box (the font size) centred on the line.
     const float lead = std::floor((line - size) * 0.5F);
-    for (std::size_t i = 0; i < value.lines.size(); ++i) {
-        const float y = origin.y + static_cast<float>(i) * line + lead;
-        if (!ImGui::IsRectVisible(ImVec2(origin.x, y), ImVec2(origin.x + 1.0F, y + line))) {
+    float top = origin.y;
+    for (const chatview::LayoutLine& row : value.lines) {
+        const float y = top + lead;
+        top += rowHeight(row);
+        if (row.segments.empty() ||
+            !ImGui::IsRectVisible(ImVec2(origin.x, y), ImVec2(origin.x + 1.0F, y + size))) {
             continue;
         }
-        for (const chatview::LayoutSegment& segment : value.lines[i].segments) {
+        for (const chatview::LayoutSegment& segment : row.segments) {
             const std::string& piece = segment.text;
             list->AddText(segment.bold ? fonts_.bold : fonts_.regular, size,
                           ImVec2(std::floor(origin.x + segment.x), y),
@@ -158,13 +177,6 @@ BoxMetrics boxMetrics(bool warning) {
 }
 
 }  // namespace
-
-float ChatViewUi::boxHeight(const std::string& value, float width, bool warning) const {
-    const BoxMetrics metrics = boxMetrics(warning);
-    const TextLayout lines =
-        layout(chatview::plainLines(value), width - 2.0F * metrics.pad.x - metrics.bar);
-    return blockHeight(lines) + 2.0F * metrics.pad.y;
-}
 
 void ChatViewUi::drawBox(const std::string& value, float width, Rgb background,
                          bool warning) const {
@@ -213,20 +225,6 @@ void ChatViewUi::drawTop(const chatview::ChatView& view, float width) {
         const bool warning = banner.tone == Tone::Warning;
         drawBox(banner.text, width, warning ? p::kNotice : p::kInfo, warning);
     }
-}
-
-float ChatViewUi::topHeight(const chatview::ChatView& view, float width) const {
-    const float spacing = ImGui::GetStyle().ItemSpacing.y;
-    float height = 0;
-    if (!view.status.empty()) {
-        height += spacing + (view.statusTone == Tone::Warning
-                                 ? boxHeight(view.status, width, true)
-                                 : blockHeight(layout(chatview::plainLines(view.status), width)));
-    }
-    for (const chatview::Banner& banner : view.banners) {
-        height += spacing + boxHeight(banner.text, width, banner.tone == Tone::Warning);
-    }
-    return height;
 }
 
 void ChatViewUi::drawQuestion(const ViewItem& item) {
@@ -556,7 +554,10 @@ ChatActions ChatViewUi::draw(const chatview::ChatView& view) {
         ImVec2(viewport->WorkPos.x + std::floor((viewport->WorkSize.x - column) * 0.5F),
                viewport->WorkPos.y));
     ImGui::SetNextWindowSize(ImVec2(column, viewport->WorkSize.y));
-    const ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
+    // No title, frame or resizing; a scroll bar appears only when the notices leave too little
+    // height for everything else (a short window with several notices).
+    const ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                                   ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove |
                                    ImGuiWindowFlags_NoSavedSettings |
                                    ImGuiWindowFlags_NoBringToFrontOnFocus;
     ImGui::Begin("##curia", nullptr, flags);
@@ -576,33 +577,14 @@ ChatActions ChatViewUi::draw(const chatview::ChatView& view) {
         actions.stop = true;
     }
 
-    const float width = ImGui::GetContentRegionAvail().x;
+    // The status line and the notices take the height their text needs (they never scroll on
+    // their own); the conversation gets the rest, at least a few lines. In a window too short for
+    // all of it, the window itself scrolls.
+    drawTop(view, ImGui::GetContentRegionAvail().x);
     const float bottom = bottomHeight(view);
-    const float top = topHeight(view, width);
-    const float topCap =
-        std::max(3.0F * lineHeight(),
-                 std::floor((ImGui::GetContentRegionAvail().y - bottom) * kMaxTopShare));
-    if (top > topCap) {
-        // Many notices in a short window: they scroll in their own area and leave room for the
-        // conversation.
-        ImGui::BeginChild("##notices", ImVec2(0.0F, topCap), ImGuiChildFlags_None,
-                          ImGuiWindowFlags_None);
-        drawTop(view, ImGui::GetContentRegionAvail().x);
-        if (ImGui::GetScrollY() < ImGui::GetScrollMaxY() - 0.5F) {
-            // More below: a rule along the bottom edge (as the conversation has one on top).
-            const ImVec2 min = ImGui::GetWindowPos();
-            const float y = std::floor(min.y + ImGui::GetWindowHeight()) - 0.5F;
-            ImGui::GetWindowDrawList()->AddLine(ImVec2(min.x, y),
-                                                ImVec2(min.x + ImGui::GetWindowWidth(), y),
-                                                palette::kRule.u32(), 1.0F);
-        }
-        ImGui::EndChild();
-    } else if (top > 0.0F) {
-        drawTop(view, width);
-    }
     const float available = ImGui::GetContentRegionAvail().y;
     const float conversation =
-        std::max(ImGui::GetFontSize() * 2.0F, available - bottom - style.ItemSpacing.y);
+        std::max(kMinConversationLines * lineHeight(), available - bottom - style.ItemSpacing.y);
     drawConversation(view, conversation, actions);
     drawBottom(view, actions);
     ImGui::End();
