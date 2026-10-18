@@ -567,9 +567,12 @@ ChatActions ChatViewUi::draw(const chatview::ChatView& view) {
     ImGui::PushFont(fonts_.bold, 0.0F);
     ImGui::PopFont();
 
-    // Esc must not throw the typed question away (ImGui's text box reverts on Esc).
-    // TODO(PR 8): Esc hides the overlay and returns the keys to CK3.
-    ImGui::Shortcut(ImGuiKey_Escape, ImGuiInputFlags_RouteGlobal | ImGuiInputFlags_RouteOverActive);
+    // Esc hides the overlay and gives the keys back to CK3 (FR-OVL-4). It is taken before the
+    // text box sees it, so it does not throw the typed question away (ImGui's box reverts on Esc).
+    if (ImGui::Shortcut(ImGuiKey_Escape,
+                        ImGuiInputFlags_RouteGlobal | ImGuiInputFlags_RouteOverActive)) {
+        actions.hide = true;
+    }
     // Cmd+. stops the answer on macOS (FR-OVL-4); ImGuiMod_Ctrl is Cmd there.
     if (view.canStop && ImGui::GetIO().ConfigMacOSXBehaviors &&
         ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Period,

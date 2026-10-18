@@ -11,7 +11,7 @@
 
 // The chat window on the UI thread: the controller's observer (it learns what changed), the ImGui
 // view, and what the run loop needs to know (did something visible change, does the window want
-// to come to the front, does something move by itself).
+// to come to the front or to be hidden, does something move by itself).
 namespace curia::ui {
 
 class ChatWindow final : public AppObserver {
@@ -43,6 +43,8 @@ public:
     bool takeChanged();
     // The player clicked Advisor in the game since the last call; resets the flag.
     bool takeOverlayRequest();
+    // The player pressed Esc since the last call (hide the overlay); resets the flag.
+    bool takeHideRequest();
     // The thinking animation (or the dot of an answer that is arriving) is on: the loop wakes up
     // on the spinner timeout.
     bool spinnerActive() const { return spinnerActive_; }
@@ -66,6 +68,7 @@ private:
     chatview::ChatView lastView_;
     bool changed_ = true;
     bool overlayRequested_ = false;
+    bool hideRequested_ = false;
     bool spinnerActive_ = false;
 };
 

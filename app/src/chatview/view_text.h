@@ -80,12 +80,19 @@ inline constexpr std::string_view kRetry = "Retry";
 inline constexpr std::string_view kCopy = "Copy";
 inline constexpr std::string_view kCopied = "Copied";
 
+// The tray menu (FR-OVL-6; the menu bar on macOS, the notification area on Windows): its tooltip
+// and its three entries.
+inline constexpr std::string_view kTrayTooltip = "Curia";
+inline constexpr std::string_view kTrayShow = "Show Curia";
+inline constexpr std::string_view kTrayHide = "Hide Curia";
+inline constexpr std::string_view kTrayQuit = "Quit Curia";
+
 // "What I can see is from 3 October 1071."
 std::string seenFrom(const bridge::Date& date);
 
 // Every fixed text above (the plain-words test walks them; the smoke test checks the font has
 // every character of them).
-inline constexpr std::array<std::string_view, 24> kAllFixedTexts = {
+inline constexpr std::array<std::string_view, 28> kAllFixedTexts = {
     kNothingReadYet,
     kSeenFromStart,
     kSeenFromEnd,
@@ -110,6 +117,10 @@ inline constexpr std::array<std::string_view, 24> kAllFixedTexts = {
     kRetry,
     kCopy,
     kCopied,
+    kTrayTooltip,
+    kTrayShow,
+    kTrayHide,
+    kTrayQuit,
 };
 
 }  // namespace curia::chatview::text

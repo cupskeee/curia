@@ -25,7 +25,7 @@ endfunction()
 if(WIN32)
     set(CURIA_PLATFORM_SOURCES src/platform/win/platform_win.cpp)
 elseif(APPLE)
-    set(CURIA_PLATFORM_SOURCES src/platform/mac/platform_mac.cpp)
+    set(CURIA_PLATFORM_SOURCES src/platform/mac/platform_mac.mm)
 else()
     set(CURIA_PLATFORM_SOURCES src/platform/linux/platform_linux.cpp)
 endif()
@@ -64,6 +64,7 @@ add_library(curia_core STATIC
     src/core/check_api_report.cpp
     src/core/cli.cpp
     src/core/dev_config.cpp
+    src/core/game_poll.cpp
     src/core/headless_chat.cpp
     src/core/headless_commands.cpp
     src/core/json_lines.cpp
@@ -81,6 +82,8 @@ add_library(curia_core STATIC
     src/providers/anthropic_stream.cpp
     src/providers/chat_error.cpp
     src/providers/provider_util.cpp
+    src/platform/game_window.cpp
+    src/platform/placement.cpp
     ${CURIA_PLATFORM_SOURCES})
 target_include_directories(curia_core PUBLIC src ${CMAKE_CURRENT_BINARY_DIR}/generated)
 find_package(Threads REQUIRED)
@@ -88,6 +91,11 @@ target_link_libraries(curia_core PUBLIC nlohmann_json::nlohmann_json Threads::Th
 # Public, so that the tests see the same value the library was built with (they branch on it).
 if(CURIA_ENABLE_DEV_ENV)
     target_compile_definitions(curia_core PUBLIC CURIA_ENABLE_DEV_ENV=1)
+endif()
+if(APPLE)
+    # platform/mac/platform_mac.mm: NSWorkspace (is CK3 running, in front) and the window list.
+    target_compile_options(curia_core PRIVATE $<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>)
+    target_link_libraries(curia_core PUBLIC "-framework AppKit" "-framework CoreGraphics")
 endif()
 curia_configure_target(curia_core)
 
@@ -173,12 +181,50 @@ if(CURIA_BUILD_APP)
         src/app.cpp
         src/ui/chat_view.cpp
         src/ui/chat_window.cpp
+        src/ui/overlay_plain.cpp
         src/ui/sdl_renderer_backend.cpp
         src/ui/smoke_run.cpp
         src/ui/theme.cpp
+        src/ui/tray.cpp
         ${CURIA_EMBEDDED_FONTS})
     target_link_libraries(curia PRIVATE curia_core curia_headless SDL3::SDL3 imgui::imgui)
+    if(APPLE)
+        # The overlay panel and the Carbon hot key (Objective-C++, ARC).
+        target_sources(curia PRIVATE src/ui/overlay_mac.mm src/ui/hotkey_mac.mm)
+        target_compile_options(curia PRIVATE $<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>)
+        target_link_libraries(curia PRIVATE "-framework AppKit" "-framework Carbon")
+    else()
+        target_sources(curia PRIVATE src/ui/hotkey_none.cpp)
+    endif()
     curia_configure_target(curia)
+
+    if(APPLE)
+        # Curia.app next to the plain binary (which stays where it is for ctest, the CI artefacts
+        # and the README's commands): Contents/MacOS/curia is a copy of it, Contents/Info.plist
+        # comes from resources/macos/Info.plist.in (LSUIElement: no Dock icon), and an ad-hoc
+        # signature over the whole bundle binds the Info.plist to it. Start it with
+        # `open build/<preset>/app/Curia.app` (README.md). The bundle's files are the outputs of
+        # their own step (target curia_app, built by default), so a new binary, a changed
+        # Info.plist.in or a deleted or damaged bundle is rebuilt by the next build.
+        set(CURIA_APP_BUNDLE ${CMAKE_CURRENT_BINARY_DIR}/Curia.app)
+        set(CURIA_APP_PLIST ${CMAKE_CURRENT_BINARY_DIR}/generated/Curia-Info.plist)
+        configure_file(resources/macos/Info.plist.in ${CURIA_APP_PLIST} @ONLY)
+        add_custom_command(
+            OUTPUT ${CURIA_APP_BUNDLE}/Contents/MacOS/curia
+                   ${CURIA_APP_BUNDLE}/Contents/Info.plist
+                   ${CURIA_APP_BUNDLE}/Contents/_CodeSignature/CodeResources
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${CURIA_APP_BUNDLE}/Contents/MacOS
+            COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:curia> ${CURIA_APP_BUNDLE}/Contents/MacOS/curia
+            COMMAND ${CMAKE_COMMAND} -E copy ${CURIA_APP_PLIST} ${CURIA_APP_BUNDLE}/Contents/Info.plist
+            COMMAND codesign --force --sign - ${CURIA_APP_BUNDLE}
+            DEPENDS curia ${CURIA_APP_PLIST}
+            COMMENT "Assembling and ad-hoc signing Curia.app"
+            VERBATIM)
+        add_custom_target(curia_app ALL
+            DEPENDS ${CURIA_APP_BUNDLE}/Contents/MacOS/curia
+                    ${CURIA_APP_BUNDLE}/Contents/Info.plist
+                    ${CURIA_APP_BUNDLE}/Contents/_CodeSignature/CodeResources)
+    endif()
 
     # Small tool used by CI to prove TLS works with the chosen libcurl configuration (milestone M1, A16).
     add_executable(curia_https_smoke tools/https_smoke.cpp)
@@ -207,6 +253,27 @@ if(CURIA_BUILD_APP)
     add_test(NAME app_idle COMMAND curia --idle-test 5)
     set_tests_properties(app_idle PROPERTIES LABELS idle TIMEOUT 90
                          ENVIRONMENT "SDL_RENDER_DRIVER=software")
+
+    if(APPLE)
+        # The same canned conversation in the overlay panel (the macOS recipe of M2: a wrapped
+        # non-activating NSPanel at the screen-saver level). It asks for no keys itself, but the
+        # launch can make it the active app with the panel key: do not type while it runs (as
+        # with app_idle).
+        add_test(NAME app_smoke_overlay
+                 COMMAND curia --smoke --overlay --screenshot ${CMAKE_CURRENT_BINARY_DIR}/app_smoke_overlay.bmp)
+        set_tests_properties(app_smoke_overlay PROPERTIES LABELS smoke TIMEOUT 60)
+        # The idle test in the panel: nothing is drawn while nothing happens there either.
+        add_test(NAME app_idle_overlay COMMAND curia --idle-test 5 --overlay)
+        set_tests_properties(app_idle_overlay PROPERTIES LABELS idle TIMEOUT 90
+                             ENVIRONMENT "SDL_RENDER_DRIVER=software")
+        # The hot key's handler and its static storage, without a window and without taking the
+        # key: a synthetic press after the installing function returned must reach the SDL queue
+        # once, and nothing after the handler is removed (the M2 probe once crashed on a callback
+        # that outlived what it pointed at).
+        add_test(NAME app_hotkey_selftest COMMAND curia --selftest-hotkey)
+        set_tests_properties(app_hotkey_selftest PROPERTIES LABELS smoke TIMEOUT 30
+                             PASS_REGULAR_EXPRESSION "CURIA_SELFTEST_OK")
+    endif()
 
     if(APPLE)
         # The M2 overlay probe: an app bundle (launched with `open`, see docs/spikes/m2-checklist.md).
@@ -291,6 +358,8 @@ if(CURIA_BUILD_TESTS)
         tests/test_log_watcher.cpp
         tests/test_mailbox.cpp
         tests/test_platform.cpp
+        tests/test_platform_game_window.cpp
+        tests/test_platform_placement.cpp
         tests/test_provider_types.cpp
         tests/test_sse_parser.cpp
         tests/test_watch_log.cpp

@@ -70,6 +70,7 @@ CLANG_FORMAT=.venv-tools/bin/clang-format tools/ci/check_format.sh --fix   # --f
 tools/ci/scan_patterns.sh      # no Paradox content, no keys, no home paths
 tools/ci/check_source_rules.sh # no model IDs, curl debug options or stray secret access in app/
 tools/ci/check_versions.sh     # CMake, vcpkg.json and CHANGELOG agree
+tools/ci/release_blockers.sh   # spike and development parts still to remove before a release (warns)
 python3 tools/ci/lint_mod.py   # structure of the mod folders and the CURIA1 export format
 python3 -m unittest discover -s tools/ci -p "test_*.py"   # tests of the lint
 ```

@@ -18,6 +18,32 @@ enum class AuthMode { Bearer, XApiKey };
 // window before anything has come from the game. The last frame is what --screenshot saves.
 enum class SmokeScene : std::uint8_t { Conversation, Notices, Start };
 
+// Where the chat is drawn (--window): the overlay panel that floats over CK3, also over its
+// Fullscreen Space (macOS only: the recipe of docs/architecture.md section 5.2), or a normal window
+// that stays on top of other windows (the companion window of FR-OVL-8, the only kind on Windows
+// and Linux, and the macOS fallback).
+enum class WindowKind : std::uint8_t { Overlay, Plain };
+
+// Who gets the keys when the overlay panel is shown from the game, the hot key or the tray
+// (--overlay-focus; the show at start-up never asks for them): Key makes the panel the key window
+// without activating Curia, meant to let the player type at once (the default; whether the keys
+// then reach the panel and not CK3 is the E6 check of the M4 testing, not verified yet); Click
+// only puts it in front (the behaviour verified in M2: the first click on the panel takes the
+// keys); Activate also makes Curia the active app (the escalation if Key does not route the
+// keys).
+enum class OverlayFocus : std::uint8_t { Key, Click, Activate };
+
+const char* toString(WindowKind kind) noexcept;
+const char* toString(OverlayFocus focus) noexcept;
+
+// The overlay panel exists on this OS (macOS). Elsewhere --window overlay, --overlay-focus and
+// --overlay are usage errors.
+#if defined(__APPLE__)
+inline constexpr bool kOverlayPanelSupported = true;
+#else
+inline constexpr bool kOverlayPanelSupported = false;
+#endif
+
 struct CliOptions {
     bool showHelp = false;
     bool showVersion = false;
@@ -34,6 +60,22 @@ struct CliOptions {
     bool smokeSceneGiven = false;
     // Run the normal event loop for N seconds and verify that no frames are drawn while idle.
     int idleSeconds = 0;
+    // --overlay, with --smoke or --idle-test (macOS): draw in the overlay panel instead of the
+    // plain window (focus Click, no hot key, no tray, placed on the pointer's display).
+    bool overlay = false;
+    // The chat window (no mode flag): --window overlay|plain. parseCli() fills in the default when
+    // the flag is absent (Overlay where the panel exists, else Plain); --smoke and --idle-test get
+    // Overlay only with --overlay. windowGiven says whether the flag was on the command line.
+    WindowKind window = WindowKind::Plain;
+    bool windowGiven = false;
+    // The overlay panel only: --overlay-focus key|click|activate (Key unless given; always Click
+    // with --smoke and --idle-test, which never ask for the keyboard).
+    OverlayFocus overlayFocus = OverlayFocus::Key;
+    bool overlayFocusGiven = false;
+    // --selftest-hotkey (macOS): installs the hot key's handler without taking the key, sends it a
+    // synthetic hot-key event after the installing function has returned and checks that the
+    // event reached the SDL queue (and that nothing arrives after it was removed). No window.
+    bool selftestHotkey = false;
     // Headless mode (no SDL, no window): tail this log file and print one JSON object per event.
     // Empty = not in this mode.
     std::string watchLogPath;
@@ -68,8 +110,11 @@ struct CliOptions {
 
     // True if no mode flag was given: the chat window runs.
     [[nodiscard]] bool windowMode() const {
-        return !smoke && idleSeconds == 0 && watchLogPath.empty() && !headlessChat && !checkApi;
+        return !smoke && idleSeconds == 0 && watchLogPath.empty() && !headlessChat && !checkApi &&
+               !selftestHotkey;
     }
+    // The chat is drawn in the overlay panel (the chat window, --smoke or --idle-test).
+    [[nodiscard]] bool usesPanel() const { return window == WindowKind::Overlay; }
 
     // Shared by headless chat and --check-api.
     // --effort default|low|medium|high|xhigh|max and --thinking adaptive|between_tools|disabled:
@@ -113,6 +158,10 @@ struct CliOptions {
 
 // Parses command-line arguments. Returns false and sets `error` on invalid input.
 bool parseCli(int argc, const char* const* argv, CliOptions& out, std::string& error);
+// The same as if the overlay panel did (or did not) exist on this OS, so that the rules of both
+// cases are tested on every OS.
+bool parseCli(int argc, const char* const* argv, CliOptions& out, std::string& error,
+              bool overlayPanelSupported);
 
 std::string_view cliUsage();
 

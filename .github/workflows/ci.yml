@@ -28,6 +28,8 @@ jobs:
         run: tools/ci/check_source_rules.sh
       - name: Version consistency (CMake, vcpkg.json, CHANGELOG)
         run: tools/ci/check_versions.sh
+      - name: Release blockers (warn only until M7, where the release workflow runs it with --enforce)
+        run: tools/ci/release_blockers.sh
       - name: Mod structure lint (no game files involved)
         run: |
           python3 tools/ci/lint_mod.py
@@ -223,11 +225,11 @@ jobs:
           ASAN_OPTIONS: detect_leaks=1
           UBSAN_OPTIONS: print_stacktrace=1
         run: ctest --preset linux-x64-sanitize
-      - name: clang-tidy (core, net, providers, chat view model, Linux platform, tests)
+      - name: clang-tidy (core, net, providers, chat view model, platform rules and Linux platform, tests)
         run: |
-          # The macOS-only probe tests (test_probe_*) are not part of this configuration.
+          # The macOS-only probe tests (test_probe_*) are not part of this configuration, nor is the Windows platform file.
           # One clang-tidy per file, one file per core (xargs exits non-zero if any invocation does).
-          find app/src/advisor app/src/bridge app/src/chatview app/src/core app/src/net app/src/providers app/src/platform/linux app/tests app/fuzz -name '*.cpp' -not -name 'test_probe_*' -print0 |
+          find app/src/advisor app/src/bridge app/src/chatview app/src/core app/src/net app/src/providers app/src/platform app/tests app/fuzz -name '*.cpp' -not -name 'test_probe_*' -not -path 'app/src/platform/win/*' -print0 |
             xargs -0 -n1 -P "$(nproc)" clang-tidy-18 -p build/linux-x64-sanitize --quiet
 
   fuzz-smoke:
