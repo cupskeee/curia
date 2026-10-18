@@ -27,7 +27,8 @@ at `0.y.z` and anything may change between minor versions.
   Font License 1.1), embedded unmodified in the app; its licence is in the generated third-party
   notices.
 - `curia --smoke` draws a canned conversation (no network, no key, no game) and checks that the
-  font has every character shown; `--screenshot <file.bmp>` and `--window-size <W>x<H>` go with it.
+  font has every character shown; `--screenshot <file.bmp>`, `--window-size <W>x<H>` and
+  `--smoke-scene notices|start` (the notices over the conversation, or the empty window) go with it.
 - `--effort default|low|medium|high|xhigh|max` and `--thinking adaptive|between_tools|disabled` for
   `--headless-chat` and `--check-api`: the request's effort and thinking settings (what is sent
   without them is under "Changed"). The headless `ready` and `done` events, the transcripts and

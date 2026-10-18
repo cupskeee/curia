@@ -433,6 +433,7 @@ int runApp(const CliOptions& options) {
         smoke.uiScale = uiScale;
         smoke.wakeEvent = firstEvent;
         smoke.screenshotPath = options.screenshotPath;
+        smoke.scene = options.smokeScene;
         exitCode = ui::runSmoke(smoke);
     } else {
         exitCode = runWindow(options, setup, window, *backend, fonts, firstEvent, firstEvent + 1);

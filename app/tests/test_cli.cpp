@@ -338,3 +338,26 @@ TEST_CASE("--screenshot and --window-size belong to --smoke") {
     CHECK_FALSE(
         parse({"--headless-chat", "--log", "d.log", "--window-size", "380x520"}, options, error));
 }
+
+TEST_CASE("--smoke-scene picks what --smoke draws") {
+    curia::CliOptions options;
+    std::string error;
+    CHECK(parse({"--smoke"}, options, error));
+    CHECK(options.smokeScene == curia::SmokeScene::Conversation);
+    CHECK(parse({"--smoke", "--smoke-scene", "notices"}, options, error));
+    CHECK(options.smokeScene == curia::SmokeScene::Notices);
+    CHECK(parse({"--smoke-scene", "start", "--smoke", "--screenshot", "s.bmp"}, options, error));
+    CHECK(options.smokeScene == curia::SmokeScene::Start);
+    CHECK(parse({"--smoke", "--smoke-scene", "conversation"}, options, error));
+    CHECK(options.smokeScene == curia::SmokeScene::Conversation);
+    for (const char* bad : {"Notices", "", "thinking", "notices "}) {
+        CAPTURE(bad);
+        CHECK_FALSE(parse({"--smoke", "--smoke-scene", bad}, options, error));
+        CHECK(error.find("--smoke-scene") != std::string::npos);
+    }
+    CHECK_FALSE(parse({"--smoke", "--smoke-scene"}, options, error));
+    // Without --smoke: a usage error (exit 2).
+    CHECK_FALSE(parse({"--smoke-scene", "notices"}, options, error));
+    CHECK(error.find("--smoke") != std::string::npos);
+    CHECK_FALSE(parse({"--idle-test", "3", "--smoke-scene", "start"}, options, error));
+}
