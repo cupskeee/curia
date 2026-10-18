@@ -123,21 +123,49 @@ ci: pin actions/checkout to a commit SHA
 feat(provider)!: rename the base_url setting to endpoint
 ```
 
+### Branches
+
+- **`dev`** is where work lands. Every change is a pull request into `dev`.
+- **`main`** is the stable branch: the default branch, and the base of releases. It
+  receives only `dev`, through a pull request from `dev` to `main` that the maintainer
+  opens when `dev` holds a stable set of changes (a milestone step, before a test
+  session, before a release).
+- **CI follows the target:**
+  - a pull request into `dev` gets the light check: lint and the Linux build with its
+    tests (about five minutes);
+  - the pull request from `dev` to `main`, and every push to `main`, get everything:
+    Windows, macOS arm64 and x86_64, Linux, the macOS universal binary, the sanitizers
+    and clang-tidy, and the fuzz smoke test.
+
+  A problem only the full set catches (a Windows build error, a sanitizer or
+  clang-tidy finding) therefore shows up on the `dev` to `main` pull request. It is
+  fixed with a pull request into `dev`, which updates that pull request.
+- **Merging:**
+  - pull requests into `dev` are squash-merged;
+  - the pull request from `dev` to `main` is merged with a merge commit. `main` then
+    holds the same commits as `dev`, so `dev` never needs to be synced back.
+- **Pull requests against `main`:** Dependabot's version updates target `dev`. A pull
+  request opened against `main` by mistake, or a Dependabot security update (those
+  always target the default branch), gets its base changed to `dev`.
+
 ### Pull request flow
 
-1. Fork the repository (or create a branch if you have access) and branch from the
-   default branch. Do not commit to the default branch directly.
+1. Fork the repository (or create a branch if you have access), branch from `dev` and
+   open the pull request against `dev`. Do not commit to `dev` or `main` directly.
 2. Keep the PR to one logical change. Fill in the PR template: summary, linked issue,
    type, what you tested on, the no-secrets confirmation, and the changelog checkbox.
 3. Update [`CHANGELOG.md`](CHANGELOG.md) under `[Unreleased]` for user-visible
    changes, following [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
-4. Wait for the **`CI result`** check to pass. It summarises build and test on Windows,
-   macOS and Linux, lint and the other jobs. The separate **`PR title`** check must pass
-   too.
-5. PRs are **squash-merged**, so the **PR title becomes the commit message** and must be a
-   valid Conventional Commit. The `PR title` check lints it and re-runs when you edit the
-   title. Individual commit messages inside the
-   PR are not kept, but write them clearly anyway.
+4. Wait for the **`CI result`** check to pass. On a pull request into `dev` it
+   summarises the light check (lint, and build and test on Linux); on the pull request
+   from `dev` to `main` it summarises build and test on Windows, macOS and Linux and
+   every other job. The separate **`PR title`** check must pass too.
+5. PRs into `dev` are **squash-merged**, so the **PR title becomes the commit message**
+   (on `dev`, and on `main` once `dev` is merged) and must be a valid Conventional
+   Commit. The `PR title` check lints it and re-runs when you edit the title.
+   Individual commit messages inside the PR are not kept, but write them clearly anyway.
+   The pull request from `dev` to `main` needs a Conventional title too (for example
+   `chore: merge dev into main`); it becomes the merge commit's title.
 
 Versions follow [SemVer 2.0.0](https://semver.org/spec/v2.0.0.html) with tags like
 `v0.1.0`; the version stays `0.y.z` until the wire protocol and config schema are
@@ -224,15 +252,21 @@ once; they are recorded here so they live in the repository. Source:
 then push, wait for one CI run, and only then create the ruleset (a required check can
 be picked only after it has run once).
 
-1. **Ruleset on the default branch (Active), after the first CI run.**
-   - Require a pull request, with **0 required approvals** (a solo author cannot
-     approve their own PR).
-   - Require the status checks **`CI result`** and **`PR title`**.
-   - Require linear history.
-   - Block force pushes and deletions.
-   - Require conversations to be resolved.
-   - Allow **squash merges only**.
-   - Keep admin bypass for emergencies only.
+1. **Rulesets (Active), after the first CI run.** Two, one per long-lived branch
+   (see "Branches"; owner decision of 2026-10-18).
+   - **`main protection`**, on the default branch (`main`):
+     - Require a pull request, with **0 required approvals** (a solo author cannot
+       approve their own PR).
+     - Require the status checks **`CI result`** and **`PR title`**.
+     - Block force pushes and deletions.
+     - Require conversations to be resolved.
+     - Allow **merge commits** (the `dev` to `main` pull request) and squash merges.
+       Linear history is not required, because the merge commits break it.
+     - Keep admin bypass for emergencies only.
+   - **`dev protection`**, on `dev`: the same rules, plus required linear history and
+     **squash merges only**.
+   - Under Settings, General, Pull Requests, allow merge commits and squash merges,
+     each with the pull request title as the default commit title.
 2. **Settings, Actions, General.** Default `GITHUB_TOKEN` permissions read-only;
    require actions to be pinned to a full commit SHA.
 3. **Settings, Advanced Security.** Enable private vulnerability reporting, the

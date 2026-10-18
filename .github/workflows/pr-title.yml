@@ -1,7 +1,8 @@
 name: PR title
 
-# Pull requests are squash-merged, so the PR title becomes the commit message on main and must follow
-# Conventional Commits. This is its own workflow (and its own required check, "PR title") because the
+# Pull requests into dev are squash-merged, so the PR title becomes the commit message (on dev, and on
+# main once dev is merged); the dev -> main pull request's title becomes its merge commit's title. Both
+# must follow Conventional Commits. This is its own workflow (and its own required check, "PR title") because the
 # check has to re-run when only the title is edited, which the main CI should not.
 on:
   pull_request:

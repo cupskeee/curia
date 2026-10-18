@@ -1,3 +1,5 @@
+<!-- Open pull requests against `dev` (CONTRIBUTING.md, "Branches"); only the dev to main pull request targets `main`. -->
+
 ## Summary
 
 <!-- What does this change and why? Keep it short. -->
@@ -8,7 +10,7 @@
 
 ## Type
 
-The PR title becomes the squash-merge commit message, so it must follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/), for example `feat(app): add settings window`. Tick the type you used.
+The PR title becomes the squash-merge commit message (a merge commit's title for the dev to main pull request), so it must follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/), for example `feat(app): add settings window`. Tick the type you used.
 
 - [ ] `feat`: new user-visible capability
 - [ ] `fix`: bug fix
