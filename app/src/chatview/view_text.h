@@ -58,7 +58,7 @@ inline constexpr std::string_view kCk3NotRunning =
 // It names CK3's default pause key (owner, 2026-10-18).
 inline constexpr std::string_view kPauseReminderLead = "Press Space";
 inline constexpr std::string_view kPauseReminderRest =
-    " (or your pause key) to pause before you ask: the game keeps running while you type.";
+    " to pause first: the game keeps running while you type.";
 inline constexpr std::string_view kInputHint =
     "Ask your advisor (Enter sends, Shift+Enter adds a line)";
 
