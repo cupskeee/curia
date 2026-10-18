@@ -54,8 +54,8 @@ the bullet) and of the window's own texts against both faces and fails if one is
   for long reading at text sizes);
 - the OFL allows bundling it in an MIT-licensed program, with the licence shipped alongside.
 
-The choice is proposed for the maintainer's review (owner decision of 2026-10-11: an OFL font with Latin Extended
-coverage, the exact font proposed in the PR that adds it).
+The maintainer approved this font on 2026-10-18, in the PR that adds it (decision D18 in `docs/requirements.md`:
+an OFL font with Latin Extended coverage, the exact font proposed in that PR).
 
 ## Replacing it
 

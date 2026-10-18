@@ -428,7 +428,7 @@ Same throwaway-game rule for any console use.
 | CWTools | MIT | optional editor tooling |
 | VOTC app | GPL-3.0 | read for concepts only |
 | VOTC mod | CC BY-SA 4.0 | read for concepts only |
-| Medieval UI font | OFL-1.1 | proposed in M4 (chat view PR), pending the owner's review: Gentium Book Plus 6.200 by SIL International, Regular and Bold, unmodified and embedded in the app; provenance and checksums in `app/resources/fonts/README.md`, licence text in `cmake/extra_notices.txt` (generated third-party notices) |
+| Medieval UI font | OFL-1.1 | chosen in M4 (chat view PR, approved by the owner on 2026-10-18, D18): Gentium Book Plus 6.200 by SIL International, Regular and Bold, unmodified and embedded in the app; provenance and checksums in `app/resources/fonts/README.md`, licence text in `cmake/extra_notices.txt` (generated third-party notices) |
 | doctest | MIT | unit tests (test-only) |
 | Mozilla CA bundle (`cacert.pem`) | MPL-2.0 | only if shipped with the app (A16 / CA strategy); notice required |
 | Contributor Covenant 3.0 text | CC BY-SA 4.0 | used for `CODE_OF_CONDUCT.md`; attribution line required |
