@@ -1,6 +1,13 @@
 # SPDX-License-Identifier: MIT
 find_package(nlohmann_json CONFIG REQUIRED)
 
+# Every test runs with HOME set to an empty folder in the build tree (owner decision D26): a default
+# path in the app, a test or a tool then cannot reach the real home folder (Curia's app log, CK3's
+# folder, the results folders), whoever runs ctest. Set on the doctest cases where they are
+# discovered and on every other test at the end of this file.
+set(CURIA_TEST_HOME ${CMAKE_CURRENT_BINARY_DIR}/test-home)
+file(MAKE_DIRECTORY ${CURIA_TEST_HOME})
+
 # --- shared compile settings -------------------------------------------------
 function(curia_configure_target target)
     if(MSVC)
@@ -393,7 +400,7 @@ if(CURIA_BUILD_TESTS)
         CURIA_GOLDEN_DIR="${PROJECT_SOURCE_DIR}/tests/golden")
     curia_configure_target(curia_tests)
     include(doctest)
-    doctest_discover_tests(curia_tests PROPERTIES LABELS unit)
+    doctest_discover_tests(curia_tests PROPERTIES LABELS unit ENVIRONMENT "HOME=${CURIA_TEST_HOME}")
 
     # The fuzz entry point (fuzz/fuzz_bridge.cpp) behind a plain main(): replays the fixtures and the
     # seed corpus without libFuzzer, on every platform and compiler.
@@ -435,7 +442,7 @@ if(CURIA_BUILD_APP AND CURIA_BUILD_TESTS)
         http_tests/test_transport_error.cpp)
     target_link_libraries(curia_http_tests PRIVATE curia_http doctest::doctest)
     curia_configure_target(curia_http_tests)
-    doctest_discover_tests(curia_http_tests PROPERTIES LABELS unit)
+    doctest_discover_tests(curia_http_tests PROPERTIES LABELS unit ENVIRONMENT "HOME=${CURIA_TEST_HOME}")
 
     if(Python3_Interpreter_FOUND)
         # fake CK3 -> curia --watch-log -> golden events. The chain with the mock LLM is chat_e2e below.
@@ -475,4 +482,20 @@ if(CURIA_BUILD_APP AND CURIA_BUILD_TESTS)
     else()
         message(STATUS "Python 3 not found: the end-to-end tests e2e_fake_ck3, provider_mock, chat_e2e and e2e_secrecy are not registered")
     endif()
+endif()
+
+# The test home (CURIA_TEST_HOME, top of this file) on every test registered with add_test above.
+# The variables that name other folders under the real home are removed, and pyenv keeps finding
+# its Pythons (its shims look under HOME unless PYENV_ROOT says where they are).
+get_property(curia_added_tests DIRECTORY PROPERTY TESTS)
+if(curia_added_tests)
+    set(curia_test_environment "HOME=${CURIA_TEST_HOME}")
+    if(DEFINED ENV{PYENV_ROOT})
+        list(APPEND curia_test_environment "PYENV_ROOT=$ENV{PYENV_ROOT}")
+    elseif(DEFINED ENV{HOME} AND IS_DIRECTORY "$ENV{HOME}/.pyenv")
+        list(APPEND curia_test_environment "PYENV_ROOT=$ENV{HOME}/.pyenv")
+    endif()
+    set_property(TEST ${curia_added_tests} APPEND PROPERTY ENVIRONMENT ${curia_test_environment})
+    set_property(TEST ${curia_added_tests} APPEND PROPERTY ENVIRONMENT_MODIFICATION
+                 XDG_CONFIG_HOME=unset: XDG_DATA_HOME=unset: XDG_STATE_HOME=unset: XDG_CACHE_HOME=unset:)
 endif()

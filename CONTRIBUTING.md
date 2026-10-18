@@ -91,7 +91,14 @@ The smoke and idle tests open a small window, which can become the active one an
 keyboard while they run, so they are opt-in: configure with `-DCURIA_GUI_TESTS=ON` to register
 them (CI does). Run them only on a machine where nobody is typing, in a graphical session (on
 headless Linux: `xvfb-run -a ctest --preset linux-x64`), and do not move the mouse over the
-window while `app_idle` runs. Unit tests use [doctest](https://github.com/doctest/doctest). Add a test with every
+window while `app_idle` runs.
+
+Every test runs with `HOME` set to an empty folder in the build tree (`app/test-home`), so a
+default path cannot reach your own app log, CK3's folder or a results folder (D26). For the Python
+suites and the tools, `tools/dev/sandboxed.sh <command>` does the same with a fresh temporary
+folder that it removes afterwards, for example
+`tools/dev/sandboxed.sh python3 -m unittest discover -s tools/m4`; it is how automated runs on a
+maintainer's machine run tests and tools (not the build). Unit tests use [doctest](https://github.com/doctest/doctest). Add a test with every
 behaviour change. Parsing code takes untrusted text, so keep it a pure function that
 can be fuzzed.
 

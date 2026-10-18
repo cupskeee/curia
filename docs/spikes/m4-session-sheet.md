@@ -464,11 +464,14 @@ Criteria 2 and 5 are checked by CI; criterion 9 was the quality sitting (done).
 
 ## 8. Optional, free: a wrong key and a wrong model
 
-Each sends one request that the service refuses before any model runs. In a **second** Terminal
-window (so that the real key of the sitting window is not touched):
+Each sends one request that the service refuses before any model runs. Both use the plain
+`build/macos-arm64/app/curia` binary: step 0.2 builds it too (`Curia.app` is assembled from it, so
+building `curia_app` builds it first; checked on 2026-10-19). In a **second** Terminal window (so
+that the real key of the sitting window is not touched):
 
 ```sh
 cd ~/PycharmProjects/curia
+ls build/macos-arm64/app/curia        # must print the path; if not, run step 0.2 again
 export CURIA_ANTHROPIC_API_KEY=sk-ant-FAKE-wrong-key-for-the-401-test-0000
 export CURIA_MODEL=claude-sonnet-5-5
 build/macos-arm64/app/curia --check-api
