@@ -7,6 +7,8 @@
 #include <array>
 #include <cstdint>
 #include <cstdio>
+#include <string>
+#include <utility>
 
 #include "ui/render_backend.h"
 
@@ -55,8 +57,18 @@ public:
         SDL_SetRenderDrawColor(renderer_, clear_[0], clear_[1], clear_[2], clear_[3]);
         SDL_RenderClear(renderer_);
         ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer_);
+        if (!capturePath_.empty()) {
+            saveCapture();
+        }
         SDL_RenderPresent(renderer_);
     }
+
+    void captureNextFrame(std::string path) override {
+        capturePath_ = std::move(path);
+        captureSaved_ = false;
+    }
+
+    bool captureSaved() const override { return captureSaved_; }
 
     void setClearColor(std::uint8_t r, std::uint8_t g, std::uint8_t b, std::uint8_t a) override {
         clear_ = {r, g, b, a};
@@ -80,7 +92,27 @@ public:
     }
 
 private:
+    // Reads the frame back before it is presented (the back buffer is undefined after
+    // SDL_RenderPresent) and writes it as a BMP file.
+    void saveCapture() {
+        const std::string path = std::move(capturePath_);
+        capturePath_.clear();
+        SDL_SetRenderScale(renderer_, 1.0F, 1.0F);  // read the whole frame, in pixels
+        SDL_Surface* surface = SDL_RenderReadPixels(renderer_, nullptr);
+        if (surface == nullptr) {
+            std::fprintf(stderr, "SDL_RenderReadPixels failed: %s\n", SDL_GetError());
+            return;
+        }
+        captureSaved_ = SDL_SaveBMP(surface, path.c_str());
+        if (!captureSaved_) {
+            std::fprintf(stderr, "SDL_SaveBMP failed: %s\n", SDL_GetError());
+        }
+        SDL_DestroySurface(surface);
+    }
+
     SDL_Renderer* renderer_ = nullptr;
+    std::string capturePath_;
+    bool captureSaved_ = false;
     std::array<std::uint8_t, 4> clear_ = {24, 20, 16, 255};
     bool initialised_ = false;
 };

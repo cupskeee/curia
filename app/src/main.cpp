@@ -57,5 +57,14 @@ int main(int argc, char** argv) {
             return curia::kHeadlessExitInternal;
         }
     }
-    return curia::runApp(options);
+    try {
+        return curia::runApp(options);
+    } catch (...) {
+        // As in the headless modes, no text of the exception is printed: it could hold anything
+        // (the window holds the key and the player's words). The window's parts were destroyed on
+        // the way here in their usual order (the watcher stops, the request is cancelled, the
+        // provider joins its net thread).
+        std::fputs("curia: internal error\n", stderr);
+        return 1;
+    }
 }

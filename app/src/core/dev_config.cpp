@@ -21,7 +21,7 @@ constexpr std::string_view kKeyRule =
     "CURIA_ANTHROPIC_API_KEY is not usable: it must be 8 to 4096 printable ASCII characters "
     "without spaces";
 constexpr std::string_view kKeyNotRegisteredRule =
-    "CURIA_ANTHROPIC_API_KEY is not usable: it cannot be protected from the logs";
+    "CURIA_ANTHROPIC_API_KEY is not usable: Curia cannot keep it out of what it writes";
 constexpr std::string_view kModelRule =
     "CURIA_MODEL is not usable: it must be 1 to 128 characters from letters, digits and . _ : -";
 constexpr std::string_view kLogContentWarning =
@@ -190,6 +190,11 @@ std::string describeNotConfigured(const DevConfig& config) {
         message += " Set them in the environment that starts Curia, then start it again.";
     }
     return message;
+}
+
+std::string_view logContentWindowNote() {
+    return "CURIA_LOG_CONTENT is set, but only --headless-chat writes transcripts; the chat "
+           "window writes none";
 }
 
 std::string_view keyVariableName() {

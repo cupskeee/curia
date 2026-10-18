@@ -66,6 +66,10 @@ std::string describeNotConfigured(const DevConfig& config);
 // name the variables.
 std::vector<std::string> missingVariables(const DevConfig& config);
 
+// The note the chat window prints on stderr when logContent is set: only the headless chat writes
+// transcripts.
+std::string_view logContentWindowNote();
+
 // The names of the two variables, for messages that must tell the owner which one to fix.
 std::string_view keyVariableName();
 std::string_view modelVariableName();

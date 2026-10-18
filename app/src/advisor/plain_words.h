@@ -8,7 +8,8 @@
 // reads uses Curia's internal words. That covers the chat window's own texts (notices, status
 // lines, errors, dividers) and, because the model copies the words it is given, the persona, the
 // block the model reads and the freshness note as well. The unit tests check those texts against
-// this list, and the chat window's texts are to be checked against it too: one list, here.
+// this list, and the chat window's own texts too (chatview/view_text.h, test_chatview_text.cpp):
+// one list, here.
 namespace curia::advisor {
 
 struct InternalWord {

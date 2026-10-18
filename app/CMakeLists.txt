@@ -50,6 +50,13 @@ add_library(curia_core STATIC
     src/bridge/log_watcher.cpp
     src/bridge/record.cpp
     src/bridge/text_hygiene.cpp
+    src/chatview/answer_text.cpp
+    src/chatview/canned_conversation.cpp
+    src/chatview/log_path.cpp
+    src/chatview/text_layout.cpp
+    src/chatview/utf8.cpp
+    src/chatview/view_model.cpp
+    src/chatview/view_text.cpp
     src/core/build_info.cpp
     src/core/app_controller.cpp
     src/core/app_log.cpp
@@ -143,10 +150,32 @@ if(CURIA_BUILD_APP)
     target_link_libraries(curia_headless PUBLIC curia_http)
     curia_configure_target(curia_headless)
 
+    # The bundled font (app/resources/fonts/README.md): each TTF becomes a generated source file
+    # with its bytes, rebuilt when the TTF changes, so the executable needs no file at run time.
+    set(CURIA_FONT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/resources/fonts)
+    set(CURIA_EMBEDDED_FONTS)
+    foreach(face IN ITEMS Regular Bold)
+        set(font_file ${CURIA_FONT_DIR}/GentiumBookPlus-${face}.ttf)
+        set(font_source ${CMAKE_CURRENT_BINARY_DIR}/generated/embedded/gentium_book_plus_${face}.cpp)
+        add_custom_command(OUTPUT ${font_source}
+            COMMAND ${CMAKE_COMMAND} -DINPUT=${font_file} -DOUTPUT=${font_source}
+                    -DFUNCTION=curia::ui::bundled${face}Font -DHEADER=ui/fonts.h
+                    -P ${PROJECT_SOURCE_DIR}/cmake/EmbedFile.cmake
+            DEPENDS ${font_file} ${PROJECT_SOURCE_DIR}/cmake/EmbedFile.cmake
+            COMMENT "Embedding GentiumBookPlus-${face}.ttf"
+            VERBATIM)
+        list(APPEND CURIA_EMBEDDED_FONTS ${font_source})
+    endforeach()
+
     add_executable(curia
         src/main.cpp
         src/app.cpp
-        src/ui/sdl_renderer_backend.cpp)
+        src/ui/chat_view.cpp
+        src/ui/chat_window.cpp
+        src/ui/sdl_renderer_backend.cpp
+        src/ui/smoke_run.cpp
+        src/ui/theme.cpp
+        ${CURIA_EMBEDDED_FONTS})
     target_link_libraries(curia PRIVATE curia_core curia_headless SDL3::SDL3 imgui::imgui)
     curia_configure_target(curia)
 
@@ -161,9 +190,10 @@ if(CURIA_BUILD_APP)
     add_test(NAME https_smoke_default_ca COMMAND curia_https_smoke --default-ca)
     set_tests_properties(https_smoke_default_ca PROPERTIES LABELS netinfo TIMEOUT 60)
 
-    # Headless smoke test: window + renderer + 3 frames, then exit (software renderer, no GPU needed).
-    # Pass/fail is the process exit code.
-    add_test(NAME app_smoke COMMAND curia --smoke)
+    # Smoke test: the chat window with a canned conversation and a scripted answer (no network, no
+    # key, no game), the bundled font checked for every character shown, the last frame saved as a
+    # BMP file; then exit (software renderer, no GPU needed). Pass/fail is the process exit code.
+    add_test(NAME app_smoke COMMAND curia --smoke --screenshot ${CMAKE_CURRENT_BINARY_DIR}/app_smoke.bmp)
     set_tests_properties(app_smoke PROPERTIES LABELS smoke TIMEOUT 60)
 
     # Idle test: the event loop must not draw frames while nothing happens (needs a display; the
@@ -234,6 +264,10 @@ if(CURIA_BUILD_TESTS)
         tests/test_bridge_robustness.cpp
         tests/test_bridge_splitter.cpp
         tests/test_build_info.cpp
+        tests/test_chatview_answer.cpp
+        tests/test_chatview_layout.cpp
+        tests/test_chatview_model.cpp
+        tests/test_chatview_text.cpp
         tests/test_check_api_report.cpp
         tests/test_cli.cpp
         tests/test_app_log.cpp

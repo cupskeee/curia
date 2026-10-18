@@ -15,8 +15,14 @@ enum class AuthMode { Bearer, XApiKey };
 struct CliOptions {
     bool showHelp = false;
     bool showVersion = false;
-    // Open a window, render three frames with the software renderer, print CURIA_SMOKE_OK, exit.
+    // Open a window, draw the canned conversation (ui/smoke_run.h) with the software renderer,
+    // print CURIA_SMOKE_OK, exit.
     bool smoke = false;
+    // --smoke only: save the last frame as a BMP file here (empty = no screenshot).
+    std::string screenshotPath;
+    // --smoke only: the window's size in logical pixels (--window-size WxH); 0 = the default.
+    int windowWidth = 0;
+    int windowHeight = 0;
     // Run the normal event loop for N seconds and verify that no frames are drawn while idle.
     int idleSeconds = 0;
     // Headless mode (no SDL, no window): tail this log file and print one JSON object per event.
@@ -35,7 +41,8 @@ struct CliOptions {
     // commands on stdin. One JSON
     // object per line on stdout. See core/headless_chat.h.
     bool headlessChat = false;
-    // --log: the game's debug.log to read (headless chat).
+    // --log: the game's debug.log to read (headless chat, and the chat window instead of the one
+    // found in CK3's folder).
     std::string logPath;
     // --frame: use the snapshot with this number instead of the newest one (needs --from-start).
     std::optional<int> frameSnap;
@@ -50,6 +57,11 @@ struct CliOptions {
     bool checkApi = false;
     bool cacheProbe = false;
 
+    // True if no mode flag was given: the chat window runs.
+    [[nodiscard]] bool windowMode() const {
+        return !smoke && idleSeconds == 0 && watchLogPath.empty() && !headlessChat && !checkApi;
+    }
+
     // Shared by headless chat and --check-api.
     // --effort default|low|medium|high|xhigh|max and --thinking adaptive|between_tools|disabled:
     // sent as the request's output_config.effort and thinking.type. Without --effort the effort is
@@ -63,7 +75,8 @@ struct CliOptions {
     bool effortGiven = false;
     bool thinkingGiven = false;
     // --test-endpoint http://127.0.0.1:PORT: a mock server (development builds only; the rules
-    // are net/endpoint_policy.h). Empty = the real service.
+    // are net/endpoint_policy.h). Empty = the real service. Also in the chat window, with the
+    // same rules, like --auth and --log-dir.
     std::string testEndpoint;
     AuthMode auth = AuthMode::Bearer;
     // --log-dir: the folder of the app's own log (curia.log); empty = the platform default.

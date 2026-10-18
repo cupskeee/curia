@@ -44,29 +44,47 @@ HeadlessChatResult runHeadlessChatMode(const CliOptions& options, std::istream& 
     std::unique_ptr<AppLog> log = openAppLog(options);
     chat.log = log.get();
 
-    if (chat.missing.empty() && config.apiKey.has_value() && config.model.has_value()) {
-        net::Endpoint endpoint;
-        std::string endpointError;
-        std::optional<std::string_view> flag;
-        if (!options.testEndpoint.empty()) {
-            flag = std::string_view(options.testEndpoint);
-        }
-        if (!net::makeEndpoint(flag, &*config.apiKey, endpoint, endpointError)) {
+    if (chat.missing.empty()) {
+        ProviderSetup setup = makeProvider(options, config, log.get());
+        if (!setup.error.empty()) {
             JsonLineWriter writer(out);
-            writer.write({{"event", "fatal"}, {"code", "setup"}, {"message", endpointError}});
-            err << "curia: " << endpointError << '\n' << std::flush;
+            writer.write({{"event", "fatal"}, {"code", "setup"}, {"message", setup.error}});
+            err << "curia: " << setup.error << '\n' << std::flush;
             HeadlessChatResult result;
             result.exitCode = kHeadlessExitSetup;
             return result;
         }
-        http::AnthropicProviderOptions providerOptions;
-        providerOptions.auth = toAuthStyle(options.auth);
-        providerOptions.log = log.get();
-        chat.model = *config.model;
-        chat.provider = std::make_shared<http::AnthropicProvider>(
-            std::move(endpoint), std::move(*config.apiKey), providerOptions);
+        chat.model = std::move(setup.model);
+        chat.provider = std::move(setup.provider);
     }
     return runHeadlessChat(std::move(chat), in, out, err);
+}
+
+ProviderSetup makeProvider(const CliOptions& options, DevConfig& config, AppLog* log) {
+    ProviderSetup setup;
+    if (!missingVariables(config).empty() || !config.apiKey.has_value() ||
+        !config.model.has_value()) {
+        return setup;
+    }
+    net::Endpoint endpoint;
+    std::optional<std::string_view> flag;
+    if (!options.testEndpoint.empty()) {
+        flag = std::string_view(options.testEndpoint);
+    }
+    if (!net::makeEndpoint(flag, &*config.apiKey, endpoint, setup.error)) {
+        if (setup.error.empty()) {
+            setup.error = "the endpoint was refused";
+        }
+        return setup;
+    }
+    setup.error.clear();
+    http::AnthropicProviderOptions providerOptions;
+    providerOptions.auth = toAuthStyle(options.auth);
+    providerOptions.log = log;
+    setup.model = *config.model;
+    setup.provider = std::make_shared<http::AnthropicProvider>(
+        std::move(endpoint), std::move(*config.apiKey), providerOptions);
+    return setup;
 }
 
 }  // namespace curia::headless

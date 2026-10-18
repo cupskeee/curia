@@ -6,7 +6,8 @@ answers using live data about your game exported by a mod.
 
 > **Status: pre-alpha. There is no release, no installable app and no working mod
 > yet.** The repository currently holds the design documents, the findings of the
-> feasibility tests, and the project skeleton (an empty SDL3 and Dear ImGui window).
+> feasibility tests, and the app in progress (a chat window that is not an overlay yet,
+> and headless test modes).
 > Everything below except "Build from source" describes the plan, not what you can
 > run today.
 
@@ -99,10 +100,11 @@ change.
 
 ## Build from source
 
-Only the skeleton builds today. You need CMake 3.25 or newer, Ninja (macOS and Linux), a
-C++20 compiler (Xcode command line tools; Visual Studio 2022 with the C++ desktop workload;
-GCC 13 or Clang on Linux) and a [vcpkg](https://github.com/microsoft/vcpkg) checkout that
-you have bootstrapped (`bootstrap-vcpkg.sh` or `.bat`).
+The app is a work in progress (milestone M4). You need CMake 3.25 or newer, Ninja (macOS
+and Linux), a C++20 compiler (Xcode command line tools; Visual Studio 2022 with the C++
+desktop workload; GCC 13 or Clang on Linux) and a
+[vcpkg](https://github.com/microsoft/vcpkg) checkout that you have bootstrapped
+(`bootstrap-vcpkg.sh` or `.bat`).
 
 ```sh
 export VCPKG_ROOT=/path/to/vcpkg          # Windows: set VCPKG_ROOT=C:\path\to\vcpkg
@@ -110,6 +112,33 @@ export VCPKG_ROOT=/path/to/vcpkg          # Windows: set VCPKG_ROOT=C:\path\to\v
 cmake --preset macos-arm64                # or macos-x64, linux-x64, windows-x64
 cmake --build --preset macos-arm64
 ctest --preset macos-arm64                # opens a small window for a few seconds
+```
+
+To see the chat window without the game or a key, `curia --smoke --screenshot shot.bmp`
+draws a canned conversation and saves the last frame. To try it with the mock server and a
+fake game log (development builds), start the fake CK3 and the mock in two terminals, then
+the window in a third:
+
+```sh
+python3 tools/fake_ck3/fake_ck3.py --stdin        # prints LOG <path>; type "frame" to click Advisor
+python3 tools/mock_llm/mock_llm.py --ignore-stdin # prints LISTEN 127.0.0.1:<port>
+
+export CURIA_ANTHROPIC_API_KEY=sk-ant-FAKE-try-the-window-0000   # a fake key: the mock needs one
+export CURIA_MODEL=mock-model-1
+build/macos-arm64/app/curia --log <LOG path> --test-endpoint http://127.0.0.1:<port>
+```
+
+With the real service, type the key at a hidden prompt in your own terminal, so that it is
+neither shown nor kept in the shell history (never put a real key into a command, a file or
+a chat), set the model, and run `curia` with no flag: it reads `debug.log` from CK3's
+folder in Documents and shows the realm once you click Advisor in the game. The full steps
+are in [docs/spikes/m4-quality-check.md](docs/spikes/m4-quality-check.md).
+
+```sh
+read -s "CURIA_ANTHROPIC_API_KEY?API key (nothing is shown): "   # zsh; bash: read -rs -p "API key: " CURIA_ANTHROPIC_API_KEY
+export CURIA_ANTHROPIC_API_KEY; echo
+export CURIA_MODEL=<model>                # a model ID from the provider's list
+build/macos-arm64/app/curia
 ```
 
 The first configure downloads and builds the dependencies through vcpkg's manifest
