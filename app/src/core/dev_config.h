@@ -66,6 +66,16 @@ std::string describeNotConfigured(const DevConfig& config);
 // name the variables.
 std::vector<std::string> missingVariables(const DevConfig& config);
 
+// How each of the two variables came in, as one word for the app log (the window logs it at
+// start-up as "dev_config key=... model=..."): "set" (read and usable), "unset", "unusable" (set,
+// but it breaks a rule) or "disabled" (a build without CURIA_ENABLE_DEV_ENV reads neither). Never a
+// value, and not the variables' names either. Call it before the key is moved out of `config`.
+struct DevConfigPresence {
+    std::string_view key;
+    std::string_view model;
+};
+DevConfigPresence devConfigPresence(const DevConfig& config);
+
 // The note the chat window prints on stderr when logContent is set: only the headless chat writes
 // transcripts.
 std::string_view logContentWindowNote();

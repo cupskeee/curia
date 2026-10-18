@@ -92,7 +92,56 @@ int modeCount(const CliOptions& o) {
     count += !o.watchLogPath.empty() ? 1 : 0;
     count += o.headlessChat ? 1 : 0;
     count += o.checkApi ? 1 : 0;
+    count += o.selftestHotkey ? 1 : 0;
     return count;
+}
+
+// --window, --overlay-focus, --overlay and --selftest-hotkey; fills in the window kind and the
+// focus mode the run uses.
+bool resolveWindow(CliOptions& out, bool overlaySupported, std::string& error) {
+    const bool window = out.windowMode();
+    if (out.windowGiven && !window) {
+        error = "--window needs the chat window (no mode flag)";
+        return false;
+    }
+    if (out.windowGiven && out.window == WindowKind::Overlay && !overlaySupported) {
+        error = "--window overlay needs macOS (on this system the chat opens in a normal window)";
+        return false;
+    }
+    if (out.overlayFocusGiven && !window) {
+        error = "--overlay-focus needs the chat window (no mode flag)";
+        return false;
+    }
+    if (out.overlayFocusGiven && !overlaySupported) {
+        error = "--overlay-focus needs macOS (the overlay panel)";
+        return false;
+    }
+    if (out.overlayFocusGiven && out.windowGiven && out.window == WindowKind::Plain) {
+        error = "--overlay-focus needs the overlay panel, not --window plain";
+        return false;
+    }
+    if (out.overlay && !out.smoke && out.idleSeconds == 0) {
+        error = "--overlay needs --smoke or --idle-test";
+        return false;
+    }
+    if (out.overlay && !overlaySupported) {
+        error = "--overlay needs macOS (the overlay panel)";
+        return false;
+    }
+    if (out.selftestHotkey && !overlaySupported) {
+        error = "--selftest-hotkey needs macOS (the hot key)";
+        return false;
+    }
+    if (window) {
+        if (!out.windowGiven) {
+            out.window = overlaySupported ? WindowKind::Overlay : WindowKind::Plain;
+        }
+    } else {
+        out.window = out.overlay ? WindowKind::Overlay : WindowKind::Plain;
+        // The test modes never ask for the keyboard (the launch may still give it to them).
+        out.overlayFocus = OverlayFocus::Click;
+    }
+    return true;
 }
 
 bool validate(const CliOptions& out, std::string& error) {
@@ -101,8 +150,8 @@ bool validate(const CliOptions& out, std::string& error) {
         return false;
     }
     if (modeCount(out) > 1) {
-        error = "only one of --smoke, --idle-test, --watch-log, --headless-chat and --check-api "
-                "can be used at a time";
+        error = "only one of --smoke, --idle-test, --watch-log, --headless-chat, --check-api and "
+                "--selftest-hotkey can be used at a time";
         return false;
     }
     const bool watch = !out.watchLogPath.empty();
@@ -158,7 +207,34 @@ bool validate(const CliOptions& out, std::string& error) {
 
 }  // namespace
 
+const char* toString(WindowKind kind) noexcept {
+    switch (kind) {
+    case WindowKind::Overlay:
+        return "overlay";
+    case WindowKind::Plain:
+        return "plain";
+    }
+    return "plain";
+}
+
+const char* toString(OverlayFocus focus) noexcept {
+    switch (focus) {
+    case OverlayFocus::Key:
+        return "key";
+    case OverlayFocus::Click:
+        return "click";
+    case OverlayFocus::Activate:
+        return "activate";
+    }
+    return "key";
+}
+
 bool parseCli(int argc, const char* const* argv, CliOptions& out, std::string& error) {
+    return parseCli(argc, argv, out, error, kOverlayPanelSupported);
+}
+
+bool parseCli(int argc, const char* const* argv, CliOptions& out, std::string& error,
+              bool overlayPanelSupported) {
     out = CliOptions{};
     for (int i = 1; i < argc; ++i) {
         const std::string_view arg = argv[i];
@@ -309,12 +385,42 @@ bool parseCli(int argc, const char* const* argv, CliOptions& out, std::string& e
             }
         } else if (arg == "--selftest-throw") {
             out.selftestThrow = true;
+        } else if (arg == "--overlay") {
+            out.overlay = true;
+        } else if (arg == "--window") {
+            const std::string_view kind = i + 1 < argc ? std::string_view(argv[i + 1]) : "";
+            if (kind == "overlay") {
+                out.window = WindowKind::Overlay;
+            } else if (kind == "plain") {
+                out.window = WindowKind::Plain;
+            } else {
+                error = "--window needs overlay or plain";
+                return false;
+            }
+            out.windowGiven = true;
+            ++i;
+        } else if (arg == "--overlay-focus") {
+            const std::string_view focus = i + 1 < argc ? std::string_view(argv[i + 1]) : "";
+            if (focus == "key") {
+                out.overlayFocus = OverlayFocus::Key;
+            } else if (focus == "click") {
+                out.overlayFocus = OverlayFocus::Click;
+            } else if (focus == "activate") {
+                out.overlayFocus = OverlayFocus::Activate;
+            } else {
+                error = "--overlay-focus needs key, click or activate";
+                return false;
+            }
+            out.overlayFocusGiven = true;
+            ++i;
+        } else if (arg == "--selftest-hotkey") {
+            out.selftestHotkey = true;
         } else {
             error = "unknown argument: " + describeArgument(arg);
             return false;
         }
     }
-    return validate(out, error);
+    return validate(out, error) && resolveWindow(out, overlayPanelSupported, error);
 }
 
 // The usage text names the default effort.
@@ -323,10 +429,11 @@ static_assert(providers::kDefaultEffort == providers::Effort::Low,
 
 std::string_view cliUsage() {
     return "Usage: curia [--log <path>] [--test-endpoint <url>] [--auth bearer|x-api-key]\n"
-           "             [--log-dir <dir>]\n"
+           "             [--log-dir <dir>] [--window overlay|plain]\n"
+           "             [--overlay-focus key|click|activate]\n"
            "       curia [--smoke [--screenshot <file.bmp>] [--window-size <W>x<H>]\n"
-           "             [--smoke-scene conversation|notices|start] |\n"
-           "             --idle-test <seconds> | --watch-log <path> [--from-start]\n"
+           "             [--smoke-scene conversation|notices|start] [--overlay] |\n"
+           "             --idle-test <seconds> [--overlay] | --watch-log <path> [--from-start]\n"
            "             [--max-frames <n>] [--timeout-seconds <s>]] [--version] [--help]\n"
            "       curia --headless-chat --log <path> [--from-start] [--frame <snap>]\n"
            "             [--test-endpoint <url>] [--auth bearer|x-api-key] [--max-tokens <n>]\n"
@@ -339,12 +446,24 @@ std::string_view cliUsage() {
            "                       folder (or --log <path>), from its end: the realm appears once\n"
            "                       the player clicks Advisor in the game. The API key and the\n"
            "                       model come from the environment (development builds)\n"
+           "  --window <kind>      the chat window: overlay (macOS, the default there: a panel\n"
+           "                       over CK3, also over its Fullscreen; Ctrl+Cmd+K shows and hides\n"
+           "                       it, Esc hides it) or plain (a normal window that stays on top;\n"
+           "                       the only kind on Windows and Linux; Esc minimises it)\n"
+           "  --overlay-focus <f>  macOS, the overlay, when opened from the game, the hot key or\n"
+           "                       the menu-bar icon: key (the default: the panel is made the key\n"
+           "                       window without activating Curia), click (the first click on\n"
+           "                       the panel takes the keys) or activate (Curia also becomes the\n"
+           "                       active app). The overlay shown at start-up asks for no keys\n"
            "  --smoke              open a window, draw a canned conversation with a scripted\n"
            "                       answer (no network, no key, no game), exit (CI smoke test);\n"
            "                       --screenshot saves the last frame, --window-size sets the\n"
            "                       window's size in logical pixels, --smoke-scene notices adds\n"
            "                       the notices, --smoke-scene start draws the empty window\n"
            "  --idle-test <sec>    run the event loop and check that nothing renders while idle\n"
+           "  --overlay            with --smoke or --idle-test (macOS): draw in the overlay\n"
+           "                       panel (it asks for no keys, but the launch may give it the\n"
+           "                       keyboard, as with the plain window)\n"
            "  --watch-log <path>   no window: tail a log file and print one JSON object per\n"
            "                       bridge event (JSON Lines). Attaches at the end of an existing\n"
            "                       file unless --from-start. Exit 0 after --max-frames complete\n"

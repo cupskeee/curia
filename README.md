@@ -6,8 +6,8 @@ answers using live data about your game exported by a mod.
 
 > **Status: pre-alpha. There is no release, no installable app and no working mod
 > yet.** The repository currently holds the design documents, the findings of the
-> feasibility tests, and the app in progress (a chat window that is not an overlay yet,
-> and headless test modes).
+> feasibility tests, and the app in progress (the chat in an overlay over the game on
+> macOS, a normal window on Windows and Linux, and headless test modes).
 > Everything below except "Build from source" describes the plan, not what you can
 > run today.
 
@@ -140,6 +140,38 @@ export CURIA_ANTHROPIC_API_KEY; echo
 export CURIA_MODEL=<model>                # a model ID from the provider's list
 build/macos-arm64/app/curia
 ```
+
+On macOS the chat opens in an overlay that floats over CK3, also over its Fullscreen mode, without
+a Dock icon (`--window plain` gives a normal window instead). It appears when Curia starts and
+each time you click Advisor in the game, on CK3's display. **Ctrl+Cmd+K** shows and hides it;
+**Esc** hides it (what you typed stays, and an answer keeps arriving); Cmd+. stops an answer. When
+you open it from the game, with the hot key or from the menu-bar icon, the overlay is made the key
+window so that you can type at once; whether the keys then really go to it and not to the game is
+still to be checked in the M4 testing (`--overlay-focus click` waits for a click on it instead).
+The overlay shown at start-up does not keep the keys: if starting Curia made it the active app, it
+hands them back a quarter of a second later. The menu-bar icon has "Show Curia", "Hide Curia" and
+"Quit Curia" (it is left out if CK3 is in front when Curia starts); over a game in Fullscreen the
+menu bar may not appear, so the in-game button and the hot key are the main controls. On Windows
+the chat is a normal window that stays on top, with a tray icon; on Linux the same window without
+one. There Esc minimises the window, its close button quits Curia, and there is no hot key yet.
+
+The build also makes `build/macos-arm64/app/Curia.app` (ad-hoc signed, not notarised), which
+macOS treats as an app of its own rather than part of your terminal. During development you can
+start it with `open` from a terminal where the variables are exported:
+
+```sh
+open -g build/macos-arm64/app/Curia.app --stderr <file> --args --log <LOG path>
+```
+
+`open` hands its own environment to the app, so the exported variables arrive without any `--env`
+and the key never appears on a command line; `--env NAME` without a value sets the variable to an
+empty value instead (tested on macOS 26.5.1, `docs/research-notes.md` §2.17). `-g` keeps `open`
+from bringing Curia to the front (it may still become active for a moment, as above). The app runs
+in `/`, so give absolute paths (after `--args` as well), and its error messages reach only the
+`--stderr` file. If Curia is already running, `open` starts no second copy: quit it first (from
+the menu-bar icon, or `kill` its process). The app log (`~/Library/Logs/Curia/curia.log`) has a
+line `dev_config key=set|unset|unusable model=...` that says which variables arrived, never a
+value. How the M4 test sittings start Curia is settled with their session sheet.
 
 The first configure downloads and builds the dependencies through vcpkg's manifest
 mode, which takes a while. The tests need a display (on headless Linux use

@@ -198,6 +198,20 @@ std::string describeNotConfigured(const DevConfig& config) {
     return message;
 }
 
+DevConfigPresence devConfigPresence(const DevConfig& config) {
+    if (hasProblemAbout(config, kDevConfigDisabledProblem)) {
+        return {"disabled", "disabled"};
+    }
+    const auto word = [&config](bool present, std::string_view variable) -> std::string_view {
+        if (present) {
+            return "set";
+        }
+        return hasProblemAbout(config, variable) ? "unusable" : "unset";
+    };
+    return {word(config.apiKey.has_value(), kKeyVariable),
+            word(config.model.has_value(), kModelVariable)};
+}
+
 std::string_view logContentWindowNote() {
     return "CURIA_LOG_CONTENT is set, but only --headless-chat writes transcripts; the chat "
            "window writes none";

@@ -336,6 +336,29 @@ TEST_CASE("dev config: an empty lookup function reads nothing") {
     CHECK_FALSE(config.model.has_value());
 }
 
+TEST_CASE("dev config: the presence words for the app log, never a value or a name") {
+    SecretRegistry registry;
+    const auto presence = [&registry](std::map<std::string, std::string> values) {
+        FakeEnv env;
+        env.values = std::move(values);
+        return curia::devConfigPresence(curia::loadDevConfig(env.getter(), registry));
+    };
+    const curia::DevConfigPresence both =
+        presence({{kKeyName, fakeKey()}, {kModelName, "mock-model-1"}});
+    CHECK(both.key == "set");
+    CHECK(both.model == "set");
+    const curia::DevConfigPresence none = presence({});
+    CHECK(none.key == "unset");
+    CHECK(none.model == "unset");
+    const curia::DevConfigPresence modelOnly = presence({{kModelName, "mock-model-1"}});
+    CHECK(modelOnly.key == "unset");
+    CHECK(modelOnly.model == "set");
+    const curia::DevConfigPresence bad =
+        presence({{kKeyName, "short"}, {kModelName, "has a blank"}});
+    CHECK(bad.key == "unusable");
+    CHECK(bad.model == "unusable");
+}
+
 #else  // built without CURIA_ENABLE_DEV_ENV
 
 TEST_CASE("dev config: disabled in this build, the environment is never read") {
@@ -354,6 +377,8 @@ TEST_CASE("dev config: disabled in this build, the environment is never read") {
     CHECK(message.find(kKeyName) == std::string::npos);
     CHECK(message.find(fakeKey()) == std::string::npos);
     CHECK(curia::missingVariables(config) == std::vector<std::string>{kKeyName, kModelName});
+    CHECK(curia::devConfigPresence(config).key == "disabled");
+    CHECK(curia::devConfigPresence(config).model == "disabled");
     CHECK_FALSE(config.logContent);
     CHECK_FALSE(config.transcriptDir.has_value());
 

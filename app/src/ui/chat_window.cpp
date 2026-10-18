@@ -41,6 +41,9 @@ void ChatWindow::draw() {
     if (actions.copy.has_value()) {
         copyAnswer(*actions.copy);
     }
+    if (actions.hide) {
+        hideRequested_ = true;
+    }
 }
 
 bool ChatWindow::submit() {
@@ -81,6 +84,12 @@ bool ChatWindow::takeChanged() {
 bool ChatWindow::takeOverlayRequest() {
     const bool requested = overlayRequested_;
     overlayRequested_ = false;
+    return requested;
+}
+
+bool ChatWindow::takeHideRequest() {
+    const bool requested = hideRequested_;
+    hideRequested_ = false;
     return requested;
 }
 

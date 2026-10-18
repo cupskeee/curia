@@ -4,7 +4,8 @@ cmake_minimum_required(VERSION 3.25)
 # Keep the version in sync with vcpkg.json ("version-semver"); the release workflow checks the tag against it.
 project(curia VERSION 0.1.0 LANGUAGES CXX)
 
-# Objective-C++ for the macOS platform code (the M2 overlay probe today, platform/mac later).
+# Objective-C++ for the macOS code: platform/mac, the overlay panel and the hot key (ui/*_mac.mm),
+# and the M2 overlay probe.
 if(APPLE)
     enable_language(OBJCXX)
     set(CMAKE_OBJCXX_STANDARD 20)
