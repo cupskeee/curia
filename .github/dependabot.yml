@@ -1,6 +1,9 @@
 version: 2
 updates:
+  # Updates go to dev like every other change (CONTRIBUTING.md, "Branches"); security updates
+  # always target the default branch and are moved to dev by hand.
   - package-ecosystem: "github-actions"
+    target-branch: "dev"
     directories:
       - "/"
       - "/.github/actions/setup-vcpkg"
@@ -24,6 +27,7 @@ updates:
   # propose moving a master-commit baseline back to the latest release. The baseline is bumped by
   # hand (see docs/research-notes.md) until it is pinned to a release tag again.
   - package-ecosystem: "vcpkg"
+    target-branch: "dev"
     directory: "/"
     schedule:
       interval: "weekly"
