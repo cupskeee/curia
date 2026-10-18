@@ -28,18 +28,18 @@ const char* toString(TailerNotice notice) noexcept {
 }
 
 IFileSource::Stat FileSource::stat() {
-    std::ifstream in(std::filesystem::path(path_), std::ios::binary);
+    std::ifstream in(path_, std::ios::binary);
     if (!in) {
         // Could not open: tell "not there" from "there but refused" (permissions, a lock).
         std::error_code ec;
-        const bool exists = std::filesystem::exists(std::filesystem::path(path_), ec);
+        const bool exists = std::filesystem::exists(path_, ec);
         return {!ec && !exists ? State::Missing : State::Error, 0};
     }
     // POSIX lets ifstream open a directory (and seekg then returns a meaningless size) where
     // Windows refuses; make every platform report "exists but cannot be tailed", so that a log
     // path that points at the logs folder is told to the user instead of watched silently.
     std::error_code regularEc;
-    if (!std::filesystem::is_regular_file(std::filesystem::path(path_), regularEc) || regularEc) {
+    if (!std::filesystem::is_regular_file(path_, regularEc) || regularEc) {
         return {State::Error, 0};
     }
     in.seekg(0, std::ios::end);
@@ -51,7 +51,7 @@ IFileSource::Stat FileSource::stat() {
 }
 
 bool FileSource::read(std::uint64_t offset, std::size_t maxBytes, std::string& out) {
-    std::ifstream in(std::filesystem::path(path_), std::ios::binary);
+    std::ifstream in(path_, std::ios::binary);
     if (!in) {
         return false;
     }

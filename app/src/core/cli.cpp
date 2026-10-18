@@ -22,6 +22,26 @@ bool parseWholeNumber(std::string_view text, int min, int max, int& out) {
     return true;
 }
 
+constexpr int kMinWindowSide = 200;
+constexpr int kMaxWindowSide = 8000;
+
+// "520x680" (also with a capital X).
+bool parseWindowSize(std::string_view text, int& width, int& height) {
+    const std::size_t x = text.find_first_of("xX");
+    if (x == std::string_view::npos) {
+        return false;
+    }
+    int w = 0;
+    int h = 0;
+    if (!parseWholeNumber(text.substr(0, x), kMinWindowSide, kMaxWindowSide, w) ||
+        !parseWholeNumber(text.substr(x + 1), kMinWindowSide, kMaxWindowSide, h)) {
+        return false;
+    }
+    width = w;
+    height = h;
+    return true;
+}
+
 // An argument that is safe to repeat in an error message: a flag-shaped word of reasonable
 // length, with anything key-shaped scrubbed. A stray positional word is never repeated (a key
 // pasted by mistake must not be echoed back).
@@ -98,11 +118,20 @@ bool validate(const CliOptions& out, std::string& error) {
         error = "--headless-chat needs --log <path of the game's debug.log>";
         return false;
     }
-    const bool headlessOnly = !out.logPath.empty() || out.frameSnap.has_value() ||
-                              out.maxTokens > 0 || out.showThinking || out.hasTestOnlyOptions();
+    const bool window = out.windowMode();
+    if (!out.headlessChat && !window && !out.logPath.empty()) {
+        error = "--log needs --headless-chat or the chat window (no mode flag)";
+        return false;
+    }
+    const bool headlessOnly = out.frameSnap.has_value() || out.maxTokens > 0 || out.showThinking ||
+                              out.hasTestOnlyOptions();
     if (!out.headlessChat && headlessOnly) {
-        error = "--log, --frame, --max-tokens, --show-thinking and the test-only timing options "
-                "need --headless-chat";
+        error = "--frame, --max-tokens, --show-thinking and the test-only timing options need "
+                "--headless-chat";
+        return false;
+    }
+    if (!out.smoke && (!out.screenshotPath.empty() || out.windowWidth > 0)) {
+        error = "--screenshot and --window-size need --smoke";
         return false;
     }
     if (out.frameSnap.has_value() && !out.fromStart) {
@@ -114,11 +143,14 @@ bool validate(const CliOptions& out, std::string& error) {
         error = "--cache-probe needs --check-api";
         return false;
     }
-    if (!out.headlessChat && !out.checkApi &&
-        (!out.testEndpoint.empty() || out.auth != AuthMode::Bearer || !out.appLogDir.empty() ||
-         out.effortGiven || out.thinkingGiven)) {
-        error = "--test-endpoint, --auth, --log-dir, --effort and --thinking need --headless-chat "
-                "or --check-api";
+    if (!out.headlessChat && !out.checkApi && (out.effortGiven || out.thinkingGiven)) {
+        error = "--effort and --thinking need --headless-chat or --check-api";
+        return false;
+    }
+    if (!out.headlessChat && !out.checkApi && !window &&
+        (!out.testEndpoint.empty() || out.auth != AuthMode::Bearer || !out.appLogDir.empty())) {
+        error = "--test-endpoint, --auth and --log-dir need --headless-chat, --check-api or the "
+                "chat window (no mode flag)";
         return false;
     }
     return true;
@@ -136,6 +168,17 @@ bool parseCli(int argc, const char* const* argv, CliOptions& out, std::string& e
             out.showVersion = true;
         } else if (arg == "--smoke") {
             out.smoke = true;
+        } else if (arg == "--screenshot") {
+            if (!textFlag(argc, argv, i, arg, out.screenshotPath, error)) {
+                return false;
+            }
+        } else if (arg == "--window-size") {
+            if (i + 1 >= argc || !parseWindowSize(argv[i + 1], out.windowWidth, out.windowHeight)) {
+                error = "--window-size needs WIDTHxHEIGHT, each a whole number between " +
+                        std::to_string(kMinWindowSide) + " and " + std::to_string(kMaxWindowSide);
+                return false;
+            }
+            ++i;
         } else if (arg == "--idle-test") {
             if (i + 1 >= argc) {
                 error = "--idle-test needs a number of seconds";
@@ -265,7 +308,10 @@ static_assert(providers::kDefaultEffort == providers::Effort::Low,
               "update the --effort line of cliUsage()");
 
 std::string_view cliUsage() {
-    return "Usage: curia [--smoke | --idle-test <seconds> | --watch-log <path> [--from-start]\n"
+    return "Usage: curia [--log <path>] [--test-endpoint <url>] [--auth bearer|x-api-key]\n"
+           "             [--log-dir <dir>]\n"
+           "       curia [--smoke [--screenshot <file.bmp>] [--window-size <W>x<H>] |\n"
+           "             --idle-test <seconds> | --watch-log <path> [--from-start]\n"
            "             [--max-frames <n>] [--timeout-seconds <s>]] [--version] [--help]\n"
            "       curia --headless-chat --log <path> [--from-start] [--frame <snap>]\n"
            "             [--test-endpoint <url>] [--auth bearer|x-api-key] [--max-tokens <n>]\n"
@@ -274,7 +320,14 @@ std::string_view cliUsage() {
            "       curia --check-api [--cache-probe] [--auth bearer|x-api-key]\n"
            "             [--effort <level>] [--thinking <mode>] [--test-endpoint <url>]\n"
            "             [--log-dir <dir>]\n"
-           "  --smoke              open a window, render 3 frames, exit (CI smoke test)\n"
+           "  (no mode flag)       the chat window. It reads CK3's debug.log from CK3's own\n"
+           "                       folder (or --log <path>), from its end: the realm appears once\n"
+           "                       the player clicks Advisor in the game. The API key and the\n"
+           "                       model come from the environment (development builds)\n"
+           "  --smoke              open a window, draw a canned conversation with a scripted\n"
+           "                       answer (no network, no key, no game), exit (CI smoke test);\n"
+           "                       --screenshot saves the last frame, --window-size sets the\n"
+           "                       window's size in logical pixels\n"
            "  --idle-test <sec>    run the event loop and check that nothing renders while idle\n"
            "  --watch-log <path>   no window: tail a log file and print one JSON object per\n"
            "                       bridge event (JSON Lines). Attaches at the end of an existing\n"

@@ -24,6 +24,10 @@ public:
     // Colour the frame is cleared to before the ImGui draw data; alpha 0 gives a transparent
     // window.
     virtual void setClearColor(std::uint8_t r, std::uint8_t g, std::uint8_t b, std::uint8_t a) = 0;
+    // The next endFrame() also saves the finished frame as a BMP file at `path`, before it is
+    // presented (the smoke test's --screenshot). False until a frame was saved.
+    virtual void captureNextFrame(std::string path) = 0;
+    virtual bool captureSaved() const = 0;
     virtual void shutdown() = 0;
     virtual std::string rendererName() const = 0;
 };

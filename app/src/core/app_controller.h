@@ -136,6 +136,8 @@ public:
     const advisor::SnapshotStore& snapshot() const { return store_; }
     advisor::Notice notice() const { return monitor_.notice(); }
     const advisor::LogSilenceMonitor& monitor() const { return monitor_; }
+    // Options::registry (null = the process-wide one): the window scrubs what it shows with it.
+    const SecretRegistry* registry() const { return options_.registry; }
 
 private:
     // ChatObserver (the session's callbacks)

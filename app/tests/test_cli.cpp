@@ -140,11 +140,15 @@ TEST_CASE("--headless-chat: bad values and misplaced options") {
     CHECK_FALSE(with({"--log-dir", ""}));
     CHECK_FALSE(with({"--smoke"}));
     CHECK_FALSE(with({"--check-api"}));
-    // The options belong to the modes that use them.
-    CHECK_FALSE(parse({"--log", "d.log"}, options, error));
+    // The options belong to the modes that use them (--log, --test-endpoint, --auth and
+    // --log-dir also to the chat window, see below).
     CHECK_FALSE(parse({"--frame", "3"}, options, error));
-    CHECK_FALSE(parse({"--test-endpoint", "http://127.0.0.1:1"}, options, error));
     CHECK_FALSE(parse({"--smoke", "--log-dir", "x"}, options, error));
+    CHECK_FALSE(parse({"--smoke", "--log", "d.log"}, options, error));
+    CHECK_FALSE(
+        parse({"--idle-test", "3", "--test-endpoint", "http://127.0.0.1:1"}, options, error));
+    CHECK_FALSE(parse({"--watch-log", "a.log", "--log", "d.log"}, options, error));
+    CHECK_FALSE(parse({"--max-tokens", "300"}, options, error));
 }
 
 TEST_CASE("test-only timing options are parsed and flagged") {
@@ -273,4 +277,64 @@ TEST_CASE("an unknown positional word is never repeated in the error") {
     const std::string flagLike = "--" + stray;
     CHECK_FALSE(parse({flagLike.c_str()}, options, error));
     CHECK(error.find("FAKE0123") == std::string::npos);
+}
+
+TEST_CASE("the chat window takes --log, --test-endpoint, --auth and --log-dir") {
+    curia::CliOptions options;
+    std::string error;
+    CHECK(parse({}, options, error));
+    CHECK(options.windowMode());
+    CHECK(parse({"--log", "d.log"}, options, error));
+    CHECK(options.windowMode());
+    CHECK((options.logPath == "d.log"));
+    CHECK(parse({"--log", "d.log", "--test-endpoint", "http://127.0.0.1:9", "--auth", "x-api-key",
+                 "--log-dir", "logs"},
+                options, error));
+    CHECK((options.testEndpoint == "http://127.0.0.1:9"));
+    CHECK(options.auth == curia::AuthMode::XApiKey);
+    CHECK((options.appLogDir == "logs"));
+    CHECK_FALSE(parse({"--log"}, options, error));
+    CHECK_FALSE(parse({"--log", ""}, options, error));
+    // The request settings stay with the modes that print what they sent.
+    CHECK_FALSE(parse({"--effort", "low"}, options, error));
+    CHECK_FALSE(parse({"--log", "d.log", "--from-start"}, options, error));
+    CHECK_FALSE(parse({"--log", "d.log", "--frame", "2"}, options, error));
+    // The other modes are no window.
+    CHECK(parse({"--smoke"}, options, error));
+    CHECK_FALSE(options.windowMode());
+    CHECK(parse({"--idle-test", "2"}, options, error));
+    CHECK_FALSE(options.windowMode());
+    CHECK(curia::cliUsage().find("--log <path>") != std::string_view::npos);
+}
+
+TEST_CASE("--screenshot and --window-size belong to --smoke") {
+    curia::CliOptions options;
+    std::string error;
+    CHECK(
+        parse({"--smoke", "--screenshot", "shot.bmp", "--window-size", "380x520"}, options, error));
+    CHECK((options.screenshotPath == "shot.bmp"));
+    CHECK(options.windowWidth == 380);
+    CHECK(options.windowHeight == 520);
+    CHECK(parse({"--smoke", "--window-size", "1200X900"}, options, error));
+    CHECK(options.windowWidth == 1200);
+    CHECK(options.windowHeight == 900);
+    CHECK(parse({"--smoke"}, options, error));
+    CHECK(options.screenshotPath.empty());
+    CHECK(options.windowWidth == 0);
+    // Bad sizes.
+    for (const char* bad : {"380", "x520", "380x", "380x520x2", "100x520", "380x99999", "axb",
+                            "-380x520", "380 x 520"}) {
+        CAPTURE(bad);
+        CHECK_FALSE(parse({"--smoke", "--window-size", bad}, options, error));
+        CHECK(error.find("--window-size") != std::string::npos);
+    }
+    CHECK_FALSE(parse({"--smoke", "--window-size"}, options, error));
+    CHECK_FALSE(parse({"--smoke", "--screenshot"}, options, error));
+    // Anywhere else: a usage error (exit 2).
+    CHECK_FALSE(parse({"--screenshot", "shot.bmp"}, options, error));
+    CHECK(error.find("--smoke") != std::string::npos);
+    CHECK_FALSE(parse({"--window-size", "380x520"}, options, error));
+    CHECK_FALSE(parse({"--idle-test", "3", "--screenshot", "shot.bmp"}, options, error));
+    CHECK_FALSE(
+        parse({"--headless-chat", "--log", "d.log", "--window-size", "380x520"}, options, error));
 }

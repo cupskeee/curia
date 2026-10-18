@@ -24,3 +24,9 @@ trim_trailing_whitespace = false
 [mod/**.{txt,yml}]
 indent_style = tab
 charset = utf-8-bom
+
+# The bundled font's licence is kept byte for byte as SIL ships it (app/resources/fonts/README.md).
+[app/resources/fonts/OFL.txt]
+end_of_line = crlf
+insert_final_newline = unset
+trim_trailing_whitespace = false

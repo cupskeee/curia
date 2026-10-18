@@ -11,3 +11,6 @@
 app/fuzz/corpus_sse/* binary
 # Synthetic SSE fixtures hold CR bytes (the crlf stream) that line-ending conversion must not touch.
 tests/fixtures/anthropic/*.sse binary
+# The bundled font's licence, kept byte for byte as SIL ships it (CRLF line endings; its sha256 is in
+# app/resources/fonts/README.md).
+app/resources/fonts/OFL.txt binary

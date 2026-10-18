@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
 #include <memory>
 #include <string>
 #include <utility>
@@ -45,12 +46,16 @@ public:
 // report stale for a file that another process is still writing.
 class FileSource final : public IFileSource {
 public:
+    // A path from the command line.
     explicit FileSource(std::string path) : path_(std::move(path)) {}
+    // A path as the OS spells it (a folder from the platform layer): never narrowed to a byte
+    // string, so that on Windows a user folder with characters outside the ANSI code page works.
+    explicit FileSource(std::filesystem::path path) : path_(std::move(path)) {}
     Stat stat() override;
     bool read(std::uint64_t offset, std::size_t maxBytes, std::string& out) override;
 
 private:
-    std::string path_;
+    std::filesystem::path path_;
 };
 
 // Something worth telling the app's log about; none of these is an error of the bridge.

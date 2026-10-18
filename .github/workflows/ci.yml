@@ -189,11 +189,11 @@ jobs:
           ASAN_OPTIONS: detect_leaks=1
           UBSAN_OPTIONS: print_stacktrace=1
         run: ctest --preset linux-x64-sanitize
-      - name: clang-tidy (core, net, providers, Linux platform, tests)
+      - name: clang-tidy (core, net, providers, chat view model, Linux platform, tests)
         run: |
           # The macOS-only probe tests (test_probe_*) are not part of this configuration.
           # One clang-tidy per file, one file per core (xargs exits non-zero if any invocation does).
-          find app/src/advisor app/src/bridge app/src/core app/src/net app/src/providers app/src/platform/linux app/tests app/fuzz -name '*.cpp' -not -name 'test_probe_*' -print0 |
+          find app/src/advisor app/src/bridge app/src/chatview app/src/core app/src/net app/src/providers app/src/platform/linux app/tests app/fuzz -name '*.cpp' -not -name 'test_probe_*' -print0 |
             xargs -0 -n1 -P "$(nproc)" clang-tidy-18 -p build/linux-x64-sanitize --quiet
 
   fuzz-smoke:
