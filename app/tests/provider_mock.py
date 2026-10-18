@@ -548,7 +548,15 @@ class ProviderMockTest(unittest.TestCase):
                 self.assertEqual(run.returncode, 1)
                 self.assertEqual(run.error["code"], "Network")
                 self.assertTrue(run.error["retryable"])
-                expected = "".join("Test token %d." % n for n in range(1, tokens + 1))
+                sent = ["Test token %d." % n for n in range(1, tokens + 1)]
+                expected = "".join(sent)
+                if name == "reset_midstream" and sys.platform == "win32":
+                    # Windows drops received data the client has not read yet when a reset
+                    # arrives, so fewer tokens may get through (2 of 3 in one CI run). Linux
+                    # and macOS hand out the queued data first. Whatever arrived must be whole
+                    # tokens, and it is the partial text the error reports.
+                    self.assertIn(run.text, ["".join(sent[:n]) for n in range(len(sent) + 1)])
+                    expected = run.text
                 self.assertEqual(run.text, expected)
                 self.assertEqual(run.error["partial_len"], len(expected))
                 self.assertEqual(run.error["partial_text"], expected)
