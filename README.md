@@ -111,8 +111,12 @@ export VCPKG_ROOT=/path/to/vcpkg          # Windows: set VCPKG_ROOT=C:\path\to\v
 
 cmake --preset macos-arm64                # or macos-x64, linux-x64, windows-x64
 cmake --build --preset macos-arm64
-ctest --preset macos-arm64                # opens a small window for a few seconds
+ctest --preset macos-arm64                # the tests that open no window
 ```
+
+The tests that open a window (the smoke and idle tests) are opt-in, because a window can take
+the keyboard while they run: configure with `-DCURIA_GUI_TESTS=ON` to add them, and do not type
+or move the mouse while they run (CI runs them).
 
 To see the chat window without the game or a key, `curia --smoke --screenshot shot.bmp`
 draws a canned conversation and saves the last frame. To try it with the mock server and a
@@ -171,12 +175,15 @@ in `/`, so give absolute paths (after `--args` as well), and its error messages 
 `--stderr` file. If Curia is already running, `open` starts no second copy: quit it first (from
 the menu-bar icon, or `kill` its process). The app log (`~/Library/Logs/Curia/curia.log`) has a
 line `dev_config key=set|unset|unusable model=...` that says which variables arrived, never a
-value. How the M4 test sittings start Curia is settled with their session sheet.
+value. The M4 test sittings start it this way, as `open -g -n …/Curia.app` with the variables
+exported and no `--env` (owner decision D24: macOS then treats Curia as the app, so any
+permission prompt would be Curia's, not the terminal's); quit a running copy first, since `-n`
+starts a second one.
 
 The first configure downloads and builds the dependencies through vcpkg's manifest
-mode, which takes a while. The tests need a display (on headless Linux use
-`xvfb-run -a ctest --preset linux-x64`), and the idle test fails if you move the mouse
-over its window. Only Release and RelWithDebInfo builds are supported (the vcpkg
+mode, which takes a while. The window tests (`-DCURIA_GUI_TESTS=ON`) need a display (on
+headless Linux use `xvfb-run -a ctest --preset linux-x64`), and the idle test fails if you
+move the mouse over its window. Only Release and RelWithDebInfo builds are supported (the vcpkg
 triplets are release-only). The Ubuntu package list and more detail are in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 

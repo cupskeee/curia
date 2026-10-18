@@ -15,8 +15,8 @@ at `0.y.z` and anything may change between minor versions.
   questions and read the answers as they arrive. It shows the date of what the advisor can see
   (before the first update from the game, what to do in the middle of the window), notices (the
   last update could not be read, the mod and app versions differ, no update from the game, CK3's
-  folder not found; each as tall as its text), a reminder to press Space to pause before
-  asking, a "thinking..." state until the first word and a pulsing dot while the answer
+  folder not found; each as tall as its text), a reminder to pause the game (Space) before
+  clicking Advisor, a "thinking..." state until the first word and a pulsing dot while the answer
   arrives, **bold** in answers (other markdown is removed; numbered lines stay as written), Stop
   (also Cmd+. on macOS), Retry after an error and Copy on each answer (also on one that was
   stopped or failed part way). Lines are 1.4 em apart with short gaps between paragraphs, and in a

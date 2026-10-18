@@ -237,28 +237,36 @@ if(CURIA_BUILD_APP)
     add_test(NAME https_smoke_default_ca COMMAND curia_https_smoke --default-ca)
     set_tests_properties(https_smoke_default_ca PROPERTIES LABELS netinfo TIMEOUT 60)
 
-    # Smoke test: the chat window with a canned conversation and a scripted answer (no network, no
-    # key, no game), the bundled font checked for every character shown, the last frame saved as a
-    # BMP file; then exit (software renderer, no GPU needed). Pass/fail is the process exit code.
-    add_test(NAME app_smoke COMMAND curia --smoke --screenshot ${CMAKE_CURRENT_BINARY_DIR}/app_smoke.bmp)
-    set_tests_properties(app_smoke PROPERTIES LABELS smoke TIMEOUT 60)
-    # The same window with its notices over the conversation, and before anything came from the
-    # game (--smoke-scene): the layouts the screenshots of a UI change are taken from.
-    add_test(NAME app_smoke_notices COMMAND curia --smoke --smoke-scene notices)
-    add_test(NAME app_smoke_start COMMAND curia --smoke --smoke-scene start)
-    set_tests_properties(app_smoke_notices app_smoke_start PROPERTIES LABELS smoke TIMEOUT 60)
+    # The tests that open a window (CURIA_GUI_TESTS, off unless asked for; CI turns it on). A
+    # window can become the active one and take the keyboard while the test runs, so they never run
+    # on a machine where someone is typing unless that person starts them (owner decision
+    # 2026-10-18). Configure with -DCURIA_GUI_TESTS=ON to run them, and do not type or move the
+    # mouse while they run.
+    if(CURIA_GUI_TESTS)
+        # Smoke test: the chat window with a canned conversation and a scripted answer (no
+        # network, no key, no game), the bundled font checked for every character shown, the last
+        # frame saved as a BMP file; then exit (software renderer, no GPU needed). Pass/fail is the
+        # process exit code.
+        add_test(NAME app_smoke COMMAND curia --smoke --screenshot ${CMAKE_CURRENT_BINARY_DIR}/app_smoke.bmp)
+        set_tests_properties(app_smoke PROPERTIES LABELS smoke TIMEOUT 60)
+        # The same window with its notices over the conversation, and before anything came from
+        # the game (--smoke-scene): the layouts the screenshots of a UI change are taken from.
+        add_test(NAME app_smoke_notices COMMAND curia --smoke --smoke-scene notices)
+        add_test(NAME app_smoke_start COMMAND curia --smoke --smoke-scene start)
+        set_tests_properties(app_smoke_notices app_smoke_start PROPERTIES LABELS smoke TIMEOUT 60)
 
-    # Idle test: the event loop must not draw frames while nothing happens (needs a display; the
-    # software renderer avoids needing a GPU). Do not move the mouse over the window while it runs.
-    add_test(NAME app_idle COMMAND curia --idle-test 5)
-    set_tests_properties(app_idle PROPERTIES LABELS idle TIMEOUT 90
-                         ENVIRONMENT "SDL_RENDER_DRIVER=software")
+        # Idle test: the event loop must not draw frames while nothing happens (needs a display;
+        # the software renderer avoids needing a GPU). Do not move the mouse over the window while
+        # it runs.
+        add_test(NAME app_idle COMMAND curia --idle-test 5)
+        set_tests_properties(app_idle PROPERTIES LABELS idle TIMEOUT 90
+                             ENVIRONMENT "SDL_RENDER_DRIVER=software")
+    endif()
 
-    if(APPLE)
+    if(APPLE AND CURIA_GUI_TESTS)
         # The same canned conversation in the overlay panel (the macOS recipe of M2: a wrapped
         # non-activating NSPanel at the screen-saver level). It asks for no keys itself, but the
-        # launch can make it the active app with the panel key: do not type while it runs (as
-        # with app_idle).
+        # launch can make it the active app with the panel key.
         add_test(NAME app_smoke_overlay
                  COMMAND curia --smoke --overlay --screenshot ${CMAKE_CURRENT_BINARY_DIR}/app_smoke_overlay.bmp)
         set_tests_properties(app_smoke_overlay PROPERTIES LABELS smoke TIMEOUT 60)
@@ -266,6 +274,9 @@ if(CURIA_BUILD_APP)
         add_test(NAME app_idle_overlay COMMAND curia --idle-test 5 --overlay)
         set_tests_properties(app_idle_overlay PROPERTIES LABELS idle TIMEOUT 90
                              ENVIRONMENT "SDL_RENDER_DRIVER=software")
+    endif()
+
+    if(APPLE)
         # The hot key's handler and its static storage, without a window and without taking the
         # key: a synthetic press after the installing function returned must reach the SDL queue
         # once, and nothing after the handler is removed (the M2 probe once crashed on a callback

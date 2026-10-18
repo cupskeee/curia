@@ -128,7 +128,8 @@ jobs:
       - name: Configure
         id: configure
         shell: bash
-        run: cmake --preset ${{ matrix.preset }} -DCURIA_WARNINGS_AS_ERRORS=ON -DCURIA_REQUIRE_PYTHON=ON
+        # CURIA_GUI_TESTS: the tests that open a window are opt-in; CI runs them (nobody types here).
+        run: cmake --preset ${{ matrix.preset }} -DCURIA_WARNINGS_AS_ERRORS=ON -DCURIA_REQUIRE_PYTHON=ON -DCURIA_GUI_TESTS=ON
       - name: Build
         shell: bash
         run: cmake --build --preset ${{ matrix.preset }}

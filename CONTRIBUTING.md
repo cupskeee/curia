@@ -83,13 +83,15 @@ Presets are named per platform: `macos-arm64`, `macos-x64`, `linux-x64`,
 ```sh
 cmake --preset macos-arm64
 cmake --build --preset macos-arm64
-ctest --preset macos-arm64            # unit, smoke and idle tests
+ctest --preset macos-arm64            # unit and end-to-end tests (no window)
 ctest --preset macos-arm64-network    # one HTTPS handshake to a public host (no key sent)
 ```
 
-The smoke and idle tests open a small window, so run `ctest` in a graphical session (on
-headless Linux: `xvfb-run -a ctest --preset linux-x64`) and do not move the mouse over
-the window while `app_idle` runs. Unit tests use [doctest](https://github.com/doctest/doctest). Add a test with every
+The smoke and idle tests open a small window, which can become the active one and take the
+keyboard while they run, so they are opt-in: configure with `-DCURIA_GUI_TESTS=ON` to register
+them (CI does). Run them only on a machine where nobody is typing, in a graphical session (on
+headless Linux: `xvfb-run -a ctest --preset linux-x64`), and do not move the mouse over the
+window while `app_idle` runs. Unit tests use [doctest](https://github.com/doctest/doctest). Add a test with every
 behaviour change. Parsing code takes untrusted text, so keep it a pure function that
 can be fuzzed.
 
