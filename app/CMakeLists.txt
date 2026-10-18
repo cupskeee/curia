@@ -52,6 +52,7 @@ add_library(curia_core STATIC
     src/bridge/text_hygiene.cpp
     src/chatview/answer_text.cpp
     src/chatview/canned_conversation.cpp
+    src/chatview/font_metrics.cpp
     src/chatview/log_path.cpp
     src/chatview/text_layout.cpp
     src/chatview/utf8.cpp
@@ -270,6 +271,7 @@ if(CURIA_BUILD_TESTS)
         tests/test_bridge_splitter.cpp
         tests/test_build_info.cpp
         tests/test_chatview_answer.cpp
+        tests/test_chatview_font_metrics.cpp
         tests/test_chatview_layout.cpp
         tests/test_chatview_model.cpp
         tests/test_chatview_text.cpp

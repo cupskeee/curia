@@ -93,6 +93,9 @@ int runSmoke(const SmokeContext& context) {
     if (!context.fonts.bundled) {
         return fail("font=default (the bundled font did not load)");
     }
+    if (!context.fonts.metricsRead) {
+        return fail("font_metrics=unread (the bundled face's size per em is unknown)");
+    }
 
     SdlWake wake(context.wakeEvent);
     AppController::Options options;

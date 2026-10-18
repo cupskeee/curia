@@ -42,6 +42,13 @@ Measured with fontTools on the two files:
 - the bullet U+2022 the chat view uses for list lines;
 - no CJK, Arabic or other scripts.
 
+Known limit (owner, 2026-10-18, backlog): a question or answer in Chinese, Japanese or Korean cannot be shown
+with this face. The plan is a fallback to a system font for the characters it lacks.
+
+The chat window sizes the letters by their em (`app/src/ui/theme.h`): the face's `hhea` ascender and descender
+(2250 and -750 of 2048 units) span 1.46 em, and ImGui fills the size it is given with that span, so the app reads
+the span from the file (`app/src/chatview/font_metrics.h`) and passes the size that gives the em it wants.
+
 `curia --smoke` checks every character of its canned conversation (names with diacritics, a name in Cyrillic,
 the bullet) and of the window's own texts against both faces and fails if one is missing.
 

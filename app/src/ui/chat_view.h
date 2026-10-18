@@ -51,7 +51,13 @@ public:
 private:
     float measure(std::string_view text, bool bold) const;
     chatview::TextLayout layout(const chatview::AnswerText& text, float width) const;
+    // The em of the text in pixels (the font size ImGui works with is larger: ui/theme.h).
+    float em() const;
+    // The distance from one line of text to the next.
     float lineHeight() const;
+    // How much height a laid-out line takes: a line of text, or a blank line of the text (a
+    // paragraph gap, shorter).
+    float rowHeight(const chatview::LayoutLine& line) const;
     float blockHeight(const chatview::TextLayout& layout) const;
     // Draws a laid-out text with its top left corner at `origin`; bold segments in `boldColor`.
     void drawText(const chatview::TextLayout& layout, ImVec2 origin, ImU32 color,
@@ -62,14 +68,12 @@ private:
     // A notice: text in a filled, rounded box across `width`; a warning has a bar in the accent
     // colour on its left edge (an information has none).
     void drawBox(const std::string& text, float width, Rgb background, bool warning) const;
-    float boxHeight(const std::string& text, float width, bool warning) const;
     // A small dot that slowly brightens and fades (the thinking and arriving states): the frames
     // come from the spinner timeout of core/ui_pacing.h, nothing loops.
     void drawPulse(ImVec2 centre) const;
 
-    // The status line and the notices; topHeight() is what they take.
+    // The status line and the notices, each as tall as its text needs.
     void drawTop(const chatview::ChatView& view, float width);
-    float topHeight(const chatview::ChatView& view, float width) const;
     void drawConversation(const chatview::ChatView& view, float height, ChatActions& actions);
     void drawEmptyState(const std::string& text, float height);
     void drawQuestion(const chatview::ViewItem& item);

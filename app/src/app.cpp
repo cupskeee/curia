@@ -406,7 +406,7 @@ int runApp(const CliOptions& options) {
         uiScale = 1.0F;
     }
     const ui::FontSet fonts = ui::loadFonts();
-    ui::applyTheme(uiScale);
+    ui::applyTheme(uiScale, fonts);
 
     auto backend = ui::createSdlRendererBackend();
     if (!backend->init(window)) {
