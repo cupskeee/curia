@@ -794,6 +794,41 @@ class ChatChainTest(ChatCase):
         time.sleep(0.3)
         self.assertEqual(decoy.count(), 0, "the redirect target received a connection")
 
+    def test_the_app_log_has_the_numbers_of_the_session_sheet(self) -> None:
+        # What tools/m4/analyze_applog.py reads (docs/spikes/m4-session-sheet.md): the reading's
+        # date and treasury, the reading an ask was made on, the request's connection, and the byte
+        # counts at the end of the run. Numbers and fixed words only.
+        mock = self.start_mock()
+        fake = self.new_fake(gold=4321, income_tenths=-17, year=1071, month=11, day=14)
+        fake.append_frame(snap=1)
+        child = self.start_curia(mock, fake.log_path, fake_key(), args=["--from-start"])
+        child.wait_kind("ready")
+        child.send("ask hello")
+        child.wait_kind("done")
+        child.close_stdin()
+        self.assertEqual(child.wait_exit(), 0)
+        applog = (self.root / ("applog%d" % self.runs) / "curia.log").read_text(encoding="utf-8")
+        frame = [line for line in applog.splitlines() if " frame_complete " in line]
+        self.assertEqual(len(frame), 1, applog)
+        for field in ("reading=1", "game_date=1071-11-14", "gold=4321", "income_tenths=-17"):
+            self.assertIn(" " + field, frame[0])
+        started = [line for line in applog.splitlines() if " ask_started " in line]
+        self.assertEqual(len(started), 1, applog)
+        self.assertIn(" reading=1", started[0])
+        net = [line for line in applog.splitlines() if " net_done " in line]
+        self.assertEqual(len(net), 1, applog)
+        for field in ("outcome=finished", "http=1.1", "connects=1", "conn=released"):
+            self.assertIn(" " + field, net[0])
+        exits = [line for line in applog.splitlines() if " log_bytes " in line and " why=exit" in line]
+        self.assertEqual(len(exits), 1, applog)
+        size = os.path.getsize(fake.log_path)
+        self.assertIn(" read=%d " % size, exits[0] + " ")
+        self.assertIn(" truncations=0", exits[0])
+        self.assert_absent("Test Heir", applog, "the app log")
+        self.assert_absent("Test Ruler", applog, "the app log")
+        # No field is lost to the redaction, so a "[redacted]" in a real app log means something.
+        self.assert_absent("[redacted]", applog, "the app log")
+
 
 class CheckApiTest(ChatCase):
     """`curia --check-api` against the mock (the only place it runs in CI; never the real service)."""

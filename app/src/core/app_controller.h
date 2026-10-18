@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -73,10 +74,16 @@ public:
 // from the DevConfig, which names the missing variables and never a value). onUserAsk() then
 // returns AskOutcome::NoProvider and starts nothing.
 //
-// The app log gets numbers and short words only: sizes, counts, timings, usage, state names. Never
-// a prompt, an answer, a name or an error body.
+// The app log gets numbers and short words only: sizes, counts, timings, usage, state names, the
+// number, game date (game_date=YYYY-MM-DD) and treasury figures (gold, income_tenths) of a
+// reading (frame_complete, and ask_started's reading=), and the log watcher's byte counts
+// (log_bytes). Never a prompt, an answer, a name or an error body. tools/m4/analyze_applog.py
+// reads these lines: add fields rather than rename them.
 class AppController final : private advisor::ChatObserver {
 public:
+    // How often onTick() writes the log watcher's byte counts while they change (log_bytes).
+    static constexpr std::chrono::seconds kByteCountInterval{60};
+
     struct Options {
         // Empty = steadyNow.
         ClockFn clock;
@@ -128,8 +135,15 @@ public:
     advisor::AskOutcome onRetry();
     void onStop();
     void onOverlayOpened(OverlaySource source);
+    // The log-silence monitor's tick; also writes log_bytes (why=minute) when the byte counts
+    // changed and kByteCountInterval has passed since the last such line.
     void onTick(TimePoint now);
     void onCk3Running(bool running);
+    // At exit, after the log watcher stopped: writes log_bytes (why=exit) once, with the newest of
+    // `latest` (LogWatcher::stats(), which may be ahead of the last progress message the mailbox
+    // delivered) and what the controller has seen. Also when nothing was read: the line marks the
+    // end of the run for the analysis of the app log.
+    void logByteCountsAtExit(const std::optional<bridge::TailerStats>& latest);
 
     // --- state for drawing -----------------------------------------------------------------
     const advisor::ChatSession& session() const { return session_; }
@@ -152,6 +166,7 @@ private:
     void handleUnsupported(const bridge::UnsupportedFormat& unsupported);
     void handleLogNotice(bridge::TailerNotice notice);
     void refreshNotice();
+    void logByteCounts(std::string_view why);
     SnapshotInfo makeInfo(const advisor::SnapshotStore::Update& update) const;
     void log(AppLog::Level level, std::string_view event,
              std::initializer_list<AppLog::Field> fields = {}) const;
@@ -169,6 +184,10 @@ private:
     advisor::Notice lastNotice_ = advisor::Notice::None;
     std::uint64_t lastTotalBytes_ = 0;
     std::uint64_t lastDropped_ = 0;
+    // The newest byte counts of the log watcher, and the lifetime count of the last log_bytes line.
+    bridge::TailerStats latestStats_;
+    std::uint64_t loggedLifetimeBytes_ = 0;
+    std::optional<TimePoint> lastByteCountAt_;
 };
 
 }  // namespace curia

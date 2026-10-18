@@ -84,6 +84,10 @@ struct TailerStats {
     // Bytes of Curia lines among them (BridgePipeline::curiaLineBytes), reset with the above.
     std::uint64_t curiaBytes = 0;
     std::uint64_t truncations = 0;
+    // The same two counts since the tailer was created, never reset (a truncation does not lose
+    // what was read before it): the bytes-per-hour figures of the app log (log_bytes).
+    std::uint64_t lifetimeBytes = 0;
+    std::uint64_t lifetimeCuriaBytes = 0;
 };
 
 struct PollResult {
@@ -142,6 +146,8 @@ private:
     std::uint64_t totalBytes_ = 0;
     std::uint64_t curiaBytes_ = 0;
     std::uint64_t truncations_ = 0;
+    std::uint64_t lifetimeBytes_ = 0;
+    std::uint64_t lifetimeCuriaBytes_ = 0;
 };
 
 }  // namespace curia::bridge

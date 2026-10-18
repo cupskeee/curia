@@ -385,10 +385,13 @@ int runEventLoop(Loop& loop) {
             loop.controller.pump();
         }
         if (tick) {
-            loop.controller.onTick(steadyNow());
+            // The poll first: a CK3 start or quit seen on this tick is logged (ck3_running) before
+            // the byte counts the controller's tick may write (log_bytes), so the analysis of the
+            // app log counts the bytes of a launch with the stretch in which CK3 ran.
             if (loop.poll != nullptr) {
                 loop.poll->onTick(loop.controller, loop.log);
             }
+            loop.controller.onTick(steadyNow());
         }
         if (settle && loop.overlay.settle()) {
             requestSettle(loop);  // it asked another app to take the keys: log how that went
@@ -569,6 +572,13 @@ int runWindow(const CliOptions& options, WindowSetup& setup, ui::Overlay& overla
         watcher->stop();
     }
     controller->onStop();
+    if (!idleMode) {
+        // The last byte counts, and the end of this run, for the bytes per hour (log_bytes). The
+        // net_done of a request stopped just above may still follow (the net thread ends it).
+        controller->logByteCountsAtExit(watcher != nullptr
+                                            ? std::optional<bridge::TailerStats>(watcher->stats())
+                                            : std::nullopt);
+    }
     hotKey.reset();
     tray.reset();
     wake.disarm();

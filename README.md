@@ -178,7 +178,8 @@ line `dev_config key=set|unset|unusable model=...` that says which variables arr
 value. The M4 test sittings start it this way, as `open -g -n …/Curia.app` with the variables
 exported and no `--env` (owner decision D24: macOS then treats Curia as the app, so any
 permission prompt would be Curia's, not the terminal's); quit a running copy first, since `-n`
-starts a second one.
+starts a second one. The sittings' steps, and the two tools that read the app log and look for the
+key afterwards, are in [docs/spikes/m4-session-sheet.md](docs/spikes/m4-session-sheet.md).
 
 The first configure downloads and builds the dependencies through vcpkg's manifest
 mode, which takes a while. The window tests (`-DCURIA_GUI_TESTS=ON`) need a display (on

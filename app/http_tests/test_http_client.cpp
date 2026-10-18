@@ -17,6 +17,7 @@
 using namespace std::chrono_literals;
 using curia::SecretString;
 using curia::http::ClientOptions;
+using curia::http::ConnectionEnd;
 using curia::http::End;
 using curia::http::Header;
 using curia::http::HttpClient;
@@ -193,6 +194,21 @@ TEST_CASE("http-client: the timeouts come from the options") {
     CHECK(plan.connectTimeoutMs == 10 * 60 * 1000);
 }
 
+TEST_CASE("http-client: the connection and HTTP version words of the app log") {
+    using curia::http::httpVersionWord;
+    using curia::http::toString;
+    CHECK(std::string(toString(ConnectionEnd::None)) == "none");
+    CHECK(std::string(toString(ConnectionEnd::Closed)) == "closed");
+    CHECK(std::string(toString(ConnectionEnd::StreamReset)) == "stream_reset");
+    CHECK(std::string(toString(ConnectionEnd::Released)) == "released");
+    CHECK(std::string(httpVersionWord(0)) == "none");
+    CHECK(std::string(httpVersionWord(1)) == "1.0");  // CURL_HTTP_VERSION_1_0
+    CHECK(std::string(httpVersionWord(2)) == "1.1");
+    CHECK(std::string(httpVersionWord(3)) == "2");
+    CHECK(std::string(httpVersionWord(30)) == "3");
+    CHECK(std::string(httpVersionWord(99)) == "none");
+}
+
 // --- the client: lifecycle without a server
 // ------------------------------------------------------------
 
@@ -218,6 +234,8 @@ TEST_CASE("http-client: a request cancelled before it starts sends nothing") {
     CHECK(result.curlCode == 0);
     CHECK(result.bytesOut == 0);
     CHECK(result.timings.connectMs == -1);
+    CHECK((result.connection == ConnectionEnd::None));
+    CHECK(result.newConnections == 0);
     CHECK_FALSE(dataSeen);
 }
 
@@ -281,6 +299,10 @@ TEST_CASE("http-client: a refused connection is a finished transfer with a curl 
     CHECK(result.curlCode != 0);
     CHECK(result.httpStatus == 0);
     CHECK(result.bytesIn == 0);
+    // libcurl ended it by itself: what became of the socket is libcurl's call.
+    CHECK((result.connection == ConnectionEnd::Released));
+    CHECK(result.httpVersion == 0);
+    CHECK(std::string(curia::http::httpVersionWord(result.httpVersion)) == "none");
 }
 
 TEST_CASE("http-client: post runs a task on the net thread, in order") {
@@ -314,7 +336,9 @@ TEST_CASE(
     }
     // The destructor joined the net thread, so the completion has already run.
     REQUIRE(ready(future, 0ms));
-    CHECK((future.get().end == End::Shutdown));
+    const Result result = future.get();
+    CHECK((result.end == End::Shutdown));
+    CHECK((result.connection == ConnectionEnd::Closed));
     CHECK(completions.load() == 1);
     CHECK(server.waitPeerClosed(5s));
 }
@@ -331,7 +355,12 @@ TEST_CASE("http-client: cancelling a request in flight closes the socket") {
     REQUIRE(server.waitAccepted(5s));
     token.cancel();
     REQUIRE(ready(future, 5s));
-    CHECK((future.get().end == End::Cancelled));
+    const Result result = future.get();
+    CHECK((result.end == End::Cancelled));
+    // What the app log's net_done says (conn=closed), and what the server sees.
+    CHECK((result.connection == ConnectionEnd::Closed));
+    CHECK(std::string(curia::http::toString(result.connection)) == "closed");
+    CHECK(result.newConnections == 1);
     CHECK(server.waitPeerClosed(5s));
 }
 
@@ -351,6 +380,7 @@ TEST_CASE("http-client: the stall guard drops a connection that stays silent, on
     CHECK((result.end == End::Finished));
     CHECK(result.curlCode == 28);  // CURLE_OPERATION_TIMEDOUT
     CHECK(result.stalled);
+    CHECK((result.connection == ConnectionEnd::Closed));
     // The client's own clock: the configured second, not libcurl's averaging window on top.
     CHECK(took >= 900ms);
     CHECK(took < 2500ms);

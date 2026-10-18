@@ -57,6 +57,10 @@ at `0.y.z` and anything may change between minor versions.
   event `thinking` comes once per answer, before its first word.
 - The quality table (`tools/m4/quality_table.py`) has the columns Run (the file's label), Setting
   and Words, and its summary gives the median times and words per run label and setting.
+- Tools for the M4 game sittings (`docs/spikes/m4-session-sheet.md`): `tools/m4/analyze_applog.py`
+  turns the app log into tables of numbers (readings, questions, cache, stops, bytes per hour of the
+  game's log, the overlay's evidence, a key check), and `tools/m4/grep_key.py` looks for the API key
+  in the files and folders given, printing only file names and counts.
 - Headless modes of the `curia` executable (no window): `--headless-chat` reads the game's log, keeps
   the newest snapshot (or `--frame <snap>`) and answers questions typed on stdin, printing one JSON
   object per event; `--check-api [--cache-probe]` is the connection check for the owner (key, model,

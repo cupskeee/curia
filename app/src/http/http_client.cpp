@@ -107,6 +107,35 @@ struct WakeHandle {
 
 }  // namespace
 
+const char* toString(ConnectionEnd end) noexcept {
+    switch (end) {
+    case ConnectionEnd::None:
+        return "none";
+    case ConnectionEnd::Closed:
+        return "closed";
+    case ConnectionEnd::StreamReset:
+        return "stream_reset";
+    case ConnectionEnd::Released:
+        return "released";
+    }
+    return "none";
+}
+
+const char* httpVersionWord(long version) noexcept {
+    switch (version) {
+    case CURL_HTTP_VERSION_1_0:
+        return "1.0";
+    case CURL_HTTP_VERSION_1_1:
+        return "1.1";
+    case CURL_HTTP_VERSION_2_0:
+        return "2";
+    case CURL_HTTP_VERSION_3:
+        return "3";
+    default:
+        return "none";
+    }
+}
+
 Header Header::plain(std::string name, std::string value) {
     Header header;
     header.name = std::move(name);
@@ -645,6 +674,24 @@ void HttpClient::Impl::finish(Transfer* raw, End end, CURLcode code) {
     }
 
     if (easy != nullptr) {
+        // Premature in libcurl's sense: the client removed the transfer before libcurl had
+        // completed it (a cancel, the destructor, the stall guard), or libcurl stopped it because
+        // a callback asked it to (multi_done counts a read, write or callback abort as premature).
+        const bool premature = end != End::Finished || raw->stalled || code == CURLE_WRITE_ERROR ||
+                               code == CURLE_READ_ERROR || code == CURLE_ABORTED_BY_CALLBACK;
+        long httpVersion = 0;
+        curl_easy_getinfo(easy, CURLINFO_HTTP_VERSION, &httpVersion);
+        long newConnections = 0;
+        curl_easy_getinfo(easy, CURLINFO_NUM_CONNECTS, &newConnections);
+        result.httpVersion = httpVersion;
+        result.newConnections = newConnections;
+        const bool multiplexed =
+            httpVersion == CURL_HTTP_VERSION_2_0 || httpVersion == CURL_HTTP_VERSION_3;
+        if (!premature) {
+            result.connection = ConnectionEnd::Released;
+        } else {
+            result.connection = multiplexed ? ConnectionEnd::StreamReset : ConnectionEnd::Closed;
+        }
         long status = 0;
         curl_easy_getinfo(easy, CURLINFO_RESPONSE_CODE, &status);
         curl_off_t connectMicros = 0;
