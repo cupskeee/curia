@@ -137,7 +137,8 @@ conflicting `Content-Length`, a bad chunk size or chunk data not followed by CRL
 `t_headers_done`, `t_close` (seconds since the server started), `client_closed_early`,
 `events_sent`, `violations`, `response_status`, `cache`, `expect_100_sent`, and the request's
 optional settings `thinking_type` (`thinking.type`) and `effort` (`output_config.effort`), each a
-string or null.
+string or null (Curia without flags sends `effort` `low` and no thinking setting, D22; with
+`--effort default` and no `--thinking`, both are null).
 
 `violations` lists the broken rules of the request contract Curia's client must keep:
 `wrong_method`, `wrong_path`, `missing_anthropic_version`, `missing_content_type`,

@@ -160,6 +160,10 @@ TEST_CASE("controller: frame in, overlay opens, ask, streamed answer, the data i
     CHECK(contains(request.snapshotText, "Heir: \"Test Heir Two\""));
     CHECK(contains(request.snapshotText, "15 September 1066"));
     CHECK((request.conversation.back().text == "Is my heir safe?"));
+    // Curia's default settings (D22): effort low, no thinking setting.
+    CHECK((request.effort == providers::kDefaultEffort));
+    CHECK((request.effort == providers::Effort::Low));
+    CHECK((request.thinking == providers::Thinking::Default));
 
     CHECK(rig.controller.pump() >= 1);
     CHECK((rig.controller.session().state() == ChatState::Done));
@@ -604,6 +608,7 @@ TEST_CASE("controller: the app log holds numbers and words, never text") {
     CHECK(contains(log, "code=Auth"));
     CHECK(contains(log, "status=401"));
     CHECK(contains(log, "persona_version="));
+    CHECK(contains(log, "effort=low"));
     CHECK(contains(log, "frame_complete"));
     // One terminal line per ask.
     CHECK(count(log, "ask_done") + count(log, "ask_error") + count(log, "ask_cancelled") == 2);

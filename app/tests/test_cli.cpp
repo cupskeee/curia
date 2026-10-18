@@ -190,9 +190,28 @@ TEST_CASE("--effort and --thinking, with --headless-chat and with --check-api") 
     using curia::providers::Thinking;
     curia::CliOptions options;
     std::string error;
+    // No flag: Curia's default effort (D22) and no thinking setting.
     CHECK(parse({"--headless-chat", "--log", "d.log"}, options, error));
-    CHECK((options.effort == Effort::Default));
+    CHECK((options.effort == curia::providers::kDefaultEffort));
+    CHECK((options.effort == Effort::Low));
     CHECK((options.thinking == Thinking::Default));
+    CHECK_FALSE(options.effortGiven);
+    CHECK_FALSE(options.thinkingGiven);
+    CHECK(parse({"--check-api"}, options, error));
+    CHECK((options.effort == Effort::Low));
+    CHECK_FALSE(options.effortGiven);
+    // --effort default sends none (the model's own default, what rounds 1 and 2 called default).
+    CHECK(parse({"--headless-chat", "--log", "d.log", "--effort", "default"}, options, error));
+    CHECK((options.effort == Effort::Default));
+    CHECK(options.effortGiven);
+    CHECK(parse({"--check-api", "--effort", "default", "--thinking", "disabled"}, options, error));
+    CHECK((options.effort == Effort::Default));
+    CHECK((options.thinking == Thinking::Disabled));
+    CHECK(options.thinkingGiven);
+    // --effort low is the same value as no flag, but given.
+    CHECK(parse({"--check-api", "--effort", "low"}, options, error));
+    CHECK((options.effort == Effort::Low));
+    CHECK(options.effortGiven);
     CHECK(parse(
         {"--headless-chat", "--log", "d.log", "--effort", "low", "--thinking", "between_tools"},
         options, error));
@@ -213,9 +232,10 @@ TEST_CASE("--effort and --thinking, with --headless-chat and with --check-api") 
 
     // Bad or missing values are usage errors that name the choices.
     CHECK_FALSE(parse({"--check-api", "--effort", "extreme"}, options, error));
-    CHECK(error.find("low, medium, high, xhigh or max") != std::string::npos);
+    CHECK(error.find("default, low, medium, high, xhigh or max") != std::string::npos);
     CHECK_FALSE(parse({"--check-api", "--effort"}, options, error));
-    CHECK_FALSE(parse({"--check-api", "--effort", "default"}, options, error));
+    CHECK_FALSE(parse({"--check-api", "--effort", "Default"}, options, error));
+    CHECK_FALSE(parse({"--check-api", "--thinking", "default"}, options, error));
     CHECK_FALSE(parse({"--check-api", "--thinking", "enabled"}, options, error));
     CHECK(error.find("adaptive, between_tools or disabled") != std::string::npos);
     CHECK_FALSE(parse({"--check-api", "--thinking"}, options, error));
@@ -225,9 +245,21 @@ TEST_CASE("--effort and --thinking, with --headless-chat and with --check-api") 
     CHECK_FALSE(parse({"--thinking", "disabled"}, options, error));
     CHECK_FALSE(parse({"--watch-log", "a.log", "--effort", "low"}, options, error));
     CHECK(error.find("--effort") != std::string::npos);
-    // The usage text names them.
+    // Even the word that sends nothing: the flag was given to a mode that sends no request.
+    CHECK_FALSE(parse({"--watch-log", "a.log", "--effort", "default"}, options, error));
+    CHECK(error.find("--effort") != std::string::npos);
+    CHECK_FALSE(parse({"--effort", "default"}, options, error));
+    CHECK_FALSE(parse({"--smoke", "--effort", "default"}, options, error));
+    // The default value itself is no flag: the other modes are unaffected.
+    CHECK(parse({"--watch-log", "a.log"}, options, error));
+    CHECK(parse({"--version"}, options, error));
+    CHECK(parse({"--smoke"}, options, error));
+    CHECK(parse({}, options, error));
+    // The usage text names them, the default and the word that sends none.
     CHECK(curia::cliUsage().find("--effort <level>") != std::string_view::npos);
     CHECK(curia::cliUsage().find("--thinking <mode>") != std::string_view::npos);
+    CHECK(curia::cliUsage().find("Without it Curia sends low") != std::string_view::npos);
+    CHECK(curia::cliUsage().find("--effort default sends none") != std::string_view::npos);
 }
 
 TEST_CASE("an unknown positional word is never repeated in the error") {

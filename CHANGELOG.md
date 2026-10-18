@@ -11,9 +11,9 @@ at `0.y.z` and anything may change between minor versions.
 
 ### Added
 
-- `--effort low|medium|high|xhigh|max` and `--thinking adaptive|between_tools|disabled` for
-  `--headless-chat` and `--check-api`: sent as the request's effort and thinking settings, and only
-  when given (by default neither is sent). The headless `ready` and `done` events, the transcripts and
+- `--effort default|low|medium|high|xhigh|max` and `--thinking adaptive|between_tools|disabled` for
+  `--headless-chat` and `--check-api`: the request's effort and thinking settings (what is sent
+  without them is under "Changed"). The headless `ready` and `done` events, the transcripts and
   the `CHECK_API_RESULT` line report them; `done` also gives `thinking_started_ms`, and the `status`
   event `thinking` comes once per answer, before its first word.
 - The quality table (`tools/m4/quality_table.py`) has the columns Run (the file's label), Setting
@@ -45,6 +45,19 @@ at `0.y.z` and anything may change between minor versions.
 
 ### Changed
 
+- The advisor asks for effort low and sends no thinking setting unless told otherwise (D22, from the
+  owner's second quality check: the first word after about 1 s instead of about 6 s, about 60% fewer
+  output tokens, rated as good as the default, average 4.4 against 4.6). `--effort default` sends no
+  effort setting, and `--thinking` alone now comes with effort low; the reports say
+  `default` for a setting that is not sent, and `--check-api` says whether the effort it sends is
+  Curia's default or a flag.
+- The advisor's wording after the second quality check (persona version 4): answers under 120 words
+  unless the player asks for more, ending with a one-line offer when more would help; names and
+  titles without quotation marks; "from what I can see" at most once per conversation, never as a
+  fixed opening. The block the model reads about the realm says that the player can see each
+  faction's members in the Factions window, and marks a faction's leader, claimant or target who is
+  not among the listed vassals. `--check-api`'s advice for a refused request speaks only of the kind of
+  setting that was sent.
 - The advisor's wording, after the owner's first quality check (`docs/spikes/m4-quality-results.md`):
   plain words for the player ("from what I can see", never "snapshot" or "export"), about 120 words
   unless the player asks for more, a numbered list and `**bold**` as the only formatting, general CK3

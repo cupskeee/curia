@@ -245,9 +245,18 @@ private:
 struct People {
     std::int32_t rulerId = 0;
     std::optional<std::int32_t> heirId;
+    // The frame has a vassals section (it may list none). Without one, whether a person is a
+    // vassal is not known, so nothing is said about it.
+    bool vassalsShown = false;
+    // The vassals the block lists (at most kMaxVassalsShown), by id.
     std::map<std::int32_t, std::int32_t> vassalRankById;
 };
 
+// "you", or the quoted name with what the ids say about the person: the heir, a listed vassal
+// with its rank, or, when the vassals are shown, someone who is not among them (so a model does
+// not take a faction leader for one of the strongest vassals). The label says no more: when the
+// list is cut, the person may be a vassal not listed or no vassal at all (a liege, a claimant
+// from elsewhere), and the ids do not tell which.
 std::string describePerson(std::int32_t id, std::string_view name, const People& people) {
     if (id == people.rulerId) {
         return "you";
@@ -258,6 +267,8 @@ std::string describePerson(std::int32_t id, std::string_view name, const People&
     } else if (const auto found = people.vassalRankById.find(id);
                found != people.vassalRankById.end()) {
         out += " (your vassal #" + toText(found->second) + " by strength)";
+    } else if (people.vassalsShown) {
+        out += " (not among the listed vassals)";
     }
     return out;
 }
@@ -445,8 +456,9 @@ void renderFactions(const bridge::Frame& frame, const People& people, Lines& out
     if (!shown.empty()) {
         out.add("  Power and threshold are the Factions window's figures: power is approximate "
                 "(about +-1) and can be above the threshold, and a threshold of 0 can occur. Not "
-                "shown: how close a faction is to acting (its discontent), and who the members are "
-                "(only their number), so whether a claimant is a member is not known.");
+                "shown here: how close a faction is to acting (its discontent) and who the members "
+                "are (only their number), so whether a claimant is a member is not known. The "
+                "player can see each faction's members in the Factions window.");
     }
     for (std::size_t i = 0; i < shown.size(); ++i) {
         const bridge::Faction& faction = *shown[i];
@@ -467,6 +479,7 @@ People collectPeople(const bridge::Frame& frame) {
         people.heirId = frame.heir->id;
     }
     if (frame.vassals.has_value()) {
+        people.vassalsShown = true;
         const std::size_t shown = std::min(frame.vassals->listed.size(), kMaxVassalsShown);
         for (std::size_t i = 0; i < shown; ++i) {
             const bridge::Vassal& vassal = frame.vassals->listed[i];

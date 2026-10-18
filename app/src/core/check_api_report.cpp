@@ -101,20 +101,31 @@ std::vector<std::string> adviceForMissing(const std::vector<std::string>& missin
     return advice;
 }
 
-std::string settingsFlags(providers::Effort effort, providers::Thinking thinking) {
-    std::string flags;
-    if (effort != providers::Effort::Default) {
-        flags += std::string("--effort ") + providers::toString(effort);
+SentSettings sentSettings(const CliOptions& options) {
+    SentSettings settings;
+    settings.effort = options.effort;
+    settings.effortFromFlag = options.effortGiven;
+    settings.thinking = options.thinking;
+    return settings;
+}
+
+std::string describeSettings(const SentSettings& settings) {
+    std::string words;
+    if (settings.effort != providers::Effort::Default) {
+        words += settings.effortFromFlag
+                     ? std::string("--effort ") + providers::toString(settings.effort)
+                     : std::string("effort ") + providers::toString(settings.effort) +
+                           " (Curia's default)";
     }
-    if (thinking != providers::Thinking::Default) {
-        flags +=
-            std::string(flags.empty() ? "" : " ") + "--thinking " + providers::toString(thinking);
+    if (settings.thinking != providers::Thinking::Default) {
+        words += std::string(words.empty() ? "" : " and ") + "--thinking " +
+                 providers::toString(settings.thinking);
     }
-    return flags;
+    return words;
 }
 
 std::vector<std::string> adviceForError(const providers::ChatError& error, AuthMode auth,
-                                        providers::Effort effort, providers::Thinking thinking) {
+                                        const SentSettings& settings) {
     using Code = providers::ChatError::Code;
     std::vector<std::string> advice;
     const std::string status =
@@ -139,16 +150,33 @@ std::vector<std::string> adviceForError(const providers::ChatError& error, AuthM
             advice.emplace_back(status + (status.empty() ? "" : ": ") +
                                 "the service refused the request. The first thing to check is " +
                                 quoted(modelVariableName()) + ".");
-            const std::string flags = settingsFlags(effort, thinking);
-            if (!flags.empty() && error.httpStatus == 400) {
-                const bool both = effort != providers::Effort::Default &&
-                                  thinking != providers::Thinking::Default;
+            const std::string carried = describeSettings(settings);
+            if (!carried.empty() && error.httpStatus == 400) {
+                const bool effort = settings.effort != providers::Effort::Default;
+                const bool thinking = settings.thinking != providers::Thinking::Default;
+                // Name only the kinds of setting that were sent, and how to send none of them.
+                std::string which;
+                std::string without;
+                if (effort && thinking) {
+                    which = "effort or thinking setting";
+                    without = "with --effort default and without --thinking (then no effort or "
+                              "thinking setting is sent)";
+                } else if (effort) {
+                    which = "effort setting";
+                    without = "with --effort default (then no effort setting is sent)";
+                } else {
+                    which = "thinking setting";
+                    without = "without --thinking (then no thinking setting is sent)";
+                }
+                // The note on thinking values applies only to the two that some models refuse.
+                if (settings.thinking == providers::Thinking::Disabled ||
+                    settings.thinking == providers::Thinking::BetweenTools) {
+                    which += " (thinking disabled or between_tools works only on some models, and "
+                             "only at effort high or below)";
+                }
                 advice.emplace_back(
-                    "The request carried " + flags +
-                    ". The model may not support that effort or thinking setting (thinking "
-                    "disabled or between_tools works only on some models, and only at effort high "
-                    "or below). Run the same check without " +
-                    std::string(both ? "them" : "it") + " to see whether that is the cause.");
+                    "The request carried " + carried + ". The model may not support that " + which +
+                    ". Run the same check " + without + " to see whether that is the cause.");
             }
         }
         if (!error.message.empty()) {

@@ -110,40 +110,112 @@ TEST_CASE("check-api advice: each kind of failure has plain wording") {
 }
 
 TEST_CASE("check-api advice: a refused request that carried effort or thinking says so") {
+    using curia::SentSettings;
     using curia::providers::Effort;
     using curia::providers::Thinking;
     const ChatError refused =
         error(ChatError::Code::BadRequest, 400, "thinking.type: value not supported");
-    // Without a setting: the usual advice only.
+    // Without a setting (--effort default, no --thinking): the usual advice only.
     const std::vector<std::string> plain = curia::adviceForError(refused, AuthMode::Bearer);
     CHECK(anyLineContains(plain, "refused the request"));
-    CHECK_FALSE(anyLineContains(plain, "effort or thinking"));
-    // With one: the line names the flags and the likely cause.
+    CHECK_FALSE(anyLineContains(plain, "The request carried"));
+    CHECK_FALSE(anyLineContains(plain, "may not support"));
+    // Curia's default effort and --thinking: the line names both, where each came from, the
+    // likely cause and how to send neither.
     const std::vector<std::string> tuned =
-        curia::adviceForError(refused, AuthMode::Bearer, Effort::Low, Thinking::Disabled);
+        curia::adviceForError(refused, AuthMode::Bearer,
+                              SentSettings{.effort = Effort::Low, .thinking = Thinking::Disabled});
     CHECK(anyLineContains(tuned, "refused the request"));
-    CHECK(anyLineContains(tuned, "--effort low --thinking disabled"));
+    CHECK(anyLineContains(
+        tuned, "The request carried effort low (Curia's default) and --thinking disabled."));
     CHECK(anyLineContains(tuned, "may not support that effort or thinking setting"));
     CHECK(anyLineContains(tuned, "only at effort high or below"));
     CHECK(anyLineContains(tuned, "thinking.type: value not supported"));
-    // Two flags are "them", one is "it".
-    CHECK(anyLineContains(tuned, "Run the same check without them to see"));
-    const std::vector<std::string> one =
-        curia::adviceForError(refused, AuthMode::Bearer, Effort::Low, Thinking::Default);
-    CHECK(anyLineContains(one, "The request carried --effort low."));
-    CHECK(anyLineContains(one, "Run the same check without it to see"));
+    CHECK(anyLineContains(tuned, "Run the same check with --effort default and without --thinking "
+                                 "(then no effort or thinking setting is sent) to see"));
+    // Only the effort, Curia's default or a flag.
+    const std::vector<std::string> byDefault =
+        curia::adviceForError(refused, AuthMode::Bearer, SentSettings{.effort = Effort::Low});
+    CHECK(anyLineContains(byDefault, "The request carried effort low (Curia's default)."));
+    // Only an effort was sent, so the line speaks of the effort alone.
+    CHECK(anyLineContains(byDefault, "The model may not support that effort setting. Run"));
+    CHECK_FALSE(anyLineContains(byDefault, "effort or thinking"));
+    CHECK_FALSE(anyLineContains(byDefault, "only on some models"));
+    CHECK_FALSE(anyLineContains(byDefault, "--thinking"));
+    CHECK(anyLineContains(
+        byDefault,
+        "Run the same check with --effort default (then no effort setting is sent) to see"));
+    const std::vector<std::string> byFlag = curia::adviceForError(
+        refused, AuthMode::Bearer, SentSettings{.effort = Effort::Medium, .effortFromFlag = true});
+    CHECK(anyLineContains(byFlag, "The request carried --effort medium."));
+    CHECK(anyLineContains(byFlag, "with --effort default (then no effort setting is sent)"));
+    // Only the thinking (with --effort default).
+    const std::vector<std::string> thinkingOnly = curia::adviceForError(
+        refused, AuthMode::Bearer,
+        SentSettings{
+            .effort = Effort::Default, .effortFromFlag = true, .thinking = Thinking::BetweenTools});
+    CHECK(anyLineContains(thinkingOnly, "The request carried --thinking between_tools."));
+    CHECK(anyLineContains(thinkingOnly, "may not support that thinking setting (thinking disabled "
+                                        "or between_tools works only on some models"));
+    CHECK(anyLineContains(
+        thinkingOnly,
+        "Run the same check without --thinking (then no thinking setting is sent) to see"));
+    CHECK_FALSE(anyLineContains(thinkingOnly, "--effort default"));
+    // Adaptive thinking is no value some models refuse, so the note on those values is left out.
+    const std::vector<std::string> adaptive = curia::adviceForError(
+        refused, AuthMode::Bearer,
+        SentSettings{
+            .effort = Effort::High, .effortFromFlag = true, .thinking = Thinking::Adaptive});
+    CHECK(anyLineContains(adaptive, "The request carried --effort high and --thinking adaptive."));
+    CHECK(anyLineContains(adaptive, "may not support that effort or thinking setting. Run"));
+    CHECK_FALSE(anyLineContains(adaptive, "only on some models"));
     // A model that is not found, or a request that is too large, is not about the settings.
-    const std::vector<std::string> notFound = curia::adviceForError(
-        error(ChatError::Code::BadRequest, 404), AuthMode::Bearer, Effort::High);
-    CHECK_FALSE(anyLineContains(notFound, "effort or thinking"));
-    const std::vector<std::string> tooLarge = curia::adviceForError(
-        error(ChatError::Code::BadRequest, 413), AuthMode::Bearer, Effort::High);
-    CHECK_FALSE(anyLineContains(tooLarge, "effort or thinking"));
+    const std::vector<std::string> notFound =
+        curia::adviceForError(error(ChatError::Code::BadRequest, 404), AuthMode::Bearer,
+                              SentSettings{.effort = Effort::High, .effortFromFlag = true});
+    CHECK_FALSE(anyLineContains(notFound, "The request carried"));
+    const std::vector<std::string> tooLarge =
+        curia::adviceForError(error(ChatError::Code::BadRequest, 413), AuthMode::Bearer,
+                              SentSettings{.effort = Effort::High, .effortFromFlag = true});
+    CHECK_FALSE(anyLineContains(tooLarge, "The request carried"));
+}
 
-    CHECK(curia::settingsFlags(Effort::Default, Thinking::Default).empty());
-    CHECK((curia::settingsFlags(Effort::Max, Thinking::Default) == "--effort max"));
-    CHECK((curia::settingsFlags(Effort::Default, Thinking::BetweenTools) ==
+TEST_CASE("check-api settings: the words for what the requests carry") {
+    using curia::SentSettings;
+    using curia::providers::Effort;
+    using curia::providers::Thinking;
+    CHECK(curia::describeSettings(SentSettings{}).empty());
+    CHECK(curia::describeSettings(SentSettings{.effort = Effort::Default, .effortFromFlag = true})
+              .empty());
+    CHECK((curia::describeSettings(SentSettings{.effort = Effort::Low}) ==
+           "effort low (Curia's default)"));
+    CHECK((curia::describeSettings(SentSettings{.effort = Effort::Low, .effortFromFlag = true}) ==
+           "--effort low"));
+    CHECK((curia::describeSettings(SentSettings{.effort = Effort::Max, .effortFromFlag = true}) ==
+           "--effort max"));
+    CHECK((curia::describeSettings(SentSettings{.effort = Effort::Default,
+                                                .effortFromFlag = true,
+                                                .thinking = Thinking::BetweenTools}) ==
            "--thinking between_tools"));
+    CHECK((curia::describeSettings(SentSettings{
+               .effort = Effort::Medium, .effortFromFlag = true, .thinking = Thinking::Adaptive}) ==
+           "--effort medium and --thinking adaptive"));
+
+    // From the command line: no flag is Curia's default effort and no thinking setting.
+    curia::CliOptions options;
+    SentSettings settings = curia::sentSettings(options);
+    CHECK((settings.effort == curia::providers::kDefaultEffort));
+    CHECK_FALSE(settings.effortFromFlag);
+    CHECK((settings.thinking == Thinking::Default));
+    CHECK((curia::describeSettings(settings) == "effort low (Curia's default)"));
+    options.effort = Effort::Default;
+    options.effortGiven = true;
+    options.thinking = Thinking::Disabled;
+    options.thinkingGiven = true;
+    settings = curia::sentSettings(options);
+    CHECK((settings.effort == Effort::Default));
+    CHECK(settings.effortFromFlag);
+    CHECK((curia::describeSettings(settings) == "--thinking disabled"));
 }
 
 TEST_CASE("check-api advice: missing variables are named without values") {

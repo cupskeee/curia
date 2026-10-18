@@ -48,7 +48,9 @@ run it from.
    ```
 
    `SNAP=75` chooses which saved moment of the realm the questions are about (see step 2).
-   `FLAGS=()` means "no extra settings"; round 2 (step 7) changes it.
+   `FLAGS=()` means "no extra settings"; round 2 (step 7) changes it. Since D22 (2026-10-17)
+   `FLAGS=()` runs Curia's own settings, effort low and no thinking setting; the default runs of
+   rounds 1 and 2 sent no setting at all, which is now `FLAGS=(--effort default)`.
    Both files (the program and the log) must be listed; if either is missing, stop and tell me which.
 
    **About the money figure of snapshot 75.** This log was written by mod 0.2.0, whose income figure
@@ -83,17 +85,19 @@ question.
 ```
 
 **What you should see**: a first line `Sending one tiny request (usually a few seconds)...`, then five
-lines that start with `[ok]`, an empty line and the `CHECK_API_RESULT` line:
+lines that start with `[ok]` (since D22 with an `[info]` line after the second, naming the effort
+the check sends), an empty line and the `CHECK_API_RESULT` line:
 
 ```
 Sending one tiny request (usually a few seconds)...
 [ok] API key: present (never shown)
 [ok] Model: claude-sonnet-5-5
+[info] Effort and thinking: every request of this check carries effort low (Curia's default)
 [ok] Connection and certificates: connected in 120 ms, certificates checked with the system default certificate store
 [ok] Sign-in header (bearer): accepted (HTTP 200)
 [ok] Tiny answer: first token after 900 ms, finished after 1200 ms; tokens in 30, out 5, stop reason end_turn
 
-CHECK_API_RESULT ok=true key=present model=set effort=default thinking=default tls=ok ca=default auth=bearer status=200 completion=ok ...
+CHECK_API_RESULT ok=true key=present model=set effort=low thinking=default tls=ok ca=default auth=bearer status=200 completion=ok ...
 ```
 
 (The numbers differ.) A line that starts with `[FAILED]` is explained by lines that start with `->`
@@ -133,8 +137,8 @@ The program reads the log (the M3 pre-freeze capture, which holds six saved mome
 complete snapshot of the realm as the game exported it) and answers each question as a fresh chat.
 **Which moment**: the program's own default is the *last* one in the file, which is a fresh start
 (snapshot 1: a duke in 1066 with 156 gold and 7 vassals; little to say about). That is why this sheet
-uses `SNAP=75` (set in step 0.3): a king in 1071 with 928 gold, 11 vassals of whom several dislike him,
-a faction against him and a war. If you want to see the other one, set `SNAP=1` and repeat the run
+uses `SNAP=75` (set in step 0.3): a king in 1071 with 928 gold, 11 vassals of whom several dislike the king,
+a faction against the king and a war. If you want to see the other one, set `SNAP=1` and repeat the run
 with another label; write the snapshot number next to your ratings (the table has a column for it).
 
 Copy this block once. It only defines two commands and runs nothing:
@@ -228,11 +232,12 @@ python3 ~/PycharmProjects/curia/tools/m4/quality_table.py ~/curia_m4_results/run
 ```
 
 This prints a table with one row per question and run: the run's label (`sonnet`, `haiku`), the model,
-the setting (`default` unless round 2 sent one), the snapshot number, time to the first token, total
-time, tokens, the number of words in the answer, the cache numbers and how the answer ended, plus empty
-columns for your rating and notes, and then the median times and words per run label and setting. The
-rows are in the order of the file names (`haiku-...` comes before `sonnet-...`); each row names its
-run and question, so the order does not matter. Copy it into a text note and fill in the two last
+the setting (`default` when none was sent, `effort low` for Curia's own settings since D22), the
+snapshot number, time to the first token, total time, tokens, the number of words in the answer, the
+cache numbers and how the answer ended, plus empty columns for your rating and notes, and then the
+median times and words per run label and setting. The rows are in the order of the file names
+(`haiku-...` comes before `sonnet-...`); each row names its run and question, so the order does not
+matter. Copy it into a text note and fill in the two last
 columns (the table below is the shape of what you send back):
 
 | Run | Question | First token (ms) | Total (ms) | Rating 1-5 | Notes |
@@ -274,6 +279,13 @@ stay on your computer; they hold game text, which is why they are never inside t
 
 ## 7. Round 2: after the persona revision (about 30 minutes, about 30 cents)
 
+**Done (2026-10-17).** Round 2 has been run; the results are in `docs/spikes/m4-quality-results.md`
+("Round 2"). Outcome: the owner chose effort low on the Sonnet tier as Curia's default (D22), so
+`FLAGS=()` now sends effort low, and a `--thinking` flag alone now comes with effort low too. To send
+what round 2 sent, the blocks below therefore add `--effort default` (no effort setting) to the
+default run and to the two runs without thinking. The text of this step describes the settings as
+they were before D22.
+
 A later sitting, once the revised advisor (plain words, about 120 words, bold only) is merged. It asks
 the same five questions on Sonnet three times, once per setting, to find out how much of the wait
 before the first word is the model's thinking, and whether the answers stay good without it. The 30
@@ -308,7 +320,7 @@ two settings to try:
 
    ```sh
    LABEL=sonnet2
-   FLAGS=()
+   FLAGS=(--effort default)
    run_questions
    ask_one 5 "$Q5"
    ```
@@ -322,13 +334,13 @@ two settings to try:
 
    ```sh
    LABEL=sonnet2-off
-   FLAGS=(--thinking between_tools)
+   FLAGS=(--effort default --thinking between_tools)
    run_questions
    ask_one 5 "$Q5"
    ```
 
    Check that the settings were used (the first line of each run's first file; it also shows
-   `"persona_version":3`, the revised advisor):
+   `"persona_version":3`, the revised advisor, in round 2, and 4 since the polish after it):
 
    ```sh
    grep -m1 '"event":"ready"' ~/curia_m4_results/runs/sonnet2*-q1.jsonl
@@ -351,7 +363,7 @@ two settings to try:
 
    ```sh
    LABEL=haiku2-off
-   FLAGS=(--thinking disabled)
+   FLAGS=(--effort default --thinking disabled)
    run_questions
    ask_one 5 "$Q5"
    ```
@@ -412,9 +424,9 @@ started (from Terminal or by double-click) is decided at the game sitting, not h
 | `command not found` / `no such file` for the program | The build in step 0.2 did not finish, or `$CURIA` was typed in another window. Rebuild and set `CURIA=` again in this window. |
 | `zsh: no matches found`, `zsh: event not found` or odd quote characters | A line was copied with different quotes, or your own question (step 2) holds a `!`, a quote or an apostrophe. Copy again from this page, and keep your question free of `!`, `"` and `'`. |
 | `ask_one: LABEL: set LABEL first` | You skipped the line `LABEL=sonnet` (or `LABEL=haiku`). Type it and run the questions again. |
-| `set FLAGS first` | `FLAGS` is not set in this window. Type `FLAGS=()` (round 1, or the default run of round 2) or the line the step shows, and run the questions again. |
+| `set FLAGS first` | `FLAGS` is not set in this window. Type `FLAGS=()` (Curia's own settings; `FLAGS=(--effort default)` repeats the default runs of rounds 1 and 2) or the line the step shows, and run the questions again. |
 | `curia: --effort needs ...` or `curia: --thinking needs ...`, exit code 2 | A setting in `FLAGS` is mistyped. Copy the `FLAGS=(...)` line from step 7 again. Nothing was sent. |
-| With a setting from step 7: exit code `1` and `"code":"BadRequest"` (HTTP 400) in the file | The model does not accept that setting. That is a result: write "not supported" in the notes for that run and go on with the next one. |
+| Exit code `1` and `"code":"BadRequest"` (HTTP 400) in the file, with a setting from step 7 or with `FLAGS=()` (since D22 every run sends effort low) | The model does not accept that setting. With a setting from step 7 that is a result: write "not supported" in the notes for that run and go on with the next one. With `FLAGS=()`, run the same question once with `FLAGS=(--effort default)`; if that works, tell me. |
 | An answer calls +9.2 a month the "net" income | Expected with snapshot 75 (mod 0.2.0 exported the income before expenses; see step 0.3). Rate the reasoning, not that number. |
 | `command not found: ask_one` | The commands of step 2 are not defined in this window. Copy the first block of step 2 again. |
 | Exit code `1` for a question | That question ended in an error; the file still has the details (`"event":"error"`). Run it again; tell me if it repeats. |

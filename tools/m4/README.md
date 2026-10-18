@@ -5,7 +5,8 @@
   sheet, `docs/spikes/m4-quality-check.md`, tells the owner to save) and prints a markdown table,
   one row per question: run label (the file name without `-q<n>` and the extension), model, setting
   (the `--effort` / `--thinking` values the run sent, from the `done` event, else the `ready` event;
-  `default` when none was sent), question, snapshot number, time to the first token, total time,
+  `default` when none was sent; since D22 a run without flags shows `effort low`, Curia's default,
+  and a run with `--effort default` shows `default`), question, snapshot number, time to the first token, total time,
   tokens, words (the answer's text split at white space), cache numbers, how the answer ended, and
   empty columns for the rating and notes; then, per run label and setting, the median times and
   words. It never prints an answer. `--csv` gives comma-separated values.

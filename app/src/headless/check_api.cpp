@@ -145,7 +145,8 @@ std::string number(long long value) {
 }
 
 // The answer limit of the check's requests: room for "OK" and a little thinking. Thinking counts
-// toward it, so a high --effort can use it up (the check then says so).
+// toward it, so the model's thinking can use it up, more likely at a high effort (the check then
+// says so).
 constexpr int kCheckMaxTokens = 256;
 
 providers::ChatRequest tinyRequest(const std::string& model, const CliOptions& options) {
@@ -215,12 +216,15 @@ int runCheckApiMode(const CliOptions& options, std::ostream& out, std::ostream& 
         }
         report.add(std::move(step));
     }
-    const std::string flags = settingsFlags(options.effort, options.thinking);
-    if (!flags.empty()) {
+    // Every request of the check carries the settings the app would send (Curia's default effort
+    // unless a flag says otherwise), so a model that refuses them is found here.
+    const SentSettings settings = sentSettings(options);
+    const std::string carried = describeSettings(settings);
+    if (!carried.empty()) {
         CheckStep step;
         step.name = "Effort and thinking";
         step.state = CheckStep::State::Info;
-        step.detail = "every request of this check carries " + flags;
+        step.detail = "every request of this check carries " + carried;
         report.add(std::move(step));
     }
     report.set("key", keyOk ? "present" : "missing");
@@ -302,8 +306,7 @@ int runCheckApiMode(const CliOptions& options, std::ostream& out, std::ostream& 
         } else {
             step.state = CheckStep::State::Failed;
             step.detail = "could not connect";
-            step.advice =
-                adviceForError(first.error, options.auth, options.effort, options.thinking);
+            step.advice = adviceForError(first.error, options.auth, settings);
         }
         report.add(std::move(step));
     }
@@ -321,8 +324,7 @@ int runCheckApiMode(const CliOptions& options, std::ostream& out, std::ostream& 
         } else if (status == 401 || status == 403) {
             step.state = CheckStep::State::Failed;
             step.detail = "rejected (HTTP " + number(status) + ")";
-            step.advice =
-                adviceForError(first.error, options.auth, options.effort, options.thinking);
+            step.advice = adviceForError(first.error, options.auth, settings);
         } else if (status >= 200 && status < 300) {
             step.state = CheckStep::State::Ok;
             step.detail = "accepted (HTTP " + number(status) + ")";
@@ -348,19 +350,23 @@ int runCheckApiMode(const CliOptions& options, std::ostream& out, std::ostream& 
             if (first.textBytes == 0) {
                 step.detail += " (no text came back: the small test budget may have been used up "
                                "before the answer; not a problem for the connection)";
-                if (!flags.empty()) {
+                // Not when the thinking before the answer was turned off: "disabled", and
+                // "between_tools" in a request without tools (research-notes C13).
+                const bool thinksFirst = settings.thinking == providers::Thinking::Default ||
+                                         settings.thinking == providers::Thinking::Adaptive;
+                if (!carried.empty() && thinksFirst) {
                     step.advice.push_back(
-                        "The request carried " + flags + ". Thinking counts toward the check's " +
+                        "The request carried " + carried + ". Thinking counts toward the check's " +
                         number(kCheckMaxTokens) +
-                        "-token answer limit, so a high effort can use it up before the answer.");
+                        "-token answer limit, so the model's thinking can use it up before the "
+                        "answer (more likely at a high effort).");
                 }
             }
         } else {
             step.state = CheckStep::State::Failed;
             step.detail = "no answer";
             if (step.advice.empty()) {
-                step.advice =
-                    adviceForError(first.error, options.auth, options.effort, options.thinking);
+                step.advice = adviceForError(first.error, options.auth, settings);
             }
         }
         report.add(std::move(step));
@@ -399,8 +405,8 @@ int runCheckApiMode(const CliOptions& options, std::ostream& out, std::ostream& 
             } else if (!a.succeeded || !b.succeeded) {
                 step.state = CheckStep::State::Failed;
                 step.detail = "a probe request failed";
-                step.advice = adviceForError(!a.succeeded ? a.error : b.error, options.auth,
-                                             options.effort, options.thinking);
+                step.advice =
+                    adviceForError(!a.succeeded ? a.error : b.error, options.auth, settings);
                 exitCode = kExitFailed;
                 report.set("cache_probe", "failed");
             } else {

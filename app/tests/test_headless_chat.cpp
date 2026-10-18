@@ -136,7 +136,8 @@ TEST_CASE("headless chat: the newest snapshot, a question, a streamed answer") {
     CHECK(ready["frames"] == 3);
     CHECK(ready["from_start"] == true);
     CHECK(ready["model"] == "mock-model-1");
-    CHECK(ready["effort"] == "default");
+    // Curia's default settings (D22): effort low, no thinking setting.
+    CHECK(ready["effort"] == "low");
     CHECK(ready["thinking"] == "default");
     CHECK(ready["persona_version"] == curia::advisor::kPersonaVersion);
     CHECK(ready["transcripts"].is_null());
@@ -157,7 +158,7 @@ TEST_CASE("headless chat: the newest snapshot, a question, a streamed answer") {
     CHECK(done["generation"] == 1);
     CHECK(done["max_tokens"] == false);
     CHECK(done["total_ms"].is_number());
-    CHECK(done["effort"] == "default");
+    CHECK(done["effort"] == "low");
     CHECK(done["thinking"] == "default");
     CHECK_FALSE(done.contains("thinking_started_ms"));  // no thinking block came
     CHECK(run.of("status").size() == 2);                // waiting, streaming; no "thinking"
@@ -170,7 +171,25 @@ TEST_CASE("headless chat: the newest snapshot, a question, a streamed answer") {
     // The request carried the newest snapshot.
     REQUIRE(rig.provider->callCount() == 1);
     CHECK(rig.provider->call(0).request.snapshotText.find("Test Heir Two") != std::string::npos);
+    CHECK((rig.provider->call(0).request.effort == curia::providers::Effort::Low));
+    CHECK((rig.provider->call(0).request.thinking == curia::providers::Thinking::Default));
     CHECK(run.of("ask")[0]["text"] == "is my heir safe?");
+}
+
+TEST_CASE("headless chat: --effort default sends no effort setting and reports default") {
+    Rig rig;
+    rig.config.options.effort = curia::providers::Effort::Default;
+    rig.config.options.effortGiven = true;
+    const Run run = rig.run("ask is my heir safe?\n");
+    CHECK(run.result.exitCode == curia::kHeadlessExitOk);
+    REQUIRE(rig.provider->callCount() == 1);
+    CHECK((rig.provider->call(0).request.effort == curia::providers::Effort::Default));
+    CHECK((rig.provider->call(0).request.thinking == curia::providers::Thinking::Default));
+    REQUIRE(run.of("ready").size() == 1);
+    CHECK(run.of("ready")[0]["effort"] == "default");
+    CHECK(run.of("ready")[0]["thinking"] == "default");
+    REQUIRE(run.of("done").size() == 1);
+    CHECK(run.of("done")[0]["effort"] == "default");
 }
 
 TEST_CASE("headless chat: the effort and thinking settings reach the request and the events") {
@@ -559,6 +578,7 @@ TEST_CASE("headless chat: a transcript file per question, only when asked for") 
     CHECK(text.str().find("usage: input=500 output=12 cache_read=400 cache_write=0") !=
           std::string::npos);
     CHECK(text.str().find("snapshot: 3\n") != std::string::npos);
+    CHECK(text.str().find("\neffort: low\nthinking: default\n") != std::string::npos);
     CHECK(run.of("ready")[0]["transcripts"] == rig.dir.path("transcripts"));
     // The default stays off.
     Rig plain;

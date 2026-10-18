@@ -20,9 +20,9 @@ struct PromptSettings {
     // From configuration or the provider's models endpoint; never a literal in source (D4).
     std::string model;
     // The answer limit and the thinking settings, passed to the request as they are (Default
-    // effort and thinking send nothing).
+    // effort and thinking send nothing; Curia's default effort is kDefaultEffort, D22).
     int maxTokens = 4096;
-    providers::Effort effort = providers::Effort::Default;
+    providers::Effort effort = providers::kDefaultEffort;
     providers::Thinking thinking = providers::Thinking::Default;
     bool showThinking = false;
     providers::CacheHints cache;

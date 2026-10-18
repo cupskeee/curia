@@ -25,7 +25,8 @@ struct BuiltRequest {
 // budget_tokens is a 400 on the current models). Never any of temperature, top_p, top_k,
 // tool_choice, metadata (the current models answer 400 to forced or non-default values, and the
 // defaults are what Curia wants). With both settings at Default the bytes are those of a request
-// without them (decision D22 keeps the default unset until the owner's measurement).
+// without them (ChatRequest defaults to Default; the app's own choice is providers::kDefaultEffort,
+// D22).
 //
 // system is an array of text blocks in a fixed order: block 1 the persona, block 2 the realm
 // snapshot. A block carries cache_control {type: ephemeral} (plus ttl "1h" when cache.longTtl)
