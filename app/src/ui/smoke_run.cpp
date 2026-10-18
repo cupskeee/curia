@@ -221,9 +221,9 @@ int runSmoke(const SmokeContext& context) {
 
     if (result == 0) {
         std::printf("CURIA_SMOKE_OK frames=%llu renderer=%s ui_scale=%.2f font=bundled "
-                    "glyphs_missing=0\n",
+                    "glyphs_missing=0 window=%s\n",
                     static_cast<unsigned long long>(frames), backend.rendererName().c_str(),
-                    static_cast<double>(context.uiScale));
+                    static_cast<double>(context.uiScale), context.windowKind);
     }
     return result;
 }

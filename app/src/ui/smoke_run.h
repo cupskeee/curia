@@ -23,6 +23,8 @@ struct SmokeContext {
     std::string screenshotPath;
     // What to draw (--smoke-scene).
     SmokeScene scene = SmokeScene::Conversation;
+    // "window" or "panel" (--overlay): the last field of the result line.
+    const char* windowKind = "window";
 };
 
 // `curia --smoke`: the real controller and chat window with the canned conversation
@@ -32,7 +34,7 @@ struct SmokeContext {
 // a missing variable, so the window shows its notices; the start scene draws the window before
 // anything has come from the game. No environment variable is read, no CK3 folder is looked for,
 // nothing goes to the network and no key exists. Prints one line,
-//   CURIA_SMOKE_OK frames=N renderer=NAME ui_scale=S font=bundled glyphs_missing=0
+//   CURIA_SMOKE_OK frames=N renderer=NAME ui_scale=S font=bundled glyphs_missing=0 window=KIND
 // (the first three fields as before), and returns 0; returns 1 with a CURIA_SMOKE_FAIL line when
 // the bundled font did not load, a character of the conversation or of the window's texts is
 // missing from it, the scene did not end as scripted, or the screenshot failed.

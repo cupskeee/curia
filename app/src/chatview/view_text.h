@@ -55,10 +55,12 @@ inline constexpr std::string_view kCk3NotRunning =
     "CK3 is not running. Start it, then click Advisor in the game.";
 
 // Next to the input box (the pause reminder is FR-OVL-10): the lead in bold ink, the rest muted.
-// It names CK3's default pause key (owner, 2026-10-18).
-inline constexpr std::string_view kPauseReminderLead = "Press Space";
+// It names CK3's default pause key and the real order, pause first, then click Advisor, as the
+// text before anything was read does (owner, 2026-10-18: once the overlay is open it may have the
+// keys, and Space would then go into the input box).
+inline constexpr std::string_view kPauseReminderLead = "Pause the game (Space)";
 inline constexpr std::string_view kPauseReminderRest =
-    " to pause first: the game keeps running while you type.";
+    " before you click Advisor: it keeps running while you type.";
 inline constexpr std::string_view kInputHint =
     "Ask your advisor (Enter sends, Shift+Enter adds a line)";
 
@@ -80,12 +82,19 @@ inline constexpr std::string_view kRetry = "Retry";
 inline constexpr std::string_view kCopy = "Copy";
 inline constexpr std::string_view kCopied = "Copied";
 
+// The tray menu (FR-OVL-6; the menu bar on macOS, the notification area on Windows): its tooltip
+// and its three entries.
+inline constexpr std::string_view kTrayTooltip = "Curia";
+inline constexpr std::string_view kTrayShow = "Show Curia";
+inline constexpr std::string_view kTrayHide = "Hide Curia";
+inline constexpr std::string_view kTrayQuit = "Quit Curia";
+
 // "What I can see is from 3 October 1071."
 std::string seenFrom(const bridge::Date& date);
 
 // Every fixed text above (the plain-words test walks them; the smoke test checks the font has
 // every character of them).
-inline constexpr std::array<std::string_view, 24> kAllFixedTexts = {
+inline constexpr std::array<std::string_view, 28> kAllFixedTexts = {
     kNothingReadYet,
     kSeenFromStart,
     kSeenFromEnd,
@@ -110,6 +119,10 @@ inline constexpr std::array<std::string_view, 24> kAllFixedTexts = {
     kRetry,
     kCopy,
     kCopied,
+    kTrayTooltip,
+    kTrayShow,
+    kTrayHide,
+    kTrayQuit,
 };
 
 }  // namespace curia::chatview::text

@@ -70,6 +70,7 @@ CLANG_FORMAT=.venv-tools/bin/clang-format tools/ci/check_format.sh --fix   # --f
 tools/ci/scan_patterns.sh      # no Paradox content, no keys, no home paths
 tools/ci/check_source_rules.sh # no model IDs, curl debug options or stray secret access in app/
 tools/ci/check_versions.sh     # CMake, vcpkg.json and CHANGELOG agree
+tools/ci/release_blockers.sh   # spike and development parts still to remove before a release (warns)
 python3 tools/ci/lint_mod.py   # structure of the mod folders and the CURIA1 export format
 python3 -m unittest discover -s tools/ci -p "test_*.py"   # tests of the lint
 ```
@@ -82,13 +83,22 @@ Presets are named per platform: `macos-arm64`, `macos-x64`, `linux-x64`,
 ```sh
 cmake --preset macos-arm64
 cmake --build --preset macos-arm64
-ctest --preset macos-arm64            # unit, smoke and idle tests
+ctest --preset macos-arm64            # unit and end-to-end tests (no window)
 ctest --preset macos-arm64-network    # one HTTPS handshake to a public host (no key sent)
 ```
 
-The smoke and idle tests open a small window, so run `ctest` in a graphical session (on
-headless Linux: `xvfb-run -a ctest --preset linux-x64`) and do not move the mouse over
-the window while `app_idle` runs. Unit tests use [doctest](https://github.com/doctest/doctest). Add a test with every
+The smoke and idle tests open a small window, which can become the active one and take the
+keyboard while they run, so they are opt-in: configure with `-DCURIA_GUI_TESTS=ON` to register
+them (CI does). Run them only on a machine where nobody is typing, in a graphical session (on
+headless Linux: `xvfb-run -a ctest --preset linux-x64`), and do not move the mouse over the
+window while `app_idle` runs.
+
+Every test runs with `HOME` set to an empty folder in the build tree (`app/test-home`), so a
+default path cannot reach your own app log, CK3's folder or a results folder (D26). For the Python
+suites and the tools, `tools/dev/sandboxed.sh <command>` does the same with a fresh temporary
+folder that it removes afterwards, for example
+`tools/dev/sandboxed.sh python3 -m unittest discover -s tools/m4`; it is how automated runs on a
+maintainer's machine run tests and tools (not the build). Unit tests use [doctest](https://github.com/doctest/doctest). Add a test with every
 behaviour change. Parsing code takes untrusted text, so keep it a pure function that
 can be fuzzed.
 

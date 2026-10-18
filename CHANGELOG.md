@@ -15,15 +15,35 @@ at `0.y.z` and anything may change between minor versions.
   questions and read the answers as they arrive. It shows the date of what the advisor can see
   (before the first update from the game, what to do in the middle of the window), notices (the
   last update could not be read, the mod and app versions differ, no update from the game, CK3's
-  folder not found; each as tall as its text), a reminder to press Space to pause before
-  asking, a "thinking..." state until the first word and a pulsing dot while the answer
+  folder not found; each as tall as its text), a reminder to pause the game (Space) before
+  clicking Advisor, a "thinking..." state until the first word and a pulsing dot while the answer
   arrives, **bold** in answers (other markdown is removed; numbered lines stay as written), Stop
   (also Cmd+. on macOS), Retry after an error and Copy on each answer (also on one that was
   stopped or failed part way). Lines are 1.4 em apart with short gaps between paragraphs, and in a
   wide window the text keeps a readable width. It reads CK3's own `debug.log` (or `--log <path>`)
-  and shows the realm once you click Advisor in the game. In this version it is a normal window; the overlay over the
-  game comes next. Development builds take the key and the model from the environment, as the
-  headless chat does.
+  and shows the realm once you click Advisor in the game. Development builds take the key and the
+  model from the environment, as the headless chat does.
+- The overlay over CK3 on macOS: the chat opens in a panel that floats over the game, also over
+  its Fullscreen mode, without taking CK3 out of it and without a Dock icon. It appears when Curia
+  starts and every time you click Advisor in the game, on the display where CK3 is, at the right
+  edge of the game. Ctrl+Cmd+K shows and hides it; Esc hides it and is meant to give the keys back
+  to the game (what you typed stays, an answer keeps arriving). When it is opened from the game,
+  the hot key or the menu-bar icon it tries to take the keys at once (to be checked in the M4
+  testing; `--overlay-focus click` waits for a click on the panel instead); the overlay shown at
+  start-up gives them back if starting Curia took them. A menu-bar icon offers "Show Curia",
+  "Hide Curia" and "Quit Curia" (not created if CK3 is in front when Curia starts). `--window plain` opens a normal
+  window instead. Curia never asks for Accessibility, Input Monitoring, Screen Recording or the
+  microphone.
+- On Windows and Linux the chat opens in a normal window that stays on top of other windows (no
+  hot key yet: click Advisor in the game); Esc minimises it and its close button quits Curia. A
+  tray icon has the same three entries on Windows; Linux has none yet.
+- `Curia.app` (macOS) next to the `curia` binary in the build folder: start it with
+  `open -g build/macos-arm64/app/Curia.app` (see the README for how the development variables
+  reach it).
+- The app notices whether CK3 is running (checked once a second on macOS and Windows, every five
+  seconds on Linux) and says so.
+- `tools/ci/release_blockers.sh` lists the spike and development parts that must be removed before
+  a release; CI runs it as a warning.
 - A parchment look with a bundled font, Gentium Book Plus 6.200 by SIL International (SIL Open
   Font License 1.1), embedded unmodified in the app; its licence is in the generated third-party
   notices.
@@ -37,6 +57,10 @@ at `0.y.z` and anything may change between minor versions.
   event `thinking` comes once per answer, before its first word.
 - The quality table (`tools/m4/quality_table.py`) has the columns Run (the file's label), Setting
   and Words, and its summary gives the median times and words per run label and setting.
+- Tools for the M4 game sittings (`docs/spikes/m4-session-sheet.md`): `tools/m4/analyze_applog.py`
+  turns the app log into tables of numbers (readings, questions, cache, stops, bytes per hour of the
+  game's log, the overlay's evidence, a key check), and `tools/m4/grep_key.py` looks for the API key
+  in the files and folders given, printing only file names and counts.
 - Headless modes of the `curia` executable (no window): `--headless-chat` reads the game's log, keeps
   the newest snapshot (or `--frame <snap>`) and answers questions typed on stdin, printing one JSON
   object per event; `--check-api [--cache-probe]` is the connection check for the owner (key, model,

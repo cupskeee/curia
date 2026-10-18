@@ -4,8 +4,10 @@
 #include <atomic>
 #include <chrono>
 #include <cstddef>
+#include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <string>
 #include <variant>
 #include <vector>
@@ -732,4 +734,155 @@ TEST_CASE("controller: messages dropped by the mailbox limit are counted in the 
     box->push(UiMessage{LogNotice{bridge::TailerNotice::Attached}});
     rig.controller.pump();
     CHECK(count(rig.logText(), "mailbox_dropped") == 1);
+}
+
+// --- the numbers the M4 sittings read from the app log (docs/spikes/m4-session-sheet.md) ------
+
+namespace {
+
+// The app log's lines of `event` (whole lines, without the newline).
+std::vector<std::string> linesWith(const std::string& log, const std::string& event) {
+    std::vector<std::string> lines;
+    std::size_t start = 0;
+    while (start < log.size()) {
+        std::size_t end = log.find('\n', start);
+        if (end == std::string::npos) {
+            end = log.size();
+        }
+        const std::string line = log.substr(start, end - start) + " ";
+        if (contains(line, " " + event + " ")) {
+            lines.push_back(line);
+        }
+        start = end + 1;
+    }
+    return lines;
+}
+
+void progressStats(Rig& rig, std::uint64_t lifetime, std::uint64_t curia, std::uint64_t total,
+                   std::uint64_t truncations = 0) {
+    bridge::TailerStats stats;
+    stats.lifetimeBytes = lifetime;
+    stats.lifetimeCuriaBytes = curia;
+    stats.totalBytes = total;
+    stats.truncations = truncations;
+    rig.controller.onMessage(UiMessage{LogProgress{stats}});
+}
+
+}  // namespace
+
+TEST_CASE("controller: frame_complete logs the reading, the game date and the treasury") {
+    Rig rig;
+    rig.frame(frameWithGoldAndHeir(1066, 9, 15, 4321, "Test Heir Two"));
+    rig.frame(frameWithGoldAndHeir(867, 1, 2, -12, "Test Heir Two"));
+    // A frame without its FIN section: the treasury is "none", never a made-up 0.
+    rig.frame(makeFrame({"BEGIN|0|0.2.1|1067|10|1|1001|Test Ruler One"}, 9));
+    const std::vector<std::string> lines = linesWith(rig.logText(), "frame_complete");
+    REQUIRE(lines.size() == 3);
+    CHECK(contains(lines[0], " reading=1 "));
+    CHECK(contains(lines[0], " game_date=1066-09-15 "));
+    CHECK(contains(lines[0], " gold=4321 "));
+    CHECK(contains(lines[0], " income_tenths=31 "));
+    CHECK(contains(lines[1], " reading=2 "));
+    CHECK(contains(lines[1], " game_date=0867-01-02 "));
+    CHECK(contains(lines[1], " gold=-12 "));
+    CHECK(contains(lines[2], " reading=3 "));
+    CHECK(contains(lines[2], " snap=9 "));
+    CHECK(contains(lines[2], " gold=none "));
+    CHECK(contains(lines[2], " income_tenths=none "));
+    // Numbers only: no name of the frame reaches the line.
+    CHECK_FALSE(contains(rig.logText(), "Test Ruler"));
+    CHECK_FALSE(contains(rig.logText(), "Test Heir"));
+}
+
+TEST_CASE("controller: ask_started names the reading the question was asked on") {
+    Rig rig;
+    REQUIRE((rig.controller.onUserAsk("before any reading") == AskOutcome::Started));
+    rig.controller.pump();
+    rig.frame(frameWithGoldAndHeir(1066, 9, 15, 100, "Test Heir Two"));
+    REQUIRE((rig.controller.onUserAsk("after the first reading") == AskOutcome::Started));
+    rig.controller.pump();
+    const std::vector<std::string> lines = linesWith(rig.logText(), "ask_started");
+    REQUIRE(lines.size() == 2);
+    CHECK(contains(lines[0], " reading=0 "));
+    CHECK(contains(lines[1], " reading=1 "));
+}
+
+TEST_CASE("controller: log_bytes once a minute while the counts change, and at exit") {
+    Rig rig;
+    // Nothing read yet: no line.
+    rig.controller.onTick(rig.clock.now);
+    CHECK(linesWith(rig.logText(), "log_bytes").empty());
+
+    progressStats(rig, 1000, 200, 1000);
+    rig.controller.onTick(rig.clock.now);  // the first counts are written at once
+    std::vector<std::string> lines = linesWith(rig.logText(), "log_bytes");
+    REQUIRE(lines.size() == 1);
+    CHECK(contains(lines[0], " why=minute "));
+    CHECK(contains(lines[0], " read=1000 "));
+    CHECK(contains(lines[0], " curia=200 "));
+    CHECK(contains(lines[0], " since_truncation=1000 "));
+    CHECK(contains(lines[0], " truncations=0 "));
+    CHECK(contains(lines[0], " mailbox_dropped=0 "));
+
+    // Within the minute: nothing new, however much arrives.
+    progressStats(rig, 1500, 200, 1500);
+    rig.clock.advance(std::chrono::seconds(59));
+    rig.controller.onTick(rig.clock.now);
+    CHECK(linesWith(rig.logText(), "log_bytes").size() == 1);
+    rig.clock.advance(std::chrono::seconds(1));
+    rig.controller.onTick(rig.clock.now);
+    lines = linesWith(rig.logText(), "log_bytes");
+    REQUIRE(lines.size() == 2);
+    CHECK(contains(lines[1], " read=1500 "));
+
+    // Minutes without new bytes: no line.
+    rig.clock.advance(std::chrono::seconds(120));
+    rig.controller.onTick(rig.clock.now);
+    CHECK(linesWith(rig.logText(), "log_bytes").size() == 2);
+
+    // CK3 restarted and truncated its log: the lifetime counts go on, the running total restarts.
+    rig.controller.onMessage(UiMessage{LogNotice{bridge::TailerNotice::Truncated}});
+    progressStats(rig, 1800, 450, 300, 1);
+    rig.controller.onTick(rig.clock.now);
+    lines = linesWith(rig.logText(), "log_bytes");
+    REQUIRE(lines.size() == 3);
+    CHECK(contains(lines[2], " read=1800 "));
+    CHECK(contains(lines[2], " curia=450 "));
+    CHECK(contains(lines[2], " since_truncation=300 "));
+    CHECK(contains(lines[2], " truncations=1 "));
+
+    // At exit the watcher's own counts may be ahead of the last message.
+    bridge::TailerStats latest;
+    latest.lifetimeBytes = 1900;
+    latest.lifetimeCuriaBytes = 450;
+    latest.totalBytes = 400;
+    latest.truncations = 1;
+    rig.controller.logByteCountsAtExit(latest);
+    lines = linesWith(rig.logText(), "log_bytes");
+    REQUIRE(lines.size() == 4);
+    CHECK(contains(lines[3], " why=exit "));
+    CHECK(contains(lines[3], " read=1900 "));
+    CHECK(contains(lines[3], " since_truncation=400 "));
+}
+
+TEST_CASE("controller: log_bytes at exit, also without a watcher, marks the end of the run") {
+    Rig rig;
+    rig.controller.logByteCountsAtExit(std::nullopt);
+    const std::vector<std::string> lines = linesWith(rig.logText(), "log_bytes");
+    REQUIRE(lines.size() == 1);
+    CHECK(contains(lines[0], " why=exit "));
+    CHECK(contains(lines[0], " read=0 "));
+}
+
+TEST_CASE("controller: log_bytes carries the count of messages the mailbox dropped") {
+    Rig rig;
+    const auto box = rig.controller.mailbox();
+    for (std::size_t i = 0; i < UiMailbox::kDefaultMaxMessages + 3; ++i) {
+        box->push(UiMessage{LogNotice{bridge::TailerNotice::Attached}});
+    }
+    rig.controller.pump();
+    rig.controller.logByteCountsAtExit(std::nullopt);
+    const std::vector<std::string> lines = linesWith(rig.logText(), "log_bytes");
+    REQUIRE(lines.size() == 1);
+    CHECK(contains(lines[0], " mailbox_dropped=3 "));
 }

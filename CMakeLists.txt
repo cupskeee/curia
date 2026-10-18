@@ -4,7 +4,8 @@ cmake_minimum_required(VERSION 3.25)
 # Keep the version in sync with vcpkg.json ("version-semver"); the release workflow checks the tag against it.
 project(curia VERSION 0.1.0 LANGUAGES CXX)
 
-# Objective-C++ for the macOS platform code (the M2 overlay probe today, platform/mac later).
+# Objective-C++ for the macOS code: platform/mac, the overlay panel and the hot key (ui/*_mac.mm),
+# and the M2 overlay probe.
 if(APPLE)
     enable_language(OBJCXX)
     set(CMAKE_OBJCXX_STANDARD 20)
@@ -32,6 +33,9 @@ option(CURIA_ENABLE_DEV_ENV "Development configuration: env-var API key and --te
 # CI turns this ON so that a missing Python 3 fails the configuration instead of silently dropping the
 # end-to-end tests that need it.
 option(CURIA_REQUIRE_PYTHON "Fail the configuration if Python 3 is missing (otherwise the end-to-end tests are skipped)" OFF)
+# The tests that open a window (smoke and idle) can take the keyboard while they run, so they are
+# registered only on request (owner decision 2026-10-18); CI turns them on.
+option(CURIA_GUI_TESTS "Register the tests that open a window (app_smoke*, app_idle*)" OFF)
 
 include(CTest)
 

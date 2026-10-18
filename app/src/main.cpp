@@ -10,6 +10,7 @@
 #include "core/headless_chat.h"
 #include "core/watch_log.h"
 #include "headless/headless_modes.h"
+#include "ui/hotkey.h"
 
 int main(int argc, char** argv) {
     curia::CliOptions options;
@@ -26,6 +27,10 @@ int main(int argc, char** argv) {
     if (options.showVersion) {
         std::printf("%s\n", curia::buildInfoJson().c_str());
         return 0;
+    }
+    if (options.selftestHotkey) {
+        return curia::ui::runHotKeySelfTest();  // no window (macOS; the parser refuses it
+                                                // elsewhere)
     }
     // Headless: must run before runApp, which initialises SDL and opens a window.
     if (!options.watchLogPath.empty()) {

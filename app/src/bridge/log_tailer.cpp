@@ -72,7 +72,7 @@ LogTailer::LogTailer(std::unique_ptr<IFileSource> source, Options options)
     : source_(std::move(source)), options_(options), attachAtEnd_(!options.fromStart) {}
 
 TailerStats LogTailer::stats() const noexcept {
-    return {offset_, totalBytes_, curiaBytes_, truncations_};
+    return {offset_, totalBytes_, curiaBytes_, truncations_, lifetimeBytes_, lifetimeCuriaBytes_};
 }
 
 void LogTailer::onTruncation(PollResult& result) {
@@ -101,10 +101,13 @@ bool LogTailer::readAppended(std::uint64_t size, PollResult& result) {
         }
         offset_ += chunk.size();
         totalBytes_ += chunk.size();
+        lifetimeBytes_ += chunk.size();
         result.bytesRead += chunk.size();
         const std::uint64_t curiaBefore = pipeline_.curiaLineBytes();
         std::vector<Event> events = pipeline_.feed(chunk);
-        curiaBytes_ += pipeline_.curiaLineBytes() - curiaBefore;
+        const std::uint64_t curiaAdded = pipeline_.curiaLineBytes() - curiaBefore;
+        curiaBytes_ += curiaAdded;
+        lifetimeCuriaBytes_ += curiaAdded;
         result.events.insert(result.events.end(), std::make_move_iterator(events.begin()),
                              std::make_move_iterator(events.end()));
     }

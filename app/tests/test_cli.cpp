@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #include <doctest/doctest.h>
 
+#include <ostream>  // doctest prints std::string_view through operator<< (MSVC needs the header)
 #include <string>
 #include <string_view>
 #include <vector>
@@ -12,6 +13,13 @@ namespace {
 bool parse(std::vector<const char*> args, curia::CliOptions& out, std::string& error) {
     args.insert(args.begin(), "curia");
     return curia::parseCli(static_cast<int>(args.size()), args.data(), out, error);
+}
+
+// As on an OS with (macOS) or without (Windows, Linux) the overlay panel.
+bool parseOn(bool panel, std::vector<const char*> args, curia::CliOptions& out,
+             std::string& error) {
+    args.insert(args.begin(), "curia");
+    return curia::parseCli(static_cast<int>(args.size()), args.data(), out, error, panel);
 }
 
 }  // namespace
@@ -360,4 +368,114 @@ TEST_CASE("--smoke-scene picks what --smoke draws") {
     CHECK_FALSE(parse({"--smoke-scene", "notices"}, options, error));
     CHECK(error.find("--smoke") != std::string::npos);
     CHECK_FALSE(parse({"--idle-test", "3", "--smoke-scene", "start"}, options, error));
+}
+
+TEST_CASE("--window: the overlay panel is the default where it exists") {
+    using curia::OverlayFocus;
+    using curia::WindowKind;
+    curia::CliOptions options;
+    std::string error;
+    // macOS: the panel, made the key window when it is opened.
+    CHECK(parseOn(true, {}, options, error));
+    CHECK((options.window == WindowKind::Overlay));
+    CHECK(options.usesPanel());
+    CHECK_FALSE(options.windowGiven);
+    CHECK((options.overlayFocus == OverlayFocus::Key));
+    CHECK(parseOn(true, {"--window", "plain"}, options, error));
+    CHECK((options.window == WindowKind::Plain));
+    CHECK(options.windowGiven);
+    CHECK(parseOn(true, {"--window", "overlay", "--log", "d.log"}, options, error));
+    CHECK((options.window == WindowKind::Overlay));
+    // Windows and Linux: the normal window, and asking for the panel is a usage error.
+    CHECK(parseOn(false, {}, options, error));
+    CHECK((options.window == WindowKind::Plain));
+    CHECK_FALSE(options.usesPanel());
+    CHECK(parseOn(false, {"--window", "plain"}, options, error));
+    CHECK_FALSE(parseOn(false, {"--window", "overlay"}, options, error));
+    CHECK(error.find("macOS") != std::string::npos);
+    // Bad values, and other modes.
+    for (const char* bad : {"Overlay", "", "panel"}) {
+        CAPTURE(bad);
+        CHECK_FALSE(parseOn(true, {"--window", bad}, options, error));
+        CHECK(error.find("--window") != std::string::npos);
+    }
+    CHECK_FALSE(parseOn(true, {"--window"}, options, error));
+    CHECK_FALSE(parseOn(true, {"--smoke", "--window", "plain"}, options, error));
+    CHECK_FALSE(parseOn(true, {"--idle-test", "3", "--window", "overlay"}, options, error));
+    CHECK_FALSE(
+        parseOn(true, {"--headless-chat", "--log", "d.log", "--window", "plain"}, options, error));
+}
+
+TEST_CASE("--overlay-focus: the overlay panel of the chat window only") {
+    using curia::OverlayFocus;
+    curia::CliOptions options;
+    std::string error;
+    CHECK(parseOn(true, {"--overlay-focus", "click"}, options, error));
+    CHECK((options.overlayFocus == OverlayFocus::Click));
+    CHECK(options.overlayFocusGiven);
+    CHECK(parseOn(true, {"--overlay-focus", "activate", "--window", "overlay"}, options, error));
+    CHECK((options.overlayFocus == OverlayFocus::Activate));
+    CHECK(parseOn(true, {"--overlay-focus", "key"}, options, error));
+    CHECK((options.overlayFocus == OverlayFocus::Key));
+    for (const char* bad : {"Key", "", "none", "keys"}) {
+        CAPTURE(bad);
+        CHECK_FALSE(parseOn(true, {"--overlay-focus", bad}, options, error));
+        CHECK(error.find("--overlay-focus") != std::string::npos);
+    }
+    CHECK_FALSE(parseOn(true, {"--overlay-focus"}, options, error));
+    // Not with the plain window, not in another mode, not where the panel does not exist.
+    CHECK_FALSE(parseOn(true, {"--window", "plain", "--overlay-focus", "key"}, options, error));
+    CHECK(error.find("--window plain") != std::string::npos);
+    CHECK_FALSE(parseOn(true, {"--smoke", "--overlay-focus", "click"}, options, error));
+    CHECK_FALSE(parseOn(true, {"--idle-test", "2", "--overlay-focus", "click"}, options, error));
+    CHECK_FALSE(parseOn(false, {"--overlay-focus", "click"}, options, error));
+    CHECK(error.find("macOS") != std::string::npos);
+}
+
+TEST_CASE("--overlay draws --smoke and --idle-test in the panel, asking for no keys") {
+    using curia::OverlayFocus;
+    using curia::WindowKind;
+    curia::CliOptions options;
+    std::string error;
+    CHECK(parseOn(true, {"--smoke"}, options, error));
+    CHECK((options.window == WindowKind::Plain));
+    CHECK(parseOn(true,
+                  {"--smoke", "--overlay", "--screenshot", "s.bmp", "--window-size", "380x520"},
+                  options, error));
+    CHECK(options.overlay);
+    CHECK(options.usesPanel());
+    CHECK((options.overlayFocus == OverlayFocus::Click));
+    CHECK(parseOn(true, {"--overlay", "--idle-test", "3"}, options, error));
+    CHECK(options.usesPanel());
+    CHECK((options.overlayFocus == OverlayFocus::Click));
+    CHECK(parseOn(true, {"--idle-test", "3"}, options, error));
+    CHECK_FALSE(options.usesPanel());
+    // Only with the two test modes, and only where the panel exists.
+    CHECK_FALSE(parseOn(true, {"--overlay"}, options, error));
+    CHECK(error.find("--overlay needs --smoke or --idle-test") != std::string::npos);
+    CHECK_FALSE(parseOn(true, {"--watch-log", "a.log", "--overlay"}, options, error));
+    CHECK_FALSE(parseOn(false, {"--smoke", "--overlay"}, options, error));
+    CHECK(error.find("macOS") != std::string::npos);
+    CHECK(curia::cliUsage().find("--overlay-focus") != std::string_view::npos);
+    CHECK(curia::cliUsage().find("--window overlay|plain") != std::string_view::npos);
+}
+
+TEST_CASE("--selftest-hotkey is a mode of its own, on macOS") {
+    curia::CliOptions options;
+    std::string error;
+    CHECK(parseOn(true, {"--selftest-hotkey"}, options, error));
+    CHECK(options.selftestHotkey);
+    CHECK_FALSE(options.windowMode());
+    CHECK_FALSE(options.usesPanel());
+    CHECK_FALSE(parseOn(false, {"--selftest-hotkey"}, options, error));
+    CHECK_FALSE(parseOn(true, {"--selftest-hotkey", "--smoke"}, options, error));
+    CHECK_FALSE(parseOn(true, {"--selftest-hotkey", "--log", "d.log"}, options, error));
+}
+
+TEST_CASE("the window kind and the focus mode have short names for the app log") {
+    CHECK(std::string_view(curia::toString(curia::WindowKind::Overlay)) == "overlay");
+    CHECK(std::string_view(curia::toString(curia::WindowKind::Plain)) == "plain");
+    CHECK(std::string_view(curia::toString(curia::OverlayFocus::Key)) == "key");
+    CHECK(std::string_view(curia::toString(curia::OverlayFocus::Click)) == "click");
+    CHECK(std::string_view(curia::toString(curia::OverlayFocus::Activate)) == "activate");
 }

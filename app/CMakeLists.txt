@@ -1,6 +1,13 @@
 # SPDX-License-Identifier: MIT
 find_package(nlohmann_json CONFIG REQUIRED)
 
+# Every test runs with HOME set to an empty folder in the build tree (owner decision D26): a default
+# path in the app, a test or a tool then cannot reach the real home folder (Curia's app log, CK3's
+# folder, the results folders), whoever runs ctest. Set on the doctest cases where they are
+# discovered and on every other test at the end of this file.
+set(CURIA_TEST_HOME ${CMAKE_CURRENT_BINARY_DIR}/test-home)
+file(MAKE_DIRECTORY ${CURIA_TEST_HOME})
+
 # --- shared compile settings -------------------------------------------------
 function(curia_configure_target target)
     if(MSVC)
@@ -25,7 +32,7 @@ endfunction()
 if(WIN32)
     set(CURIA_PLATFORM_SOURCES src/platform/win/platform_win.cpp)
 elseif(APPLE)
-    set(CURIA_PLATFORM_SOURCES src/platform/mac/platform_mac.cpp)
+    set(CURIA_PLATFORM_SOURCES src/platform/mac/platform_mac.mm)
 else()
     set(CURIA_PLATFORM_SOURCES src/platform/linux/platform_linux.cpp)
 endif()
@@ -64,6 +71,7 @@ add_library(curia_core STATIC
     src/core/check_api_report.cpp
     src/core/cli.cpp
     src/core/dev_config.cpp
+    src/core/game_poll.cpp
     src/core/headless_chat.cpp
     src/core/headless_commands.cpp
     src/core/json_lines.cpp
@@ -81,6 +89,8 @@ add_library(curia_core STATIC
     src/providers/anthropic_stream.cpp
     src/providers/chat_error.cpp
     src/providers/provider_util.cpp
+    src/platform/game_window.cpp
+    src/platform/placement.cpp
     ${CURIA_PLATFORM_SOURCES})
 target_include_directories(curia_core PUBLIC src ${CMAKE_CURRENT_BINARY_DIR}/generated)
 find_package(Threads REQUIRED)
@@ -88,6 +98,11 @@ target_link_libraries(curia_core PUBLIC nlohmann_json::nlohmann_json Threads::Th
 # Public, so that the tests see the same value the library was built with (they branch on it).
 if(CURIA_ENABLE_DEV_ENV)
     target_compile_definitions(curia_core PUBLIC CURIA_ENABLE_DEV_ENV=1)
+endif()
+if(APPLE)
+    # platform/mac/platform_mac.mm: NSWorkspace (is CK3 running, in front) and the window list.
+    target_compile_options(curia_core PRIVATE $<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>)
+    target_link_libraries(curia_core PUBLIC "-framework AppKit" "-framework CoreGraphics")
 endif()
 curia_configure_target(curia_core)
 
@@ -173,12 +188,50 @@ if(CURIA_BUILD_APP)
         src/app.cpp
         src/ui/chat_view.cpp
         src/ui/chat_window.cpp
+        src/ui/overlay_plain.cpp
         src/ui/sdl_renderer_backend.cpp
         src/ui/smoke_run.cpp
         src/ui/theme.cpp
+        src/ui/tray.cpp
         ${CURIA_EMBEDDED_FONTS})
     target_link_libraries(curia PRIVATE curia_core curia_headless SDL3::SDL3 imgui::imgui)
+    if(APPLE)
+        # The overlay panel and the Carbon hot key (Objective-C++, ARC).
+        target_sources(curia PRIVATE src/ui/overlay_mac.mm src/ui/hotkey_mac.mm)
+        target_compile_options(curia PRIVATE $<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>)
+        target_link_libraries(curia PRIVATE "-framework AppKit" "-framework Carbon")
+    else()
+        target_sources(curia PRIVATE src/ui/hotkey_none.cpp)
+    endif()
     curia_configure_target(curia)
+
+    if(APPLE)
+        # Curia.app next to the plain binary (which stays where it is for ctest, the CI artefacts
+        # and the README's commands): Contents/MacOS/curia is a copy of it, Contents/Info.plist
+        # comes from resources/macos/Info.plist.in (LSUIElement: no Dock icon), and an ad-hoc
+        # signature over the whole bundle binds the Info.plist to it. Start it with
+        # `open build/<preset>/app/Curia.app` (README.md). The bundle's files are the outputs of
+        # their own step (target curia_app, built by default), so a new binary, a changed
+        # Info.plist.in or a deleted or damaged bundle is rebuilt by the next build.
+        set(CURIA_APP_BUNDLE ${CMAKE_CURRENT_BINARY_DIR}/Curia.app)
+        set(CURIA_APP_PLIST ${CMAKE_CURRENT_BINARY_DIR}/generated/Curia-Info.plist)
+        configure_file(resources/macos/Info.plist.in ${CURIA_APP_PLIST} @ONLY)
+        add_custom_command(
+            OUTPUT ${CURIA_APP_BUNDLE}/Contents/MacOS/curia
+                   ${CURIA_APP_BUNDLE}/Contents/Info.plist
+                   ${CURIA_APP_BUNDLE}/Contents/_CodeSignature/CodeResources
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${CURIA_APP_BUNDLE}/Contents/MacOS
+            COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:curia> ${CURIA_APP_BUNDLE}/Contents/MacOS/curia
+            COMMAND ${CMAKE_COMMAND} -E copy ${CURIA_APP_PLIST} ${CURIA_APP_BUNDLE}/Contents/Info.plist
+            COMMAND codesign --force --sign - ${CURIA_APP_BUNDLE}
+            DEPENDS curia ${CURIA_APP_PLIST}
+            COMMENT "Assembling and ad-hoc signing Curia.app"
+            VERBATIM)
+        add_custom_target(curia_app ALL
+            DEPENDS ${CURIA_APP_BUNDLE}/Contents/MacOS/curia
+                    ${CURIA_APP_BUNDLE}/Contents/Info.plist
+                    ${CURIA_APP_BUNDLE}/Contents/_CodeSignature/CodeResources)
+    endif()
 
     # Small tool used by CI to prove TLS works with the chosen libcurl configuration (milestone M1, A16).
     add_executable(curia_https_smoke tools/https_smoke.cpp)
@@ -191,22 +244,54 @@ if(CURIA_BUILD_APP)
     add_test(NAME https_smoke_default_ca COMMAND curia_https_smoke --default-ca)
     set_tests_properties(https_smoke_default_ca PROPERTIES LABELS netinfo TIMEOUT 60)
 
-    # Smoke test: the chat window with a canned conversation and a scripted answer (no network, no
-    # key, no game), the bundled font checked for every character shown, the last frame saved as a
-    # BMP file; then exit (software renderer, no GPU needed). Pass/fail is the process exit code.
-    add_test(NAME app_smoke COMMAND curia --smoke --screenshot ${CMAKE_CURRENT_BINARY_DIR}/app_smoke.bmp)
-    set_tests_properties(app_smoke PROPERTIES LABELS smoke TIMEOUT 60)
-    # The same window with its notices over the conversation, and before anything came from the
-    # game (--smoke-scene): the layouts the screenshots of a UI change are taken from.
-    add_test(NAME app_smoke_notices COMMAND curia --smoke --smoke-scene notices)
-    add_test(NAME app_smoke_start COMMAND curia --smoke --smoke-scene start)
-    set_tests_properties(app_smoke_notices app_smoke_start PROPERTIES LABELS smoke TIMEOUT 60)
+    # The tests that open a window (CURIA_GUI_TESTS, off unless asked for; CI turns it on). A
+    # window can become the active one and take the keyboard while the test runs, so they never run
+    # on a machine where someone is typing unless that person starts them (owner decision
+    # 2026-10-18). Configure with -DCURIA_GUI_TESTS=ON to run them, and do not type or move the
+    # mouse while they run.
+    if(CURIA_GUI_TESTS)
+        # Smoke test: the chat window with a canned conversation and a scripted answer (no
+        # network, no key, no game), the bundled font checked for every character shown, the last
+        # frame saved as a BMP file; then exit (software renderer, no GPU needed). Pass/fail is the
+        # process exit code.
+        add_test(NAME app_smoke COMMAND curia --smoke --screenshot ${CMAKE_CURRENT_BINARY_DIR}/app_smoke.bmp)
+        set_tests_properties(app_smoke PROPERTIES LABELS smoke TIMEOUT 60)
+        # The same window with its notices over the conversation, and before anything came from
+        # the game (--smoke-scene): the layouts the screenshots of a UI change are taken from.
+        add_test(NAME app_smoke_notices COMMAND curia --smoke --smoke-scene notices)
+        add_test(NAME app_smoke_start COMMAND curia --smoke --smoke-scene start)
+        set_tests_properties(app_smoke_notices app_smoke_start PROPERTIES LABELS smoke TIMEOUT 60)
 
-    # Idle test: the event loop must not draw frames while nothing happens (needs a display; the
-    # software renderer avoids needing a GPU). Do not move the mouse over the window while it runs.
-    add_test(NAME app_idle COMMAND curia --idle-test 5)
-    set_tests_properties(app_idle PROPERTIES LABELS idle TIMEOUT 90
-                         ENVIRONMENT "SDL_RENDER_DRIVER=software")
+        # Idle test: the event loop must not draw frames while nothing happens (needs a display;
+        # the software renderer avoids needing a GPU). Do not move the mouse over the window while
+        # it runs.
+        add_test(NAME app_idle COMMAND curia --idle-test 5)
+        set_tests_properties(app_idle PROPERTIES LABELS idle TIMEOUT 90
+                             ENVIRONMENT "SDL_RENDER_DRIVER=software")
+    endif()
+
+    if(APPLE AND CURIA_GUI_TESTS)
+        # The same canned conversation in the overlay panel (the macOS recipe of M2: a wrapped
+        # non-activating NSPanel at the screen-saver level). It asks for no keys itself, but the
+        # launch can make it the active app with the panel key.
+        add_test(NAME app_smoke_overlay
+                 COMMAND curia --smoke --overlay --screenshot ${CMAKE_CURRENT_BINARY_DIR}/app_smoke_overlay.bmp)
+        set_tests_properties(app_smoke_overlay PROPERTIES LABELS smoke TIMEOUT 60)
+        # The idle test in the panel: nothing is drawn while nothing happens there either.
+        add_test(NAME app_idle_overlay COMMAND curia --idle-test 5 --overlay)
+        set_tests_properties(app_idle_overlay PROPERTIES LABELS idle TIMEOUT 90
+                             ENVIRONMENT "SDL_RENDER_DRIVER=software")
+    endif()
+
+    if(APPLE)
+        # The hot key's handler and its static storage, without a window and without taking the
+        # key: a synthetic press after the installing function returned must reach the SDL queue
+        # once, and nothing after the handler is removed (the M2 probe once crashed on a callback
+        # that outlived what it pointed at).
+        add_test(NAME app_hotkey_selftest COMMAND curia --selftest-hotkey)
+        set_tests_properties(app_hotkey_selftest PROPERTIES LABELS smoke TIMEOUT 30
+                             PASS_REGULAR_EXPRESSION "CURIA_SELFTEST_OK")
+    endif()
 
     if(APPLE)
         # The M2 overlay probe: an app bundle (launched with `open`, see docs/spikes/m2-checklist.md).
@@ -291,6 +376,8 @@ if(CURIA_BUILD_TESTS)
         tests/test_log_watcher.cpp
         tests/test_mailbox.cpp
         tests/test_platform.cpp
+        tests/test_platform_game_window.cpp
+        tests/test_platform_placement.cpp
         tests/test_provider_types.cpp
         tests/test_sse_parser.cpp
         tests/test_watch_log.cpp
@@ -313,7 +400,7 @@ if(CURIA_BUILD_TESTS)
         CURIA_GOLDEN_DIR="${PROJECT_SOURCE_DIR}/tests/golden")
     curia_configure_target(curia_tests)
     include(doctest)
-    doctest_discover_tests(curia_tests PROPERTIES LABELS unit)
+    doctest_discover_tests(curia_tests PROPERTIES LABELS unit ENVIRONMENT "HOME=${CURIA_TEST_HOME}")
 
     # The fuzz entry point (fuzz/fuzz_bridge.cpp) behind a plain main(): replays the fixtures and the
     # seed corpus without libFuzzer, on every platform and compiler.
@@ -355,7 +442,7 @@ if(CURIA_BUILD_APP AND CURIA_BUILD_TESTS)
         http_tests/test_transport_error.cpp)
     target_link_libraries(curia_http_tests PRIVATE curia_http doctest::doctest)
     curia_configure_target(curia_http_tests)
-    doctest_discover_tests(curia_http_tests PROPERTIES LABELS unit)
+    doctest_discover_tests(curia_http_tests PROPERTIES LABELS unit ENVIRONMENT "HOME=${CURIA_TEST_HOME}")
 
     if(Python3_Interpreter_FOUND)
         # fake CK3 -> curia --watch-log -> golden events. The chain with the mock LLM is chat_e2e below.
@@ -395,4 +482,20 @@ if(CURIA_BUILD_APP AND CURIA_BUILD_TESTS)
     else()
         message(STATUS "Python 3 not found: the end-to-end tests e2e_fake_ck3, provider_mock, chat_e2e and e2e_secrecy are not registered")
     endif()
+endif()
+
+# The test home (CURIA_TEST_HOME, top of this file) on every test registered with add_test above.
+# The variables that name other folders under the real home are removed, and pyenv keeps finding
+# its Pythons (its shims look under HOME unless PYENV_ROOT says where they are).
+get_property(curia_added_tests DIRECTORY PROPERTY TESTS)
+if(curia_added_tests)
+    set(curia_test_environment "HOME=${CURIA_TEST_HOME}")
+    if(DEFINED ENV{PYENV_ROOT})
+        list(APPEND curia_test_environment "PYENV_ROOT=$ENV{PYENV_ROOT}")
+    elseif(DEFINED ENV{HOME} AND IS_DIRECTORY "$ENV{HOME}/.pyenv")
+        list(APPEND curia_test_environment "PYENV_ROOT=$ENV{HOME}/.pyenv")
+    endif()
+    set_property(TEST ${curia_added_tests} APPEND PROPERTY ENVIRONMENT ${curia_test_environment})
+    set_property(TEST ${curia_added_tests} APPEND PROPERTY ENVIRONMENT_MODIFICATION
+                 XDG_CONFIG_HOME=unset: XDG_DATA_HOME=unset: XDG_STATE_HOME=unset: XDG_CACHE_HOME=unset:)
 endif()

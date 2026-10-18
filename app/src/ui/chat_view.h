@@ -26,6 +26,8 @@ struct ChatActions {
     // Stop was clicked, or Cmd+. pressed on macOS.
     bool stop = false;
     bool retry = false;
+    // Esc was pressed: hide the overlay (the typed text stays in the box).
+    bool hide = false;
     // Copy was clicked on the answer of this transcript entry.
     std::optional<std::size_t> copy;
 };
