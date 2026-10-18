@@ -230,7 +230,10 @@ struct StreamState {
                  {"connect_ms", result.timings.connectMs},
                  {"first_byte_ms", result.timings.firstByteMs},
                  {"total_ms", result.timings.totalMs},
-                 {"tls_retry", result.tlsRetried}});
+                 {"tls_retry", result.tlsRetried},
+                 {"http", httpVersionWord(result.httpVersion)},
+                 {"connects", result.newConnections},
+                 {"conn", toString(result.connection)}});
         if (onNet && !muted()) {
             NetSummary summary;
             summary.httpStatus = result.httpStatus;
@@ -380,11 +383,13 @@ void AnthropicProvider::streamChat(const ChatRequest& request, StreamHandlers ha
         return;
     }
 
+    // The auth word last: the redaction's header shape takes the word after "bearer " for a token,
+    // so a field after it would be logged as "[redacted]".
     state->logLine(AppLog::Level::Info, "chat_request",
                    {{"body_bytes", built.body.size()},
                     {"messages", request.conversation.size()},
-                    {"auth", options_.auth == AuthStyle::Bearer ? "bearer" : "x-api-key"},
-                    {"test_endpoint", endpoint_.isTest}});
+                    {"test_endpoint", endpoint_.isTest},
+                    {"auth", options_.auth == AuthStyle::Bearer ? "bearer" : "x-api-key"}});
 
     Request outgoing;
     outgoing.url = endpoint_.url;

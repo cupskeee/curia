@@ -156,6 +156,12 @@ public:
         if (watcher_ != nullptr) {
             watcher_->stop();
         }
+        if (controller_ != nullptr) {
+            // As the chat window does: the last byte counts and the end of the run (log_bytes).
+            controller_->logByteCountsAtExit(
+                watcher_ != nullptr ? std::optional<bridge::TailerStats>(watcher_->stats())
+                                    : std::nullopt);
+        }
         result.inputStillBlocked = finishReader();
         return result;
     }

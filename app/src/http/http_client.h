@@ -54,6 +54,31 @@ enum class End {
     Refused,
 };
 
+// What became of a transfer's connection, as far as the client can tell (the app log's net_done
+// conn=). libcurl 8.22 (lib/multi.c, multi_conn_should_close) closes the connection of a transfer
+// that ends before it is complete ("premature": the client removed it, or a callback stopped it)
+// unless the connection is multiplexed (HTTP/2 or 3), and decides by itself otherwise.
+enum class ConnectionEnd : std::uint8_t {
+    // No transfer was started (refused, cancelled before it started): no connection.
+    None,
+    // Ended early on a connection that is not multiplexed (HTTP/1.x, the only kind this build's
+    // libcurl speaks: no HTTP/2 support is built in): libcurl closed it. The cancel and the stall
+    // guard end this way, and so does the client's destructor.
+    Closed,
+    // Ended early on a multiplexed connection: libcurl reset the stream; the connection may stay
+    // open for other transfers.
+    StreamReset,
+    // libcurl completed the transfer (successfully or with an error of its own) and kept the
+    // connection for reuse or closed it; the client does not see which.
+    Released,
+};
+
+const char* toString(ConnectionEnd end) noexcept;
+
+// The HTTP version of a response as a word for the app log: "1.0", "1.1", "2", "3", or "none"
+// (no response arrived). `version` is libcurl's CURLINFO_HTTP_VERSION value.
+const char* httpVersionWord(long version) noexcept;
+
 struct Timings {
     // Milliseconds from the start of the request; -1 when that point was never reached.
     std::int64_t connectMs = -1;
@@ -87,6 +112,12 @@ struct Result {
     // The first attempt failed with a certificate-trust error and the retry with a located CA
     // bundle was made (the result is that of the retry).
     bool tlsRetried = false;
+    ConnectionEnd connection = ConnectionEnd::None;
+    // CURLINFO_HTTP_VERSION of the response (0 = none arrived); see httpVersionWord().
+    long httpVersion = 0;
+    // New connections libcurl made for this transfer (CURLINFO_NUM_CONNECTS): 0 means it reused a
+    // connection kept from an earlier request of this client.
+    long newConnections = 0;
 };
 
 // All three run on the client's net thread and must not throw (an exception is caught and ends the

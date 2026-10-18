@@ -642,6 +642,11 @@ class ProviderMockTest(unittest.TestCase):
                 time.sleep(0.4)
                 self.assertEqual(mock.records()[0]["events_sent"], sent)
                 self.assertLess(record["t_close"] - record["t_headers_done"], 10)
+                # The app log says so in words (net_done), the evidence the owner's sitting reads.
+                log = run.log_text()
+                self.assertIn("outcome=cancelled", log)
+                self.assertIn("conn=closed", log)
+                self.assertIn("http=1.1", log)
 
     def test_cancel_after_time_closes_the_socket(self) -> None:
         mock = self.start_mock()
@@ -765,6 +770,13 @@ class ProviderMockTest(unittest.TestCase):
         log = run.log_text()
         for event in ("chat_request", "net_done", "chat_done"):
             self.assertIn(event, log)
+        # Every field survives the redaction (none is mistaken for a token after "bearer").
+        self.assertIn("test_endpoint=true auth=bearer", log)
+        self.assertNotIn("[redacted]", log)
+        # A completed answer leaves the connection to libcurl (kept for the next request).
+        self.assertIn("conn=released", log)
+        self.assertIn("http=1.1", log)
+        self.assertIn("connects=1", log)
         for text in ("PROMPT-MARKER-0815", "PERSONA-MARKER", "gold: 77", "Test answer", "mock:"):
             self.assertNotIn(text, log)
         self.assertNotIn("Bearer", log)

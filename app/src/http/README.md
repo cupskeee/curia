@@ -34,7 +34,13 @@ keep building without it.
 - No verbose, debug or trace option and no verification switch is used anywhere
   (`tools/ci/check_source_rules.sh` fails on them).
 - Cancel: the `CancelToken`'s waker wakes the net thread, which removes the transfer and closes the
-  connection before it reports `End::Cancelled`. The waker is the same for every request of a client
+  connection before it reports `End::Cancelled`. `Result::connection` says what became of the
+  connection (the app log's `net_done conn=`, with `http=` the response's HTTP version and
+  `connects=` the new connections the transfer made): `closed` for a transfer removed before its end
+  (a cancel, the stall guard, the destructor) on an HTTP/1.x connection, which libcurl 8.22 closes
+  (`lib/multi.c`; this build's libcurl has no HTTP/2), `stream_reset` for the same on a multiplexed
+  one, `released` when libcurl completed the transfer and decided by itself, `none` when no
+  transfer started. The waker is the same for every request of a client
   and stays on the token, so one token may be shared by several requests of one client. The
   destructor ends everything in flight the same way (`End::Shutdown`), joins the thread, and no
   callback runs after it returns.

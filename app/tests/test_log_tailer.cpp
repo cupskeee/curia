@@ -239,6 +239,31 @@ TEST_CASE("tailer: counts total bytes and bytes of Curia lines, both reset by a 
     CHECK(rig.tailer->stats().curiaBytes == 0);
 }
 
+TEST_CASE("tailer: the lifetime counts keep what was read before a truncation") {
+    Rig rig(false, "history that is never read\n");
+    rig.tailer->poll();
+    CHECK(rig.tailer->stats().lifetimeBytes == 0);  // attached at the end: nothing read yet
+    const std::string noiseLine = prefixedLine("hand written noise without the marker");
+    const std::string frame = exampleFrameText(13);
+    rig.file->append(noiseLine + frame);
+    rig.tailer->poll();
+    const std::uint64_t firstRun = noiseLine.size() + frame.size();
+    CHECK(rig.tailer->stats().lifetimeBytes == firstRun);
+    CHECK(rig.tailer->stats().lifetimeCuriaBytes == frame.size());
+
+    rig.file->truncate();
+    rig.file->append(noiseLine);
+    rig.tailer->poll();
+    rig.file->append(frame);
+    rig.tailer->poll();
+    const TailerStats stats = rig.tailer->stats();
+    CHECK(stats.totalBytes == noiseLine.size() + frame.size());
+    CHECK(stats.curiaBytes == frame.size());
+    CHECK(stats.lifetimeBytes == firstRun + noiseLine.size() + frame.size());
+    CHECK(stats.lifetimeCuriaBytes == 2 * frame.size());
+    CHECK(stats.truncations == 1);
+}
+
 TEST_CASE("tailer: the events do not depend on how the file grows (all fixtures)") {
     for (const std::string& name : fixtureNames()) {
         CAPTURE(name);

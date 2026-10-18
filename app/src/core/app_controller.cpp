@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 #include "core/app_controller.h"
 
+#include <array>
+#include <cstdio>
 #include <initializer_list>
 #include <utility>
 #include <variant>
@@ -40,6 +42,15 @@ advisor::ChatSession::Options sessionOptions(const AppController::Options& optio
     session.registry = options.registry;
     session.clock = options.clock;
     return session;
+}
+
+// The game date of a reading for the app log: "1071-11-14", the year with four digits, so that the
+// dates sort as text and a script reads them without a calendar.
+std::string logGameDate(const bridge::Date& date) {
+    std::array<char, 40> buffer{};
+    std::snprintf(buffer.data(), buffer.size(), "%04d-%02d-%02d", static_cast<int>(date.year),
+                  static_cast<int>(date.month), static_cast<int>(date.day));
+    return buffer.data();
 }
 
 }  // namespace
@@ -139,6 +150,7 @@ void AppController::onMessage(UiMessage message) {
             monitor_.logGrew();
         }
         lastTotalBytes_ = progress->stats.totalBytes;
+        latestStats_ = progress->stats;
     } else if (const auto* notice = std::get_if<LogNotice>(&message)) {
         handleLogNotice(notice->notice);
     } else if (const auto* running = std::get_if<Ck3RunningChanged>(&message)) {
@@ -197,12 +209,21 @@ void AppController::handleFrame(const bridge::FrameComplete& complete) {
     if (!session_.transcript().empty()) {
         session_.addDivider(dividerLabel(store_.frame()->date, update.dateWentBack));
     }
+    // The reading's number (the one ask_started names), the game date as game_date=YYYY-MM-DD and
+    // the treasury as the frame carries it (gold, income_tenths: the monthly-tick test compares
+    // income_tenths across a month boundary); "none" for a frame without its FIN section.
+    const std::optional<bridge::Finances>& fin = complete.frame.fin;
     log(AppLog::Level::Info, "frame_complete",
         {{"snap", snap},
          {"mode", mode},
          {"records", records},
          {"text_shortened", shortened},
-         {"snapshot_bytes", store_.text().size()}});
+         {"snapshot_bytes", store_.text().size()},
+         {"reading", store_.sequence()},
+         {"game_date", logGameDate(complete.frame.date)},
+         {"gold", fin.has_value() ? std::to_string(fin->gold) : std::string("none")},
+         {"income_tenths",
+          fin.has_value() ? std::to_string(fin->incomeTenths) : std::string("none")}});
     const SnapshotInfo info = makeInfo(update);
     if (observer_ != nullptr) {
         observer_->onSnapshotChanged(info);
@@ -259,7 +280,8 @@ void AppController::logAskStarted(advisor::AskOutcome outcome) {
          {"messages", info.conversationMessages},
          {"conversation_bytes", info.conversationBytes},
          {"snapshot_age_s", arrived.has_value() ? secondsBetween(*arrived, now) : 0},
-         {"unreadable", store_.unreadable()}});
+         {"unreadable", store_.unreadable()},
+         {"reading", store_.sequence()}});
 }
 
 advisor::AskOutcome AppController::onUserAsk(std::string_view text) {
@@ -289,6 +311,35 @@ void AppController::onOverlayOpened(OverlaySource source) {
 void AppController::onTick(TimePoint now) {
     monitor_.tick(now);
     refreshNotice();
+    if (latestStats_.lifetimeBytes != loggedLifetimeBytes_ &&
+        (!lastByteCountAt_.has_value() || now - *lastByteCountAt_ >= kByteCountInterval)) {
+        lastByteCountAt_ = now;
+        logByteCounts("minute");
+    }
+}
+
+void AppController::logByteCountsAtExit(const std::optional<bridge::TailerStats>& latest) {
+    if (latest.has_value() && latest->lifetimeBytes >= latestStats_.lifetimeBytes) {
+        latestStats_ = *latest;
+    }
+    logByteCounts("exit");
+}
+
+void AppController::logByteCounts(std::string_view why) {
+    // Cumulative since the watcher started (read, curia: across CK3's truncations at launch), and
+    // the running total since the last truncation (FR-BRG-5's lower bound on what the game wrote).
+    // The watcher itself drops no byte; what can be lost on the way is a message the mailbox's
+    // hard limit dropped (a reading among them), so its count goes on the line too. Written on the
+    // UI thread like every other line of the controller: one line of about 130 bytes a minute,
+    // accepted so that the watcher's callbacks keep doing nothing but push to the mailbox.
+    loggedLifetimeBytes_ = latestStats_.lifetimeBytes;
+    log(AppLog::Level::Info, "log_bytes",
+        {{"why", why},
+         {"read", latestStats_.lifetimeBytes},
+         {"curia", latestStats_.lifetimeCuriaBytes},
+         {"since_truncation", latestStats_.totalBytes},
+         {"truncations", latestStats_.truncations},
+         {"mailbox_dropped", mailbox_->dropped()}});
 }
 
 void AppController::onCk3Running(bool running) {
