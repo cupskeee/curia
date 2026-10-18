@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: MIT -->
 # M4 game sittings (owner, macOS, in the game): Sitting A about 1 hour, Sitting B about 15 minutes, S4 during normal play; about $2
 
-**Build from commit `<commit: filled in after the dev to main merge>`** (the merged `main`).
+**Build from commit `7b14f90`** (the merged `main`: the `dev` to `main` merge #44 of 2026-10-19, full CI green on Windows, macOS and Linux).
 
 Purpose: the first time Curia runs over the real game. You click Advisor in Crusader Kings III, the
 overlay opens, you ask your advisor and the answer streams in. Sitting A checks this with CK3 in
